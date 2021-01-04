@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>国際交流パーティー</title>
+        <link rel="stylesheet" href="css/main.css">
+        <!-- Bootstrap CSS -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+        <!-- その他のライブラリのCSS -->
+        <link rel="stylesheet" href="css/animate.css">
+    </head>
+
+    <body>
+        <!--ここからヘッダー-->
+        <header>
+
+
+            <nav class="navbar navbar-expand-sm navbar-light bg-primary">
+                <!-- ホームへ戻るリンク。ブランドロゴなどを置く。 -->
+                <a href="#" class="navbar-brand">
+                    <img src="image/logo.png" width="100%" height="100%" alt="logo">
+                </a>
+
+                <!-- 横幅が狭いときに出るハンバーガーボタン -->
+                <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#nav-bar">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- メニュー項目 -->
+                <div class="collapse navbar-collapse" id="nav-bar">
+                    <div class="button1">
+                    <ul class="navbar-nav">
+                        <li class="nav-item"><a href="#heading" class="nav-link">About us</a></li>
+                        <li class="nav-item"><a href="#comevent" class="nav-link">Event</a></li>
+                        <li class="nav-item dropdown">
+                            <a href="" class="nav-link dropdown-toggle" data-toggle="dropdown">Blog</a>
+                            <div class="dropdown-menu bg-primary">
+                                <a class="dropdown-item" href="#blog">Blog1</a>
+                                <a class="dropdown-item" href="#blog">Blog2</a>
+                                <a class="dropdown-item" href="#blog">Bolg3</a>
+                            </div>
+                        </li>
+                        <li class="nav-item1"><a href="inquiry/inquiry.html" target="_blank" class="nav-link">Inquiry</a></li>
+                    </ul>
+                    </div>
+                    <div class="button2">
+                        <button id="register" type="button" name="register" onclick="newwindowa()">Register</button>
+                        <button id="login" type="button" name="login" onclick="newwindowb()">Log in</button>
+                    </div>
+                </div>
+                
+            </nav>
+
+        </header>
+        <!--ヘッダーここまで-->
+
+
+
+        
+
+
+        <!--ここからメイン-->
+
+        <div class="main">
+            
+            <div class="carousel">
+                <ul class="slides">
+                    <li><img src="image/foreigner.jpeg" width="100%" height="100%" alt="Image 1">
+                        <p class="carouselp carouselp1 animated fadeInDown" data-animate="fadeInDownBig">
+                            友達を作ろう
+                        </p>
+                    </li>
+                    <li><img src="image/food.jpeg" width="100%" height="100%" alt="Image 2">
+                        <p class="carouselp carouselp2 animated" data-animate="fadeInDownBig">
+                            Let's bump into
+                        </p>
+                    </li>
+                    <li><img src="image/friend.jpeg" width="100%" height="100%" alt="Image 3">
+                        <p class="carouselp carouselp3 animated" data-animate="fadeInDownBig">
+                            異文化交流にも
+                        </p>
+                    </li>
+                    <li><img src="image/talk.jpeg" width="100%" height="100%" alt="Image 4">
+                        <p class="carouselp carouselp4 animated" data-animate="fadeInDownBig">
+                            語学勉強にも
+                        </p>
+                    </li>  
+                </ul>
+                <a href="#" class="carousel-control carousel-control-prev">&lt;</a>
+                <a href="#" class="carousel-control carousel-control-next">&gt;</a>
+            </div>
+
+　　　　　    <div class="serch-area">
+                <div class="choose-events">
+                    <label for="choose">エリア：</label>
+                    <select required>
+                        <option value="" hidden></option>
+                        <option value="1">Tokyo</option>
+                        <option value="2">Osaka</option>
+                        <option value="3">Nagoya</option>
+                        <option value="4">Yokohama</option>
+                        <option value="5">Kyoto</option>
+                    </select>
+                </div>
+                <div class="choose-events">
+                    <label for="choose">カテゴリー：</label>
+                    <select required>
+                        <option value="" hidden></option>
+                        <option value="1">土曜開催</option>
+                        <option value="2">日曜開催</option>
+                        <option value="3">飲み放題</option>
+                        <option value="4">女子割引</option>
+                        <option value="5">過半数外国人</option>
+                        <option value="6">男気</option>
+                    </select>
+                </div>
+                <button class="serch btn btn-secondary">
+                    <span>Search</span>
+                </button>
+            </div>
+
+        
+            <div class="heading" id="heading">
+                <h1>About us</h1>
+                <p class="headingp">
+                    外国人の友達が欲しい。外国語を話したい。海外が大好き。という人は多いはず。
+                    Bumpyは、外国人と気軽に交流できる場として、国際交流イベントを開催しています。
+                    日本にいながら海外にいるような気分を味わってみませんか?
+                </p>
+            </div>
+        
+        
+            <div class="comevent" id="comevent">
+                <h1>Upcoming event</h1>
+                <div class="coming-event">
+                    <ul class="events">
+                        <li class="event event1"><img src="image/tokyo.jpeg" width="100%" height="100%">
+                            <p class="eventp event1p1">
+                                Tokyo
+                            </p>
+                            <p class="eventp event1p2">
+                                ・2020/3/15<br>
+                                ・2020/4/12
+                            </p>
+                        </li>
+                        <li class="event event2"><img src="image/osaka.jpeg" width="100%" height="100%">
+                            <p class="eventp event2p1">
+                                Osaka
+                            </p>
+                            <p class="eventp event2p2">
+                                ・2020/4/4<br>
+                                ・2020/4/19
+                            </p>
+                        </li>
+                        <li class="event event3"><img src="image/nagoya.jpeg" width="100%" height="100%">
+                            <p class="eventp event3p1">
+                                Nagoya
+                            </p>
+                            <p class="eventp event3p2">
+                                ・2020/3/8
+                            </p>
+                        </li>
+                        <li class="event event4"><img src="image/yokohama.jpeg" width="100%" height="100%">
+                            <p class="eventp event4p1">
+                                Yokohama
+                            </p>
+                            <p class="eventp event4p2">
+                                ・2020/3/8<br>
+                                ・2020/4/19
+                            </p>
+                        </li>
+                        <li class="event event5"><img src="image/kyoto.jpeg" width="100%" height="100%">
+                            <p class="eventp event5p1">
+                                Kyoto
+                            </p>
+                            <p class="eventp event5p2">
+                                Planning:)
+                            </p>
+                        </li>
+                    </ul>
+                    <a class="event-control event-control-prev">&lt;</a>
+                    <a class="event-control event-control-next">&gt;</a>
+                </div>
+                <p class="comeventp">
+                    毎週末、主要都市でイベントを開催しております。
+                    気になるイベントがございましたら、お気軽にお問い合わせ下さい。
+                </p>
+            </div>
+
+
+
+            <div class="event-categories">
+                <h1>Event categories</h1>
+                <p class="categoriesp">
+                    私たちは参加者の意見をもとに、多種多様なイベントを開催しております。<br>
+                    あなたに合ったイベントがすぐに見つかります。
+                </p>
+                <div class="categories">
+                    <div class="category">
+                        <img class="animated animated1" src="image/saturday.jpeg" width="100%" height="100%">
+                        <p class="categoryp">土曜開催</p>
+                    </div>
+                    <div class="category">
+                        <img class="animated animated1" src="image/sunday.jpeg" width="100%" height="100%">
+                        <p class="categoryp">日曜開催</p>
+                    </div>
+                    <div class="category">
+                        <img class="animated animated1" src="image/all-drink.jpeg" width="100%" height="100%">
+                        <p class="categoryp">飲み放題</p>
+                    </div>
+                    <div class="category">
+                        <img class="animated animated1" src="image/girls.jpeg" width="100%" height="100%">
+                        <p class="categoryp">女子割引</p>
+                    </div>
+                    <div class="category">
+                        <img class="animated animated1" src="image/foreigner3.jpeg" width="100%" height="100%">
+                        <p class="categoryp">過半数外国人</p>
+                    </div>
+                    <div class="category">
+                        <img class="animated animated1" src="image/man.jpeg" width="100%" height="100%">
+                        <p class="categoryp">男気</p>
+                    </div>
+                </div>
+            </div>
+
+
+       
+            <div class="blog" id="blog">
+                <h1>Blog</h1>
+                <p　class="blogp">
+                    最近行ったイベントの様子をSNSで公開しております。
+                    ぜひ私たちをフォローをしていただき、イベントの様子をご覧ください。
+                </p>
+                <div class="sns twitter">
+                    <img class="animated animated1" src="image/twitter.jpeg" width="100%" height="100%">
+                    <p class="snsp">Blog1</p>
+                </div>
+                <div class="sns facebook">
+                    <img class="animated animated1" src="image/facebook.jpeg" width="100%" height="100%">
+                    <p class="snsp">Blog2</p>
+                </div>
+                <div class="sns instagram">
+                    <img class="animated animated1" src="image/instagram.jpeg" width="100%" height="100%">
+                    <p class="snsp">Blog3</p>
+                </div>
+            </div>
+
+
+        </div>
+
+       <!--ここまでメイン-->
+        
+        
+     
+        <!--ここからフッター-->
+        <footer>
+            <div id="footer_navi">
+                <p>
+                    ご不明点がございましたら、以下の連絡先にお気軽にご連絡ください。
+                    皆様のご参加をスタッフ一同心よりお待ちしております。
+                </p>
+                <ul>
+                    <li><a href="index.html">国際交流パーティー Bumpy</a></li>
+                    <li>代表：xxx xxxx</li>
+                    <li>Location：愛知県xxx市xxx区xxx xx-xxx</li>
+                    <li>TEL：xxx-xxxx-xxxx</li>
+                    <li>E-mail:xxxxxxxxx@cccc.xxx</li>
+                    <li>開催日：毎週末、祝日</li>
+                </ul>
+                <div class="icon">
+                    <i class="fab fa-facebook fa-2x"></i>
+                    <i class="fab fa-line fa-2x"></i>
+                    <i class="fab fa-instagram fa-2x"></i>
+                    <i class="fab fa-twitter fa-2x"></i>
+                </div>    
+            </div>
+            <small>&copy; Bumpy</small>
+        </footer>
+        <!--フッターここまで-->
+        
+        
+        
+        
+        
+        <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.6/umd/popper.min.js"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+        <!-- Font Awesome -->
+        <script defer src="https://use.fontawesome.com/releases/v5.7.2/js/all.js"></script>
+        <!-- jQuery -->
+        <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+        <!-- その他のライブラリのJavaScript -->
+        <script src="js/jquery.waypoints.min.js"></script>
+        <!-- Optional JavaScript -->
+        <script src="js/main.js"></script>
+        
+    </body>
+</html>
+
+
+
+
