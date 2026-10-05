@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Bumpy Tennis</title>
 <style>
-  :root { --ink: #1f2340; --accent: #ff5d73; --sub: #6b6f8f; --ball: #e8ff3a; }
+  :root { --ink: #1f2340; --accent: #ff5d73; --sub: #6b6f8f; --ball: #e8ff3a;
+    --top: #ff9f43; --slice: #4cc9f0; --flat: #f1f1f1; --lob: #c77dff; --drop: #80ed99; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #22304d; color: #fff;
     font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", "Yu Gothic", system-ui, sans-serif; }
@@ -23,27 +24,38 @@
   #topR { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
   #topR button, #topR a { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(15, 20, 40, .85);
     color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
-  #swing { position: absolute; right: 18px; bottom: 24px; width: 100px; height: 100px; border-radius: 50%; border: 0;
-    background: rgba(255, 93, 115, .92); color: #fff; font: inherit; font-weight: bold; font-size: 22px;
-    box-shadow: 0 5px 0 #c9384d; display: none; }
-  #swing:active { transform: translateY(3px); box-shadow: 0 2px 0 #c9384d; }
-  .coarse #swing { display: block; }
+  #shots { position: absolute; right: 12px; bottom: 18px; display: none; grid-template-columns: repeat(3, 74px); gap: 8px; }
+  .coarse #shots { display: grid; }
+  #shots button { height: 54px; border: 0; border-radius: 16px; font: inherit; font-weight: bold; font-size: 12px; color: var(--ink); white-space: nowrap; padding: 0;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, .35); touch-action: none; }
+  #shots button:active, #shots button.on { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .35); }
+  #shots .big { height: 70px; font-size: 14px; }
+  #shots [data-shot=top] { background: var(--top); grid-column: span 2; }
+  #shots [data-shot=slice] { background: var(--slice); }
+  #shots [data-shot=flat] { background: var(--flat); }
+  #shots [data-shot=lob] { background: var(--lob); }
+  #shots [data-shot=drop] { background: var(--drop); }
   .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px;
     background: rgba(20, 28, 50, .45); }
-  .card { background: #fff; color: var(--ink); border-radius: 18px; padding: 24px 22px; max-width: 440px; width: 100%;
+  .card { background: #fff; color: var(--ink); border-radius: 18px; padding: 22px 20px; max-width: 480px; width: 100%;
     text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); max-height: 100%; overflow: auto; }
   .card h2 { margin: 0 0 6px; font-size: 28px; }
   .card p { margin: 6px 0; line-height: 1.6; font-size: 14px; }
-  .card .how { text-align: left; background: #f6f3ee; border-radius: 12px; padding: 10px 14px; font-size: 13px; }
+  .card .how { text-align: left; background: #f6f3ee; border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+  .shotlist { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 6px 0; align-items: baseline; }
+  .shotlist .t { font-weight: bold; padding: 0 8px; border-radius: 6px; color: var(--ink); white-space: nowrap; font-size: 12px; }
+  .shotlist small { color: var(--sub); }
   .card .big { font-size: 46px; font-weight: bold; color: var(--accent); margin: 2px 0; }
   .btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
   .card button { font: inherit; font-weight: bold; font-size: 16px; border: 0; border-radius: 999px; padding: 11px 20px;
     background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 4px 0 #c9384d; }
   .card button.alt { background: #4a6fd1; box-shadow: 0 4px 0 #2f4ea3; }
-  .card button.gray { background: #8b8fa8; box-shadow: 0 4px 0 #666a82; }
+  .card button.dark { background: #2b2f4a; box-shadow: 0 4px 0 #111; }
   .card button:active { transform: translateY(3px); box-shadow: none; }
   .card label { font-size: 14px; display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; cursor: pointer; }
   .card a { color: var(--sub); font-size: 13px; }
+  .pc { display: inline; } .coarse .pc { display: none; }
+  .sp { display: none; } .coarse .sp { display: inline; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -58,26 +70,39 @@
     <button id="mute" title="サウンド">🔊</button>
     <a href="../index.html" title="ホームへ">🏠</a>
   </div>
-  <button id="swing">打つ!</button>
+  <div id="shots">
+    <button data-shot="lob">ロブ</button>
+    <button data-shot="drop">ドロップ</button>
+    <button data-shot="flat">フラット</button>
+    <button data-shot="slice" class="big">スライス</button>
+    <button data-shot="top" class="big">トップスピン</button>
+  </div>
 
   <div class="overlay" id="menu">
     <div class="card">
       <h2>🎾 Bumpy Tennis</h2>
       <p>CPU と 1 対 1 のテニス勝負！<b>3 ゲーム先取</b>で勝ち。</p>
       <div class="how">
-        <b>移動</b>：マウス / 指でドラッグ / 矢印キー・WASD<br>
-        <b>打つ</b>：クリック / スペースキー / 「打つ!」ボタン<br>
-        <b>サーブ</b>：1 回押すとトス、ボールが一番高いところでもう 1 回！<br>
-        <b>コツ</b>：ボールの真横で打つとナイスショット。左右に動きながら打つと、その方向へ飛ぶよ。高いボールはスマッシュ！
+        <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
+        <b>パワー</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。ためている間は動きが遅くなり、強く打つほどアウトしやすい。<br>
+        <b>サーブ</b>：1 回押してトス、一番高いところでもう 1 回。押したボタンで球種が変わる。
+        <div class="shotlist">
+          <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
+          <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>低く滑って横に曲がる。弾まない</small></span>
+          <span class="t" style="background:var(--flat)">フラット</span><span><span class="pc">C・L・ホイールクリック</span> <small>一番速い。でもミスしやすい</small></span>
+          <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">V・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
+          <span class="t" style="background:var(--drop)">ドロップ</span><span><span class="pc">B・O・Shift+右クリック</span> <small>ネット際にポトリ。後ろの相手に効く</small></span>
+        </div>
+        <b>コツ</b>：ボールの真横で打つとナイスショット。動きながら打つとその方向へ。高いボールはスマッシュ！
       </div>
-      <label><input type="checkbox" id="auto"> オートスイング（近くに来たら自動で打つ）</label>
-      <p style="margin-top:12px"><b>相手の強さを選んでスタート</b></p>
+      <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
+      <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
       <div class="btns">
         <button class="alt" data-level="easy">やさしい</button>
         <button data-level="normal">ふつう</button>
-        <button class="gray" data-level="hard" style="background:#2b2f4a;box-shadow:0 4px 0 #111">つよい</button>
+        <button class="dark" data-level="hard">つよい</button>
       </div>
-      <p style="margin-top:14px"><a href="index.html">🎉 Bumpy Party! であそぶ</a></p>
+      <p style="margin-top:12px"><a href="index.html">🎉 Bumpy Party! であそぶ</a></p>
     </div>
   </div>
 
@@ -99,11 +124,25 @@
   // ---------- court (meters) ----------
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
-  const PSPEED = 7, REACH = 1.6, SWING = 0.28;
+  const PSPEED = 7, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9;
+
+  // sf: extra "gravity" from spin (topspin dives, backspin floats)
+  // bz / bh: how much height / forward speed survives the bounce
+  // margin: how far above the net tape the shot aims to pass
+  const SHOTS = {
+    top:   { name: 'トップスピン', color: '#ff9f43', sf: .75, bz: .8,  bh: .93, margin: .9,  speed: [15, 28], err: .8 },
+    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.35, bz: .5, bh: .72, margin: .3,  speed: [13, 22], err: .7, curve: 2.2 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .68, bh: .86, margin: .12, speed: [18, 35], err: 1.3 },
+    lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .85, margin: 1.5, speed: [0, 0],   err: .6 },
+    drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
+  };
   const LEVELS = {
-    easy:   { name: 'やさしい', speed: 3.4, react: .35, reach: 1.2, err: .20, shot: [14, 18], noise: .8, serve: [.45, .9] },
-    normal: { name: 'ふつう',   speed: 4.4, react: .25, reach: 1.3, err: .11, shot: [17, 22], noise: .5, serve: [.55, 1] },
-    hard:   { name: 'つよい',   speed: 5.4, react: .15, reach: 1.45, err: .05, shot: [20, 26], noise: .25, serve: [.7, 1] },
+    easy:   { name: 'やさしい', speed: 3.4, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
+              mix: { top: 5, slice: 3, flat: 1 }, tactic: .2 },
+    normal: { name: 'ふつう',   speed: 4.4, react: .25, reach: 1.3,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
+              mix: { top: 5, slice: 3, flat: 2 }, tactic: .4 },
+    hard:   { name: 'つよい',   speed: 5.4, react: .15, reach: 1.45, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
+              mix: { top: 5, slice: 3, flat: 3 }, tactic: .6 },
   };
 
   const $ = id => document.getElementById(id);
@@ -151,49 +190,72 @@
       o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur + .02);
     } catch (e) {}
   }
-  const sHit = big => { tone(big ? 300 : 420, .08, 'square', .07, 0, 120); tone(1400, .03, 'triangle', .05); };
+  const sHit = power => { tone(440 - power * 200, .08, 'square', .05 + power * .05, 0, 110); tone(1400, .03, 'triangle', .05); };
   const sBounce = () => tone(150, .06, 'sine', .15, 0, 90);
   const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
   const sLose = () => [392, 311].forEach((f, i) => tone(f, .18, 'triangle', .09, i * .12));
   $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; };
 
   // ---------- input ----------
+  const KEYMAP = { ' ': 'top', z: 'top', j: 'top', x: 'slice', k: 'slice', c: 'flat', l: 'flat', v: 'lob', i: 'lob', b: 'drop', o: 'drop' };
   const keys = {};
-  let ptr = null;
+  let ptr = null, mouseShot = null;
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
-    if (!keys[k] && (k === ' ' || k === 'z' || k === 'j')) doSwing();
+    if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
     keys[k] = true;
     if (k.startsWith('arrow') || k === ' ') e.preventDefault();
   });
-  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    keys[k] = false;
+    if (KEYMAP[k]) release(KEYMAP[k]);
+  });
   function setPtr(e) {
     const r = canvas.getBoundingClientRect();
     ptr = { x: e.clientX - r.left, y: e.clientY - r.top - (e.pointerType === 'mouse' ? 0 : 50) };
   }
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
     setPtr(e);
-    if (e.pointerType === 'mouse') { if (e.button === 0) doSwing(); }
-    else canvas.setPointerCapture(e.pointerId);
+    if (e.pointerType === 'mouse') {
+      mouseShot = e.button === 1 ? 'flat' : e.button === 2 ? (e.shiftKey ? 'drop' : 'slice') : (e.shiftKey ? 'lob' : 'top');
+      press(mouseShot);
+      e.preventDefault();
+    } else canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) setPtr(e); });
-  canvas.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') ptr = null; });
+  canvas.addEventListener('pointerup', e => {
+    if (e.pointerType === 'mouse') { if (mouseShot) release(mouseShot); mouseShot = null; }
+    else ptr = null;
+  });
   canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') ptr = null; });
-  $('swing').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doSwing(); });
+  document.querySelectorAll('#shots button').forEach(b => {
+    const s = b.dataset.shot;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.setPointerCapture(e.pointerId); b.classList.add('on'); press(s); });
+    const up = () => { if (b.classList.contains('on')) { b.classList.remove('on'); release(s); } };
+    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+  });
 
   // ---------- state ----------
   const rand = (a, b) => a + Math.random() * (b - a);
+  const lerp = (a, b, t) => a + (b - a) * t;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const other = w => (w === 'P' ? 'C' : 'P');
+  const pickWeighted = mix => {
+    let r = Math.random() * Object.values(mix).reduce((a, b) => a + b, 0);
+    for (const [k, w] of Object.entries(mix)) if ((r -= w) < 0) return k;
+    return 'top';
+  };
 
   let lvKey = 'normal', lv = LEVELS.normal, state = 'menu';
-  const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0 };
+  const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0, shot: 'top', power: 0 };
   const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0 };
-  const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, live: false, held: false, serve: false,
-                 last: null, bounces: 0, rolling: false, trail: [] };
-  let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, tossing = false, cpuServeT = 0;
-  let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [];
+  const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
+                 live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
+  let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
+  let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null;
 
   const server = () => ((games[0] + games[1]) % 2 === 0 ? 'P' : 'C');
   const deuce = () => (pts[0] + pts[1]) % 2 === 0;
@@ -210,7 +272,7 @@
 
   function startMatch(key) {
     lvKey = key; lv = LEVELS[key];
-    pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; popups = []; marks = [];
+    pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; maxSpeed = 0; popups = []; marks = [];
     $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.remove('hidden');
     $('lvName').textContent = lv.name;
     setupServe();
@@ -218,8 +280,9 @@
 
   function setupServe() {
     const dc = deuce();
-    Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [] });
-    tossing = false; rally = 0; msg = null;
+    Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [],
+                          ge: G, sf: 0, bz: .7, bh: .85, ax: 0, spin: 0, type: 'flat' });
+    tossing = false; rally = 0; msg = null; charge = null;
     if (server() === 'P') {
       Object.assign(player, { x: CX + (dc ? .9 : -.9), y: L + .4 });
       Object.assign(cpu, { x: CX + (dc ? -2.6 : 2.6), y: -.8 });
@@ -235,23 +298,48 @@
 
   function holdBall() {
     const s = server() === 'P' ? player : cpu, dir = s === player ? 1 : -1;
-    Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0 });
+    Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85 });
   }
   function toss() { ball.held = false; ball.z = 1.1; ball.vz = 5.2; ball.vx = ball.vy = 0; tossing = true; }
 
-  // launch the ball from where it is so that it lands on (tx, ty)
-  function shoot(tx, ty, speed, noClear) {
-    const dx = tx - ball.x, dy = ty - ball.y, dist = Math.hypot(dx, dy);
-    let t = Math.max(.35, dist / speed);
+  // One physics step, shared by the real ball and the AI's look-ahead. Returns impact speed on a bounce.
+  function physStep(b, dt) {
+    if (!b.rolling) b.vz -= b.ge * dt;
+    b.vx += b.ax * dt;
+    b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+    if (b.z <= 0 && b.vz < 0) {
+      const impact = -b.vz;
+      b.z = 0; b.vz = impact * b.bz; b.vx *= b.bh; b.vy *= b.bh;
+      // spin mostly wears off after the first bounce
+      b.ge = G * (1 + b.sf * .3); b.sf *= .3; b.ax = 0; b.bz = .68; b.bh = .85;
+      if (b.vz < 1) { b.vz = 0; b.rolling = true; }
+      return impact;
+    }
+    return 0;
+  }
+
+  // Launch the ball from where it is so that it lands on (tx, ty).
+  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false } = {}) {
+    const sh = SHOTS[type];
+    const ge = G * (1 + sh.sf);
+    const ax = sh.curve ? (tx > CX ? 1 : -1) * sh.curve : 0; // slices curve away toward the sideline
+    const dx = tx - ball.x, dy = ty - ball.y;
+    let t = flight || Math.max(.35, Math.hypot(dx, dy) / speed);
     const f = (NET_Y - ball.y) / dy;
     if (!noClear && f > 0 && f < 1) {
-      for (let i = 0; i < 60; i++) {
-        const vz = (.5 * G * t * t - ball.z) / t, tn = f * t;
-        if (ball.z + vz * tn - .5 * G * tn * tn > NET_H + .3) break;
-        t *= 1.04;
+      for (let i = 0; i < 80; i++) {
+        const vz = (.5 * ge * t * t - ball.z) / t, tn = f * t;
+        if (ball.z + vz * tn - .5 * ge * tn * tn > NET_H + sh.margin) break;
+        t *= 1.03;
       }
     }
-    Object.assign(ball, { vx: dx / t, vy: dy / t, vz: (.5 * G * t * t - ball.z) / t, rolling: false, trail: [] });
+    Object.assign(ball, {
+      vx: (dx - .5 * ax * t * t) / t, vy: dy / t, vz: (.5 * ge * t * t - ball.z) / t,
+      ax, ge, sf: sh.sf, bz: sh.bz, bh: sh.bh, type, rolling: false, trail: [],
+      spin: sh.sf * 40 + (type === 'flat' ? 6 : 0),
+    });
+    const kmh = Math.round(Math.hypot(ball.vx, ball.vy, ball.vz) * 3.6);
+    return kmh;
   }
 
   function aimKeys() {
@@ -259,35 +347,48 @@
     return l && !r ? -1 : r && !l ? 1 : null;
   }
 
-  function serveHit(who, q) {
+  function serveHit(who, q, type) {
+    if (type === 'lob') type = 'top';
+    if (type === 'drop') type = 'slice';
     const recv = other(who), box = serveBox(recv, deuce());
     let aim = rand(-1, 1);
     if (who === 'P') {
       const k = aimKeys();
       aim = k !== null ? k : ptr ? clamp((unproject(ptr.x, ptr.y).x - CX) / CX, -1, 1) : rand(-.5, .5);
     }
-    const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45, err = (1 - q) * 1.8;
+    const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45;
+    const err = (1 - q) * 1.8 * (type === 'flat' ? 1.25 : type === 'top' ? .75 : 1);
     const tx = bx + aim * hw + rand(-err, err);
     const deep = rand(.6, 2);
     const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
-    shoot(tx, ty, 14 + 16 * q, q < .3);
+    const speed = type === 'flat' ? 20 + 18 * q : type === 'top' ? 17 + 11 * q : 18 + 12 * q;
+    const kmh = shoot(tx, ty, type, { speed, noClear: q < .3 });
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
     tossing = false; state = 'rally';
     (who === 'P' ? player : cpu).swing = SWING;
-    sHit(q > .85);
+    sHit(q);
+    const s = who === 'P' ? player : cpu;
+    popupAt(s.x, s.y, 2.6, `${kmh} km/h`, SHOTS[type].color);
     if (who === 'P') {
-      popupAt(player.x, player.y, 2.4, q > .85 ? 'ナイスサーブ!' : q < .3 ? 'あっ…' : '', q > .85 ? '#e8ff3a' : '#fff');
+      if (q > .85) popupAt(player.x, player.y, 3.1, 'ナイスサーブ!', '#e8ff3a');
       cpu.plan = null; cpu.react = lv.react;
     }
   }
 
-  function doSwing() {
+  function press(type) {
     if (state === 'serve' && server() === 'P') {
       if (ball.held) toss();
-      else if (tossing) serveHit('P', clamp(1 - Math.abs(ball.vz) / 4.5, 0, 1));
+      else if (tossing) serveHit('P', clamp(1 - Math.abs(ball.vz) / 4.5, 0, 1), type);
       return;
     }
-    if ((state === 'rally' || state === 'pause') && player.cool <= 0) { player.swing = SWING; player.cool = .42; }
+    if ((state === 'rally' || state === 'pause') && !charge) charge = { type, t: 0 };
+  }
+  function release(type) { if (charge && charge.type === type) fireSwing(); }
+  function fireSwing() {
+    if (player.cool > 0) { charge = null; return; }
+    player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
+    player.swing = SWING; player.cool = .42;
+    charge = null;
   }
 
   function canHit(w) {
@@ -297,47 +398,76 @@
   }
 
   function playerHit(d) {
-    const smash = ball.z > 2 && ball.bounces === 0;
+    let type = player.shot;
+    const power = player.power;
+    const smash = ball.z > 2.1 && ball.bounces === 0 && (type === 'top' || type === 'flat');
+    if (smash) type = 'flat';
+    const sh = SHOTS[type];
     const q = clamp(1 - Math.max(0, d - .55) / (REACH - .55), 0, 1);
     const k = aimKeys();
     const aim = k !== null ? k : clamp(player.vx / PSPEED * 1.3, -1, 1);
-    const err = (1 - q) * 1.7;
-    const tx = CX + aim * (CX - .7) + rand(-err, err) + rand(-.4, .4);
-    const ty = (smash ? rand(2, 7) : rand(1, 4.5)) + rand(-err, err * .4);
-    shoot(tx, ty, smash ? 30 : 16 + 9 * q, q < .2);
+    // timing errors plus the risk of hitting hard
+    const err = (1 - q) * 1.6 + power * power * sh.err * .9;
+    let tx = CX + aim * (CX - .7) + rand(-err, err) + rand(-.3, .3);
+    let ty, opts;
+    if (type === 'lob') {
+      tx = CX + aim * (CX - 1) + rand(-err * .6, err * .6);
+      ty = rand(.6, 3) + rand(-err * .8, err * .3) - power * 1.2;
+      opts = { flight: 1.75 + power * .25 + rand(0, .2) };
+    } else if (type === 'drop') {
+      ty = NET_Y - rand(1.5, 3.2) + rand(-err * .6, err * .6);
+      opts = { flight: 1.05 + rand(0, .15), noClear: q < .35 };
+    } else {
+      ty = (smash ? rand(2, 7) : rand(1, type === 'slice' ? 5 : 4.5)) + rand(-err, err * .4);
+      const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25);
+      opts = { speed, noClear: q < .2 };
+    }
+    const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'P', bounces: 0, serve: false });
-    rally++; maxRally = Math.max(maxRally, rally);
-    sHit(smash || q > .85);
-    const txt = smash ? 'スマッシュ!' : q > .85 ? 'ナイス!' : q < .2 ? 'ミスヒット…' : '';
-    popupAt(player.x, player.y, 2.4, txt, smash ? '#ff5d73' : '#e8ff3a');
+    rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
+    sHit(smash ? 1 : power);
+    const label = smash ? 'スマッシュ!' : sh.name;
+    popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
+    if (q > .85 && !smash) popupAt(player.x, player.y, 3.1, 'ナイス!', '#e8ff3a');
+    else if (q < .2) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
     cpu.plan = null; cpu.react = lv.react;
   }
 
   function cpuHit(d) {
     const incoming = Math.hypot(ball.vx, ball.vy);
-    const errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0);
+    let type = pickWeighted(lv.mix);
+    if (player.y < NET_Y + 5 && Math.random() < lv.tactic) type = 'lob';           // passing lob over a net rusher
+    else if (player.y > L + 1.2 && Math.random() < lv.tactic * .3) type = 'drop';   // drop shot vs. a deep player
+    if (ball.z > 2.4) type = 'flat';
+    const sh = SHOTS[type], power = rand(...lv.power);
+    const errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0)
+      + power * power * sh.err * .08 + (ball.type === 'slice' && ball.bounces ? .03 : 0);
     let tx = player.x > CX ? rand(.5, CX - .3) : rand(CX + .3, CW - .5);
     if (Math.random() < .3) tx = rand(.6, CW - .6);
-    let ty = L - rand(1, 5), speed = rand(...lv.shot), noClear = false;
+    let ty, opts;
+    if (type === 'lob') { ty = L - rand(.6, 3); opts = { flight: rand(1.75, 2.1) }; }
+    else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { flight: rand(1.05, 1.2) }; }
+    else { ty = L - rand(1, 5); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
       if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
-      else if (r < .75) ty = L + rand(.2, 2);
-      else { ty = NET_Y + rand(1, 3); speed = 30; noClear = true; }
+      else if (r < .75) ty = type === 'drop' ? NET_Y + rand(-.5, .2) : L + rand(.2, 2);
+      else { type = 'flat'; ty = NET_Y + rand(1, 3); opts = { speed: 30, noClear: true }; }
     }
-    shoot(tx, ty, speed, noClear);
+    const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'C', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally);
-    cpu.swing = SWING; sHit(false);
+    cpu.swing = SWING; sHit(power);
+    if (type === 'lob' || type === 'drop' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
   // where should the CPU go to meet the ball in time?
   function planIntercept() {
-    const b = { ...ball }, step = 1 / 120;
+    const b = { ...ball, trail: null }, step = 1 / 120;
     let bounces = ball.bounces, t = 0, last = null;
-    for (let i = 0; i < 600; i++) {
-      b.vz -= G * step; b.x += b.vx * step; b.y += b.vy * step; b.z += b.vz * step; t += step;
-      if (b.z <= 0 && b.vz < 0) { b.z = 0; b.vz *= -.7; b.vx *= .85; b.vy *= .85; if (++bounces >= 2) break; }
+    for (let i = 0; i < 700; i++) {
+      if (physStep(b, step) && ++bounces >= 2) break;
+      t += step;
       if (bounces === 1 && b.z < 2.3) {
         last = { x: b.x, y: b.y };
         const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / lv.speed;
@@ -349,11 +479,8 @@
   }
 
   function predictBounce() {
-    const b = { ...ball }, step = 1 / 60;
-    for (let i = 0; i < 300; i++) {
-      b.vz -= G * step; b.x += b.vx * step; b.y += b.vy * step; b.z += b.vz * step;
-      if (b.z <= 0) return b;
-    }
+    const b = { ...ball, trail: null }, step = 1 / 60;
+    for (let i = 0; i < 300; i++) if (physStep(b, step)) return b;
     return null;
   }
 
@@ -367,7 +494,8 @@
       marks.push({ x: ball.x, y: ball.y, life: 1.2, ok });
       if (!ok) ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
     } else {
-      pointTo(ball.last, ball.last === 'P' ? 'ナイスショット!' : '取れなかった…');
+      const ace = ball.serve ? 'サービスエース!' : null;
+      pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
     }
   }
   function onNet() { ball.serve ? fault('ネット') : pointTo(other(ball.last), 'ネット!'); }
@@ -400,8 +528,8 @@
     state = 'over'; msg = null;
     $('resTitle').textContent = w === 'P' ? '🏆 勝利!' : '😢 まけちゃった…';
     $('resScore').textContent = `${games[0]} - ${games[1]}`;
-    $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回<br>` +
-      (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'もう一回挑戦してみよう！');
+    $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
+      (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
     $('result').classList.remove('hidden');
   }
 
@@ -416,7 +544,7 @@
     $('srvC').style.visibility = server() === 'C' ? 'visible' : 'hidden';
   }
 
-  function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1 }); }
+  function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1.1 }); }
 
   // ---------- update ----------
   function movePlayer(dt) {
@@ -427,12 +555,13 @@
     if (keys['arrowdown'] || keys['s']) my++;
     const serving = state === 'serve' && server() === 'P';
     if (serving) my = 0;
+    const max = PSPEED * (charge ? .45 : 1); // charging a shot slows you down
     let tvx = 0, tvy = 0;
     if (mx || my) {
-      const l = Math.hypot(mx, my); tvx = mx / l * PSPEED; tvy = my / l * PSPEED;
+      const l = Math.hypot(mx, my); tvx = mx / l * max; tvy = my / l * max;
     } else if (ptr) {
       const g = unproject(ptr.x, ptr.y), dx = g.x - player.x, dy = serving ? 0 : g.y - player.y, l = Math.hypot(dx, dy);
-      if (l > .05) { const s = Math.min(PSPEED, l * 8); tvx = dx / l * s; tvy = dy / l * s; }
+      if (l > .05) { const s = Math.min(max, l * 8); tvx = dx / l * s; tvy = dy / l * s; }
     }
     const k = 1 - Math.exp(-dt * 14);
     player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k;
@@ -464,28 +593,22 @@
     if (state === 'serve' && server() === 'C') {
       cpuServeT -= dt;
       if (ball.held && cpuServeT <= 0) toss();
-      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve));
+      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 4, slice: 3, top: 3 }));
     }
   }
 
   function moveBall(dt) {
     if (ball.held) { holdBall(); return; }
     const py = ball.y;
-    if (!ball.rolling) ball.vz -= G * dt;
-    ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.z += ball.vz * dt;
+    const impact = physStep(ball, dt);
     if (ball.rolling) { const f = Math.pow(.25, dt); ball.vx *= f; ball.vy *= f; }
+    ball.spin *= Math.pow(.6, dt);
     if (tossing && ball.vz < 0 && ball.z < .8) { ball.held = true; tossing = false; return; } // missed toss: try again
-    if (ball.z <= 0 && ball.vz < 0) {
-      const impact = -ball.vz;
-      ball.z = 0; ball.vz = impact * .7; ball.vx *= .85; ball.vy *= .85;
-      if (ball.vz < 1) { ball.vz = 0; ball.rolling = true; }
-      if (impact > 2) sBounce();
-      onBounce();
-    }
+    if (impact) { if (impact > 2) sBounce(); onBounce(); }
     if ((py - NET_Y) * (ball.y - NET_Y) < 0 && ball.x > -2.3 && ball.x < CW + 2.3) {
       const nh = NET_H + Math.min(1, Math.abs(ball.x - CX) / (CX + 2.3)) * .155;
       if (ball.z < nh) {
-        ball.y = NET_Y + Math.sign(py - NET_Y) * .06; ball.vy *= -.15; ball.vx *= .3;
+        ball.y = NET_Y + Math.sign(py - NET_Y) * .06; ball.vy *= -.15; ball.vx *= .3; ball.ax = 0;
         if (ball.live) onNet();
       }
     }
@@ -497,11 +620,15 @@
     moveBall(dt);
     player.swing = Math.max(0, player.swing - dt); player.cool -= dt;
     cpu.swing = Math.max(0, cpu.swing - dt);
+    if (charge) charge.t += dt;
 
     if (state === 'rally') {
-      const dp = d2(ball, player);
-      if ($('auto').checked && canHit('P') && dp < REACH * .9 && ball.z < 2.6 && player.cool <= 0) doSwing();
-      if (player.swing > 0 && canHit('P') && dp < REACH && ball.z < 2.8) playerHit(dp);
+      const dp = d2(ball, player), reachable = canHit('P') && ball.z < 3.2;
+      if (charge && reachable && dp < REACH * .95 && player.cool <= 0) fireSwing();      // charged shot fires on contact
+      else if (!charge && $('auto').checked && reachable && dp < REACH * .9 && ball.z < 2.6 && player.cool <= 0) {
+        player.shot = 'top'; player.power = .45; player.swing = SWING; player.cool = .42;
+      }
+      if (player.swing > 0 && reachable && dp < REACH) playerHit(dp);
       const dc = d2(ball, cpu);
       if (state === 'rally' && canHit('C') && dc < lv.reach && ball.z < 2.6) cpuHit(dc);
     }
@@ -512,7 +639,7 @@
     for (let i = 0; i < 3; i++) step(dt / 3);
     if (ball.live || tossing) {
       ball.trail.unshift({ x: ball.x, y: ball.y, z: ball.z });
-      ball.trail.length = Math.min(ball.trail.length, 8);
+      ball.trail.length = Math.min(ball.trail.length, 10);
     }
     if (state === 'pause' && (pauseT -= dt) <= 0) { state = 'wait'; pauseCb(); }
     popups.forEach(p => { p.z += dt * 1.2; p.life -= dt; });
@@ -555,7 +682,6 @@
     ctx.fillText('BUMPY OPEN 🎾', mid.x, mid.y);
     ctx.fillStyle = '#2f7d62'; ctx.fillRect(0, wallBot, W, H - wallBot);
     poly([[-ALLEY, 0], [CW + ALLEY, 0], [CW + ALLEY, L], [-ALLEY, L]], '#3567b5');
-    // lines
     [-ALLEY, 0, CW, CW + ALLEY].forEach(x => line(x, 0, x, L));
     [0, L].forEach(y => line(-ALLEY, y, CW + ALLEY, y, .08));
     [NET_Y - SVC, NET_Y + SVC].forEach(y => line(0, y, CW, y));
@@ -580,11 +706,10 @@
     line(CW + px, NET_Y, CW + px, NET_Y, .1, '#333', 0, 1.07);
   }
 
-  function figure(o, shirt, away) {
+  function figure(o, shirt, away, ch) {
     const b = P(o.x, o.y), s = b.s, zy = z => b.y - z * s;
     ctx.fillStyle = 'rgba(0,0,0,.25)';
     ctx.beginPath(); ctx.ellipse(b.x, b.y, .45 * s, .14 * s, 0, 0, Math.PI * 2); ctx.fill();
-    // legs
     const run = Math.hypot(o.vx, o.vy) > .5 ? Math.sin(performance.now() / 70) * .08 : 0;
     ctx.strokeStyle = '#f0c8a0'; ctx.lineWidth = .11 * s; ctx.lineCap = 'round';
     ctx.beginPath();
@@ -592,12 +717,10 @@
     ctx.moveTo(b.x + .12 * s, zy(.05 + Math.max(0, -run))); ctx.lineTo(b.x + .1 * s, zy(.75));
     ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.fillRect(b.x - .21 * s, zy(.9), .42 * s, .22 * s);
-    // body
     ctx.fillStyle = shirt;
     ctx.beginPath();
     ctx.roundRect ? ctx.roundRect(b.x - .25 * s, zy(1.45), .5 * s, .6 * s, .12 * s) : ctx.rect(b.x - .25 * s, zy(1.45), .5 * s, .6 * s);
     ctx.fill();
-    // head
     const hx = b.x, hY = zy(1.64), hr = .17 * s;
     ctx.fillStyle = '#f0c8a0'; ctx.beginPath(); ctx.arc(hx, hY, hr, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#3a2a22';
@@ -609,13 +732,14 @@
       ctx.fillStyle = '#222';
       ctx.beginPath(); ctx.arc(hx - hr * .4, hY, hr * .13, 0, 7); ctx.arc(hx + hr * .4, hY, hr * .13, 0, 7); ctx.fill();
     }
-    ctx.fillStyle = shirt; ctx.fillRect(hx - hr, hY - hr * .55, hr * 2, hr * .3); // headband
-    // racket arm
+    ctx.fillStyle = shirt; ctx.fillRect(hx - hr, hY - hr * .55, hr * 2, hr * .3);
+    // racket arm: idle / pulled back while charging / sweeping through a swing
     const sgn = away ? 1 : -1, sx = b.x + sgn * .24 * s, sy = zy(1.32);
     let a = sgn > 0 ? -1.2 : Math.PI + 1.2;
+    if (ch) { const back = Math.min(1, ch.t / FULL_CHARGE); a = sgn > 0 ? -1.2 + back * 2.1 : Math.PI + 1.2 - back * 2.1; }
     if (o.swing > 0) {
       const p = 1 - o.swing / SWING;
-      a = sgn > 0 ? .7 - p * 3.4 : Math.PI - .7 + p * 3.4;
+      a = sgn > 0 ? .9 - p * 3.6 : Math.PI - .9 + p * 3.6;
     }
     const ca = Math.cos(a), sa = Math.sin(a);
     ctx.strokeStyle = '#f0c8a0'; ctx.lineWidth = .08 * s;
@@ -626,24 +750,40 @@
     ctx.ellipse(sx + ca * .72 * s, sy + sa * .72 * s, .17 * s, .12 * s, a, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fill();
     ctx.lineWidth = .045 * s; ctx.strokeStyle = '#222'; ctx.stroke();
+    // charge meter
+    if (ch) {
+      const p = Math.min(1, ch.t / FULL_CHARGE), w = Math.max(44, .9 * s), y = zy(2.15), col = SHOTS[ch.type].color;
+      ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(b.x - w / 2 - 2, y - 5, w + 4, 10);
+      ctx.fillStyle = p >= 1 && Math.floor(performance.now() / 80) % 2 ? '#fff' : col;
+      ctx.fillRect(b.x - w / 2, y - 3, w * p, 6);
+      ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = col; ctx.fillText(SHOTS[ch.type].name + (p >= 1 ? ' MAX' : ''), b.x, y - 7);
+    }
   }
 
   function drawBall() {
+    const col = ball.live ? SHOTS[ball.type].color : '#e8ff3a';
     ball.trail.forEach((t, i) => {
       const p = P(t.x, t.y, t.z);
-      ctx.fillStyle = `rgba(232,255,58,${.25 - i * .03})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, .1 * p.s), 0, 7); ctx.fill();
+      ctx.globalAlpha = .45 - i * .04;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, .09 * p.s * (1 - i * .05)), 0, 7); ctx.fill();
     });
-    const p = P(ball.x, ball.y, ball.z);
+    ctx.globalAlpha = 1;
+    const p = P(ball.x, ball.y, ball.z), r = Math.max(2.5, .1 * p.s);
     ctx.fillStyle = '#e8ff3a'; ctx.strokeStyle = '#7c8a10'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2.5, .1 * p.s), 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill(); ctx.stroke();
+    if (r > 3.5) { // rotating seam shows the spin
+      const a = performance.now() / 1000 * ball.spin;
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1, r * .25);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, r * .75, r * Math.abs(Math.cos(a)) * .75 + .1, 0, 0, 7); ctx.stroke();
+    }
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
     drawCourt();
 
-    // bounce marks
     marks.forEach(m => {
       const p = P(m.x, m.y);
       ctx.globalAlpha = Math.min(1, m.life);
@@ -651,7 +791,6 @@
       ctx.beginPath(); ctx.ellipse(p.x, p.y, .25 * p.s, .1 * p.s, 0, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     });
-    // landing guide for incoming shots
     if (state === 'rally' && ball.live && ball.last === 'C' && ball.bounces === 0) {
       const b = predictBounce();
       if (b) {
@@ -669,7 +808,7 @@
     const items = [
       { y: NET_Y, f: drawNet },
       { y: cpu.y, f: () => figure(cpu, '#4a6fd1', false) },
-      { y: player.y, f: () => figure(player, '#ff5d73', true) },
+      { y: player.y, f: () => figure(player, '#ff5d73', true, charge) },
     ];
     if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
     items.sort((a, b) => a.y - b.y).forEach(i => i.f());
@@ -677,8 +816,8 @@
     popups.forEach(p => {
       const s = P(p.x, p.y, p.z);
       ctx.globalAlpha = Math.min(1, p.life * 2);
-      ctx.font = 'bold 20px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(p.text, s.x, s.y);
+      ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.strokeText(p.text, s.x, s.y);
       ctx.fillStyle = p.color; ctx.fillText(p.text, s.x, s.y);
       ctx.globalAlpha = 1;
     });
@@ -691,18 +830,18 @@
     if (state === 'serve') {
       const mine = server() === 'P';
       const text = mine
-        ? (ball.held ? (coarse ? '「打つ!」でトス' : 'クリック / スペースでトス') : '今だ! 一番高いところで打て!')
+        ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '今だ! 球種を選んで打て!')
         : 'CPU のサーブ…';
       const t2 = faults ? 'セカンドサーブ' : '';
       ctx.font = 'bold 18px system-ui, sans-serif';
-      const w = ctx.measureText(text).width + 32, y = H - (coarse ? 150 : 40);
+      const w = ctx.measureText(text).width + 32, y = coarse ? H * .42 : H - 40;
       ctx.fillStyle = 'rgba(15,20,40,.75)';
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W / 2 - w / 2, y - 20, w, 40, 20) : ctx.rect(W / 2 - w / 2, y - 20, w, 40); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.fillText(text, W / 2, y);
       if (t2) { ctx.font = 'bold 14px system-ui, sans-serif'; ctx.fillStyle = '#ffd166'; ctx.fillText(t2, W / 2, y - 34); }
     }
     if (msg) {
-      const y = H - (coarse ? 260 : 150);
+      const y = coarse ? H * .5 : H - 150;
       ctx.font = 'bold 28px system-ui, sans-serif';
       const w = Math.max(ctx.measureText(msg.title).width, 160) + 48;
       ctx.fillStyle = 'rgba(15,20,40,.82)';
