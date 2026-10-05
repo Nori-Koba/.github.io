@@ -85,7 +85,7 @@
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
         <b>パワー</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。ためている間は動きが遅くなり、強く打つほどアウトしやすい。<br>
-        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。フラット＝速い、スライス＝曲がる、トップスピン＝高く弾む（一番安全）。
+        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。フラット＝最速（180km/h 近く）、スライス＝大きく外へ曲がって滑る、トップスピン＝キックして高く横に跳ねる（一番安全）。
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>低く滑って横に曲がる。弾まない</small></span>
@@ -93,7 +93,11 @@
           <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">V・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
           <span class="t" style="background:var(--drop)">ドロップ</span><span><span class="pc">B・O・Shift+右クリック</span> <small>ネット際にポトリ。後ろの相手に効く</small></span>
         </div>
-        <b>コツ</b>：ボールの真横で打つとナイスショット。動きながら打つとその方向へ。高いボールはスマッシュ！
+        <b>球種の使い分け</b>：<br>
+        ・低く弾んだ球はスライスで返すと安全（フラットやトップは持ち上げにくい）<br>
+        ・高く跳ねた球はトップスピンで。腰の高さの打ちごろの球はフラットで強打！<br>
+        ・同じ球種ばかりだと CPU に<b>読まれる</b>。3 種類続けて打ち分けると CPU が<b>揺さぶられて</b>崩れる<br>
+        <b>コツ</b>：ボールの真横で打つとナイスショット。動きながら打つとその方向へ。ノーバウンドの高い球はスマッシュ！
       </div>
       <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
       <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
@@ -131,9 +135,9 @@
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', sf: .75, bz: .8,  bh: .93, margin: .9,  speed: [15, 28], err: .8 },
-    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.35, bz: .5, bh: .72, margin: .3,  speed: [13, 22], err: .7, curve: 2.2 },
-    flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .68, bh: .86, margin: .12, speed: [18, 35], err: 1.3 },
+    top:   { name: 'トップスピン', color: '#ff9f43', sf: .8,  bz: .9,  bh: .97, margin: .9,  speed: [15, 28], err: .8 },
+    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.35, bz: .42, bh: .82, margin: .3, speed: [13, 22], err: .7, curve: 3 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .6,  bh: .92, margin: .12, speed: [20, 38], err: 1.3 },
     lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .85, margin: 1.5, speed: [0, 0],   err: .6 },
     drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
   };
@@ -256,7 +260,7 @@
   const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
                  live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
   let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
-  let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null;
+  let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null, history = [], cpuMod = { err: 0, react: 0, noise: 1 };
 
   const server = () => ((games[0] + games[1]) % 2 === 0 ? 'P' : 'C');
   const deuce = () => (pts[0] + pts[1]) % 2 === 0;
@@ -282,8 +286,8 @@
   function setupServe() {
     const dc = deuce();
     Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [],
-                          ge: G, sf: 0, bz: .7, bh: .85, ax: 0, spin: 0, type: 'flat' });
-    tossing = false; rally = 0; msg = null; charge = null;
+                          ge: G, sf: 0, bz: .7, bh: .85, ax: 0, kick: 0, spin: 0, type: 'flat' });
+    tossing = false; rally = 0; msg = null; charge = null; history = []; cpuMod = { err: 0, react: 0, noise: 1 };
     if (server() === 'P') {
       Object.assign(player, { x: CX + (dc ? .9 : -.9), y: L + .4 });
       Object.assign(cpu, { x: CX + (dc ? -2.6 : 2.6), y: -.8 });
@@ -311,6 +315,7 @@
     if (b.z <= 0 && b.vz < 0) {
       const impact = -b.vz;
       b.z = 0; b.vz = impact * b.bz; b.vx *= b.bh; b.vy *= b.bh;
+      if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
       // spin mostly wears off after the first bounce
       b.ge = G * (1 + b.sf * .3); b.sf *= .3; b.ax = 0; b.bz = .68; b.bh = .85;
       if (b.vz < 1) { b.vz = 0; b.rolling = true; }
@@ -336,7 +341,7 @@
     }
     Object.assign(ball, {
       vx: (dx - .5 * ax * t * t) / t, vy: dy / t, vz: (.5 * ge * t * t - ball.z) / t,
-      ax, ge, sf: sh.sf, bz: sh.bz, bh: sh.bh, type, rolling: false, trail: [],
+      ax, ge, sf: sh.sf, bz: sh.bz, bh: sh.bh, kick: 0, type, rolling: false, trail: [],
       spin: sh.sf * 40 + (type === 'flat' ? 6 : 0),
     });
     const kmh = Math.round(Math.hypot(ball.vx, ball.vy, ball.vz) * 3.6);
@@ -364,10 +369,12 @@
     const tx = bx + aim * hw + rand(-err, err);
     const deep = rand(.6, 2);
     const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
-    const base = type === 'flat' ? [20, 42] : type === 'top' ? [16, 29] : [17, 32];
+    const base = type === 'flat' ? [24, 50] : type === 'top' ? [17, 30] : [18, 33];
     const speed = lerp(base[0], base[1], power) * (.75 + .25 * q);
-    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: 1 + power * .8 });
-    if (type === 'top') { ball.bz = .8 + power * .12; ball.bh = .95; } // kick serve jumps up
+    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: type === 'slice' ? 1.8 + power * 1.6 : 1 });
+    if (type === 'top') { // kick serve: jumps up high and off to the server's right
+      ball.bz = .8 + power * .15; ball.bh = .97; ball.kick = (who === 'P' ? 1 : -1) * (1.8 + 2.7 * power);
+    } else if (type === 'flat') { ball.bz = .45; ball.bh = .95; } // flat serve skids through low
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
@@ -423,7 +430,13 @@
     const k = aimKeys();
     const aim = k !== null ? k : clamp(player.vx / PSPEED * 1.3, -1, 1);
     // timing errors plus the risk of hitting hard
-    const err = (1 - q) * 1.6 + power * power * sh.err * .9;
+    let err = (1 - q) * 1.6 + power * power * sh.err * .9, speedMul = 1, note = '';
+    // the height you meet the ball at decides which shot is safe
+    if (!smash && ball.bounces === 1) {
+      if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += .6; speedMul = .85; note = '低い球はスライスで!'; }
+      else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = '高い球はトップスピンで!'; }
+      else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = '打ちごろ! 強打!'; }
+    }
     let tx = CX + aim * (CX - .7) + rand(-err, err) + rand(-.3, .3);
     let ty, opts;
     if (type === 'lob') {
@@ -435,7 +448,7 @@
       opts = { flight: 1.05 + rand(0, .15), noClear: q < .35 };
     } else {
       ty = (smash ? rand(2, 7) : rand(1, type === 'slice' ? 5 : 4.5)) + rand(-err, err * .4);
-      const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25);
+      const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
     }
     const kmh = shoot(tx, ty, type, opts);
@@ -446,7 +459,26 @@
     popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
     if (q > .85 && !smash) popupAt(player.x, player.y, 3.1, 'ナイス!', '#e8ff3a');
     else if (q < .2) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
-    cpu.plan = null; cpu.react = lv.react;
+    if (note) popupAt(player.x, player.y, 3.6, note, '#fff');
+    readPlayer(smash ? 'smash' : type);
+  }
+
+  // The CPU learns your habits: the same shot over and over gets read,
+  // mixing three different shots in a row throws it off balance.
+  function readPlayer(type) {
+    history.push(type);
+    const last3 = history.slice(-3), kinds = new Set(last3).size, prev = history[history.length - 2];
+    cpuMod = { err: 0, react: 0, noise: 1 };
+    if (last3.length === 3 && kinds === 1) {
+      cpuMod = { err: -.6, react: -.4, noise: .4 };
+      popupAt(cpu.x, cpu.y, 2.6, '読まれてる…', '#ff8080');
+    } else if (last3.length === 3 && kinds === 3) {
+      cpuMod = { err: .1, react: .45, noise: 1.6 };
+      popupAt(cpu.x, cpu.y, 2.6, '揺さぶり!', '#e8ff3a');
+    } else if (prev && prev !== type) {
+      cpuMod = { err: .04, react: .2, noise: 1.2 };
+    }
+    cpu.plan = null; cpu.react = lv.react * (1 + cpuMod.react);
   }
 
   function cpuHit(d) {
@@ -456,8 +488,13 @@
     else if (player.y > L + 1.2 && Math.random() < lv.tactic * .3) type = 'drop';   // drop shot vs. a deep player
     if (ball.z > 2.4) type = 'flat';
     const sh = SHOTS[type], power = rand(...lv.power);
-    const errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0)
-      + power * power * sh.err * .08 + (ball.type === 'slice' && ball.bounces ? .03 : 0);
+    let errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0)
+      + power * power * sh.err * .08
+      + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
+      + (ball.z > 1.9 ? .06 : 0)                       // high kicking topspin is hard to control
+      + Math.max(0, incoming - 18) * .008              // fast flat balls rush the swing
+      + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0);
+    errP = Math.max(.01, errP * (1 + Math.min(0, cpuMod.err)) + Math.max(0, cpuMod.err));
     let tx = player.x > CX ? rand(.5, CX - .3) : rand(CX + .3, CW - .5);
     if (Math.random() < .3) tx = rand(.6, CW - .6);
     let ty, opts;
@@ -491,7 +528,7 @@
       }
     }
     const p = last || { x: ball.x, y: ball.y };
-    return { x: p.x + rand(-lv.noise, lv.noise) * .6, y: p.y };
+    return { x: p.x + rand(-lv.noise, lv.noise) * .6 * cpuMod.noise, y: p.y };
   }
 
   function predictBounce() {
@@ -508,6 +545,7 @@
     if (ball.bounces === 1) {
       const ok = ball.serve ? inBox(serveBox(recv, deuce())) : inCourt(recv);
       marks.push({ x: ball.x, y: ball.y, life: 1.2, ok });
+      if (ok && ball.serve && ball.type === 'top') popupAt(ball.x, ball.y, 1.4, 'キック!', SHOTS.top.color);
       if (!ok) ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
     } else {
       const ace = ball.serve ? 'サービスエース!' : null;
