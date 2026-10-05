@@ -63,8 +63,8 @@
 <div id="wrap">
   <canvas id="c"></canvas>
   <div id="board" class="hidden">
-    <div class="r"><span class="srv" id="srvP">●</span><span class="n">あなた</span><span class="g" id="gP">0</span><span class="p" id="pP">0</span></div>
-    <div class="r"><span class="srv" id="srvC">●</span><span class="n">CPU <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
+    <div class="r"><span class="srv" id="srvP">●</span><span class="n">あなた <span class="lv">パワースピン</span></span><span class="g" id="gP">0</span><span class="p" id="pP">0</span></div>
+    <div class="r"><span class="srv" id="srvC">●</span><span class="n">CPU <span class="lv">スライス</span> <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
   </div>
   <div id="topR">
     <button id="mute" title="サウンド">🔊</button>
@@ -82,6 +82,7 @@
     <div class="card">
       <h2>🎾 Bumpy Tennis</h2>
       <p>CPU と 1 対 1 のテニス勝負！<b>3 ゲーム先取</b>で勝ち。</p>
+      <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（速い球と、低く滑るスライスを多用）</p>
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
         <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間は移動キー / マウス / 指で狙いを動かす</b>（相手コートに的が出る。上で深く、下で短いアングル）。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br>
@@ -139,18 +140,27 @@
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
     top:   { name: 'トップスピン', color: '#ff9f43', sf: .8,  bz: .7,  bh: .88, margin: .55, speed: [21, 33], err: .8 },
-    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.35, bz: .42, bh: .58, margin: .3, speed: [13, 22], err: .7, curve: 3 },
+    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.22, bz: .55, bh: .8,  margin: .3, speed: [16, 26], err: .7, curve: 3 },
     flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .6,  bh: .7,  margin: .12, speed: [20, 38], err: 1.3 },
     lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
     drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .35, margin: .25, speed: [0, 0],  err: .9 },
   };
+  // play styles: you hit heavy, dipping topspin; the CPU hits fast and lives on a skidding slice
+  const STYLE = {
+    P: { name: 'パワースピン型', top: { sf: 1.3, bz: .66, bh: .9, margin: 1, speed: [22, 35] } },
+    C: { name: 'スライス型',
+         slice: { sf: -.25, bz: .5, bh: .86, margin: .22, speed: [21, 31] },
+         flat:  { speed: [22, 40] },
+         top:   { speed: [20, 32] } },
+  };
+  const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
   const LEVELS = {
     easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
-              mix: { top: 5, slice: 3, flat: 1 }, tactic: .2 },
+              mix: { slice: 5, top: 2, flat: 1 }, tactic: .2 },
     normal: { name: 'ふつう',   speed: 4.8, react: .25, reach: 1.3,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
-              mix: { top: 5, slice: 3, flat: 2 }, tactic: .4 },
+              mix: { slice: 6, top: 1, flat: 3 }, tactic: .4 },
     hard:   { name: 'つよい',   speed: 5.8, react: .15, reach: 1.45, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
-              mix: { top: 5, slice: 3, flat: 3 }, tactic: .6 },
+              mix: { slice: 6, top: 1, flat: 4 }, tactic: .6 },
   };
 
   const $ = id => document.getElementById(id);
@@ -360,8 +370,8 @@
 
   // Launch the ball from where it is so that it lands on (tx, ty).
   // side: world-x direction the sidespin pulls toward (default: away from the center line)
-  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false, curve = 1, side = 0 } = {}) {
-    const sh = SHOTS[type];
+  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false, curve = 1, side = 0, who = null } = {}) {
+    const sh = styled(type, who);
     const ge = G * (1 + sh.sf);
     const ax = sh.curve ? (side || (tx > CX ? 1 : -1)) * sh.curve * curve : 0;
     const dx = tx - ball.x, dy = ty - ball.y;
@@ -410,7 +420,7 @@
     const base = type === 'flat' ? [24, 50] : type === 'top' ? [17, 30] : [18, 33];
     const speed = lerp(base[0], base[1], power) * (.75 + .25 * q);
     // a right-hander's slice serve curves to the server's left
-    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: type === 'slice' ? 1.8 + power * 1.6 : 1, side: leftOf(who) });
+    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: type === 'slice' ? 1.8 + power * 1.6 : 1, side: leftOf(who), who });
     if (type === 'top') { // kick serve: jumps up high and off to the server's right
       ball.bz = .72 + power * .12; ball.bh = .85; ball.kick = (who === 'P' ? 1 : -1) * (1.8 + 2.7 * power);
     } else if (type === 'flat') { ball.bz = .45; ball.bh = .75; } // flat serve skids through low
@@ -466,14 +476,14 @@
     const power = player.power;
     const smash = ball.z > 2.1 && ball.bounces === 0 && (type === 'top' || type === 'flat');
     if (smash) type = 'flat';
-    const sh = SHOTS[type];
+    const sh = styled(type, 'P');
     const q = clamp(1 - Math.max(0, d - .55) / (REACH - .55), 0, 1);
     const goal = aimTarget(type, player.aimX, player.aimD);
     // timing errors plus the risk of hitting hard
     let err = (1 - q) * 1.6 + power * power * sh.err * .9, speedMul = 1, note = '';
     // the height you meet the ball at decides which shot is safe
     if (!smash && ball.bounces === 1) {
-      if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += .6; speedMul = .85; note = '低い球はスライスで!'; }
+      if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += type === 'top' ? .3 : .6; speedMul = .85; note = type === 'top' ? '' : '低い球はスライスで!'; }
       else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = '高い球はトップスピンで!'; }
       else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = '打ちごろ! 強打!'; }
     }
@@ -492,7 +502,7 @@
       opts = { speed, noClear: q < .2 };
     }
     // forehand slice drifts to the hitter's left, backhand slice to the right
-    opts.side = leftOf('P') * (player.stroke.kind === 'bh' ? -1 : 1);
+    opts.side = leftOf('P') * (player.stroke.kind === 'bh' ? -1 : 1); opts.who = 'P';
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'P', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
@@ -531,7 +541,7 @@
     if (player.y < NET_Y + 5 && Math.random() < lv.tactic) type = 'lob';           // passing lob over a net rusher
     else if (player.y > L + 1.2 && Math.random() < lv.tactic * .3) type = 'drop';   // drop shot vs. a deep player
     if (ball.z > 2.4) type = 'flat';
-    const sh = SHOTS[type], power = rand(...lv.power);
+    const sh = styled(type, 'C'), power = rand(...lv.power);
     let errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0)
       + power * power * sh.err * .08
       + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
@@ -551,13 +561,13 @@
       else if (r < .75) ty = type === 'drop' ? NET_Y + rand(-.5, .2) : L + rand(.2, 2);
       else { type = 'flat'; ty = NET_Y + rand(1, 3); opts = { speed: 30, noClear: true }; }
     }
-    opts.side = leftOf('C') * (sideKind(cpu) === 'bh' ? -1 : 1);
+    opts.side = leftOf('C') * (sideKind(cpu) === 'bh' ? -1 : 1); opts.who = 'C';
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'C', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally);
     cpu.stroke = { kind: ball.z > 2.3 ? 'smash' : sideKind(cpu), spin: type };
     cpu.swing = SWING * .6; player.hop = HOP; sHit(power); // CPU swing starts near contact
-    if (type === 'lob' || type === 'drop' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
+    if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
   // where should the CPU go to meet the ball in time?
@@ -777,7 +787,7 @@
     if (state === 'serve' && server() === 'C') {
       cpuServeT -= dt;
       if (ball.held && cpuServeT <= 0) toss();
-      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 4, slice: 3, top: 3 }), rand(...lv.power));
+      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 5, slice: 4, top: 1 }), rand(...lv.power));
     }
   }
 
