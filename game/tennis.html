@@ -135,23 +135,23 @@
   const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
 
-  // sf: extra "gravity" from spin (topspin dives, backspin floats)
+  // mg: Magnus strength (+ topspin pulls the ball down harder the faster it flies, - backspin holds it up)
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', sf: .8,  bz: .7,  bh: .88, margin: .55, speed: [21, 33], err: .8 },
-    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.22, bz: .55, bh: .8,  margin: .3, speed: [16, 26], err: .7, curve: 3 },
-    flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .6,  bh: .7,  margin: .12, speed: [20, 38], err: 1.3 },
-    lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
-    drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .35, margin: .25, speed: [0, 0],  err: .9 },
+    top:   { name: 'トップスピン', color: '#ff9f43', mg: .016, bz: .68, bh: .88, margin: .6,  speed: [27, 38], err: .8 },
+    slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .6, bh: .7,  margin: .12, speed: [26, 44], err: 1.3 },
+    lob:   { name: 'ロブ',         color: '#c77dff', mg: .006, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
+    drop:  { name: 'ドロップ',     color: '#80ed99', mg: -.005, bz: .35, bh: .35, margin: .25, speed: [0, 0],  err: .9 },
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { sf: 1.3, bz: .66, bh: .9, margin: 1, speed: [22, 35] } },
+    P: { name: 'パワースピン型', top: { mg: .026, bz: .62, bh: .9, margin: .9, speed: [29, 41] } },
     C: { name: 'スライス型',
-         slice: { sf: -.25, bz: .5, bh: .86, margin: .22, speed: [21, 31] },
-         flat:  { speed: [22, 40] },
-         top:   { speed: [20, 32] } },
+         slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
+         flat:  { speed: [28, 46] },
+         top:   { speed: [28, 40] } },
   };
   const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
   const LEVELS = {
@@ -299,7 +299,7 @@
   const body = () => ({ phase: 0, sp: 0, hop: 0, crouch: 0, stroke: { kind: 'fh', spin: 'top' } });
   const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0, shot: 'top', power: 0, ...body() };
   const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0, ...body() };
-  const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
+  const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, mg: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
                  live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
   let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
   let aimX = 0, aimD = 0; // where you are aiming while a shot is charged: -1..1 across, -1 short .. 1 deep
@@ -330,7 +330,7 @@
   function setupServe() {
     const dc = deuce();
     Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [],
-                          ge: G, sf: 0, bz: .7, bh: .85, ax: 0, kick: 0, spin: 0, type: 'flat' });
+                          mg: 0, bz: .7, bh: .85, ax: 0, kick: 0, spin: 0, type: 'flat' });
     tossing = false; rally = 0; msg = null; charge = null; history = []; cpuMod = { err: 0, react: 0, noise: 1 };
     if (server() === 'P') {
       Object.assign(player, { x: CX + (dc ? .9 : -.9), y: L + .4 });
@@ -347,50 +347,89 @@
 
   function holdBall() {
     const s = server() === 'P' ? player : cpu, dir = s === player ? 1 : -1;
-    Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85 });
+    Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, mg: 0, bz: .7, bh: .85 });
   }
   function toss() { ball.held = false; ball.z = 1.1; ball.vz = TOSS_V; ball.vx = ball.vy = 0; tossing = true; }
 
   // One physics step, shared by the real ball and the AI's look-ahead. Returns impact speed on a bounce.
+  // Air drag slows the ball (so it falls more steeply late in flight) and the Magnus force from spin
+  // acts across the direction of travel: topspin pulls the ball down, backspin holds it up.
+  const KD = .016;
   function physStep(b, dt) {
-    if (!b.rolling) b.vz -= b.ge * dt;
-    b.vx += b.ax * dt;
+    if (!b.rolling) {
+      const v = Math.hypot(b.vx, b.vy, b.vz), vh = Math.hypot(b.vx, b.vy) || 1e-6, m = b.mg * v;
+      b.vx += (-KD * v * b.vx + m * b.vz * b.vx / vh + b.ax) * dt;
+      b.vy += (-KD * v * b.vy + m * b.vz * b.vy / vh) * dt;
+      b.vz += (-G - KD * v * b.vz - m * vh) * dt;
+    } else b.vx += b.ax * dt;
     b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
     if (b.z <= 0 && b.vz < 0) {
       const impact = -b.vz;
       b.z = 0; b.vz = impact * b.bz; b.vx *= b.bh; b.vy *= b.bh;
       if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
-      // spin mostly wears off after the first bounce
-      b.ge = G * (1 + b.sf * .3); b.sf *= .3; b.ax = 0; b.bz = .68; b.bh = .7; // court friction on later bounces
+      // spin mostly wears off after the first bounce; court friction on later bounces
+      b.mg *= .4; b.ax = 0; b.bz = .68; b.bh = .7;
       if (b.vz < 1) { b.vz = 0; b.rolling = true; }
       return impact;
     }
     return 0;
   }
 
-  // Launch the ball from where it is so that it lands on (tx, ty).
+  // Fly a copy of the ball from (x, y, z) and report where it first lands and how high it passes the net.
+  function flyTo(x, y, z, S, th, ang, mg, ax) {
+    const b = { x, y, z, vx: S * Math.cos(th) * Math.cos(ang), vy: S * Math.cos(th) * Math.sin(ang), vz: S * Math.sin(th), mg, ax };
+    let netZ = -9;
+    for (let i = 0; i < 1400; i++) {
+      const py = b.y;
+      physStep(b, 1 / 200);
+      if ((py - NET_Y) * (b.y - NET_Y) < 0) netZ = b.z;
+      if (b.z <= 0) break;
+    }
+    return { x: b.x, y: b.y, netZ };
+  }
+
+  // Launch the ball from where it is so that it lands on (tx, ty): pick the launch angle for the wanted
+  // speed (or the speed for a fixed angle, e.g. lobs), raise the arc until it clears the net by the
+  // shot's margin, then correct the aim for any sidespin curve.
   // side: world-x direction the sidespin pulls toward (default: away from the center line)
-  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false, curve = 1, side = 0, who = null } = {}) {
+  function shoot(tx, ty, type, { speed = 25, angle = null, noClear = false, curve = 1, side = 0, who = null } = {}) {
     const sh = styled(type, who);
-    const ge = G * (1 + sh.sf);
     const ax = sh.curve ? (side || (tx > CX ? 1 : -1)) * sh.curve * curve : 0;
-    const dx = tx - ball.x, dy = ty - ball.y;
-    let t = flight || Math.max(.35, Math.hypot(dx, dy) / speed);
-    const f = (NET_Y - ball.y) / dy;
-    if (!noClear && f > 0 && f < 1) {
-      for (let i = 0; i < 80; i++) {
-        const vz = (.5 * ge * t * t - ball.z) / t, tn = f * t;
-        if (ball.z + vz * tn - .5 * ge * tn * tn > NET_H + sh.margin) break;
-        t *= 1.03;
+    const { x, y, z } = ball, D = Math.hypot(tx - x, ty - y);
+    let ang = Math.atan2(ty - y, tx - x);
+    const range = (S, th) => { const r = flyTo(x, y, z, S, th, ang, sh.mg, 0); return Math.hypot(r.x - x, r.y - y); };
+    const speedFor = th => { let lo = 2, hi = 80; for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; range(m, th) < D ? lo = m : hi = m; } return (lo + hi) / 2; };
+    let S = speed, th;
+    if (angle !== null) { th = angle; S = speedFor(th); }
+    else {
+      for (let k = 0; k < 20; k++) {
+        if (range(S, .8) < D) { S *= 1.1; continue; }   // too slow to get there at all
+        if (range(S, -.25) > D) { S *= .9; continue; }  // too fast to keep it in
+        let lo = -.25, hi = .8;
+        for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; range(S, m) < D ? lo = m : hi = m; }
+        th = (lo + hi) / 2; break;
+      }
+      if (th === undefined) th = .1;
+    }
+    if (!noClear) {
+      for (let k = 0; k < 40; k++) {
+        const r = flyTo(x, y, z, S, th, ang, sh.mg, 0);
+        if (r.netZ > NET_H + sh.margin || r.netZ === -9) break;
+        th += .025; S = speedFor(th);
       }
     }
+    // sidespin: rotate the aim until the curving ball lands on the target line
+    for (let k = 0; ax && k < 3; k++) {
+      const r = flyTo(x, y, z, S, th, ang, sh.mg, ax);
+      const err = Math.atan2(r.y - y, r.x - x) - Math.atan2(ty - y, tx - x);
+      ang -= err;
+    }
     Object.assign(ball, {
-      vx: (dx - .5 * ax * t * t) / t, vy: dy / t, vz: (.5 * ge * t * t - ball.z) / t,
-      ax, ge, sf: sh.sf, bz: sh.bz, bh: sh.bh, kick: 0, type, rolling: false, trail: [],
-      spin: sh.sf * 40 + (type === 'flat' ? 6 : 0),
+      vx: S * Math.cos(th) * Math.cos(ang), vy: S * Math.cos(th) * Math.sin(ang), vz: S * Math.sin(th),
+      ax, mg: sh.mg, bz: sh.bz, bh: sh.bh, kick: 0, type, rolling: false, trail: [],
+      spin: sh.mg * 1800 + (type === 'flat' ? 6 : 0),
     });
-    const kmh = Math.round(Math.hypot(ball.vx, ball.vy, ball.vz) * 3.6);
-    return kmh;
+    return Math.round(S * 3.6);
   }
 
   // the spot a charged shot is aimed at (without the random error), for the aim marker and the shot itself
@@ -417,7 +456,7 @@
     const tx = bx + aim * hw + rand(-err, err);
     const deep = rand(.6, 2);
     const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
-    const base = type === 'flat' ? [24, 50] : type === 'top' ? [17, 30] : [18, 33];
+    const base = type === 'flat' ? [30, 56] : type === 'top' ? [24, 38] : [26, 42];
     const speed = lerp(base[0], base[1], power) * (.75 + .25 * q);
     // a right-hander's slice serve curves to the server's left
     const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: type === 'slice' ? 1.8 + power * 1.6 : 1, side: leftOf(who), who });
@@ -492,10 +531,10 @@
     if (type === 'lob') {
       tx = goal.x + rand(-err * .6, err * .6);
       ty = goal.y + rand(-.6, .6) + rand(-err * .8, err * .3) - power * 1.2;
-      opts = { flight: 1.75 + power * .25 + rand(0, .2) };
+      opts = { angle: .7 - power * .12 + rand(-.04, .04) };
     } else if (type === 'drop') {
       ty = goal.y + rand(-.7, .7) + rand(-err * .6, err * .6);
-      opts = { flight: 1.05 + rand(0, .15), noClear: q < .35 };
+      opts = { angle: .32 + rand(0, .06), noClear: q < .35 };
     } else {
       ty = (smash ? rand(2, 7) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
       const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
@@ -551,8 +590,8 @@
     let tx = player.x > CX ? rand(.5, CX - .3) : rand(CX + .3, CW - .5);
     if (Math.random() < .3) tx = rand(.6, CW - .6);
     let ty, opts;
-    if (type === 'lob') { ty = L - rand(.6, 3); opts = { flight: rand(1.75, 2.1) }; }
-    else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { flight: rand(1.05, 1.2) }; }
+    if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
+    else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
     else { ty = L - rand(1, 5); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
