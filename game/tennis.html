@@ -129,7 +129,7 @@
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
   const PSPEED = 8.5, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
-  const BALL_TS = .72; // the ball runs slower than the people, for longer rallies
+  const BALL_TS = .85; // the ball runs slower than the people, for longer rallies
   const FIG = .8;      // people are drawn at 80% size
   const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
@@ -138,11 +138,11 @@
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', sf: .8,  bz: .7,  bh: .93, margin: .55, speed: [21, 33], err: .8 },
-    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.35, bz: .42, bh: .82, margin: .3, speed: [13, 22], err: .7, curve: 3 },
-    flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .6,  bh: .92, margin: .12, speed: [20, 38], err: 1.3 },
-    lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .85, margin: 1.5, speed: [0, 0],   err: .6 },
-    drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
+    top:   { name: 'トップスピン', color: '#ff9f43', sf: .8,  bz: .7,  bh: .88, margin: .55, speed: [21, 33], err: .8 },
+    slice: { name: 'スライス',     color: '#4cc9f0', sf: -.35, bz: .42, bh: .58, margin: .3, speed: [13, 22], err: .7, curve: 3 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', sf: 0,   bz: .6,  bh: .7,  margin: .12, speed: [20, 38], err: 1.3 },
+    lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
+    drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .35, margin: .25, speed: [0, 0],  err: .9 },
   };
   const LEVELS = {
     easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
@@ -198,8 +198,31 @@
       o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur + .02);
     } catch (e) {}
   }
-  const sHit = power => { tone(440 - power * 200, .08, 'square', .05 + power * .05, 0, 110); tone(1400, .03, 'triangle', .05); };
-  const sBounce = () => tone(150, .06, 'sine', .15, 0, 90);
+  let noiseBuf = null;
+  function noise(dur, filterType, freq, q, vol, delay = 0) {
+    if (muted) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (!noiseBuf) {
+        noiseBuf = audio.createBuffer(1, audio.sampleRate * .3, audio.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain(), t = audio.currentTime + delay;
+      src.buffer = noiseBuf; f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      src.connect(f).connect(g).connect(audio.destination); src.start(t); src.stop(t + dur + .02);
+    } catch (e) {}
+  }
+  // "パコン!": a sharp string crack (pa) followed by the hollow ring of the ball and frame (kon)
+  const sHit = power => {
+    const v = .5 + power * .5;
+    noise(.035, 'bandpass', 2600 - power * 600, 1.2, .55 * v);
+    noise(.06, 'bandpass', 1100, 3, .25 * v, .004);
+    tone(760 - power * 140, .11, 'sine', .22 * v, .006, 420 - power * 80);
+    tone(1520 - power * 200, .07, 'triangle', .06 * v, .006, 900);
+  };
+  const sBounce = () => { noise(.05, 'lowpass', 500, .7, .35); tone(140, .07, 'sine', .14, 0, 80); };
   const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
   const sLose = () => [392, 311].forEach((f, i) => tone(f, .18, 'triangle', .09, i * .12));
   $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; };
@@ -255,6 +278,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const other = w => (w === 'P' ? 'C' : 'P');
+  const leftOf = w => (w === 'P' ? -1 : 1); // world-x of a right-hander's left side (player faces the far end)
   const pickWeighted = mix => {
     let r = Math.random() * Object.values(mix).reduce((a, b) => a + b, 0);
     for (const [k, w] of Object.entries(mix)) if ((r -= w) < 0) return k;
@@ -326,7 +350,7 @@
       b.z = 0; b.vz = impact * b.bz; b.vx *= b.bh; b.vy *= b.bh;
       if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
       // spin mostly wears off after the first bounce
-      b.ge = G * (1 + b.sf * .3); b.sf *= .3; b.ax = 0; b.bz = .68; b.bh = .85;
+      b.ge = G * (1 + b.sf * .3); b.sf *= .3; b.ax = 0; b.bz = .68; b.bh = .7; // court friction on later bounces
       if (b.vz < 1) { b.vz = 0; b.rolling = true; }
       return impact;
     }
@@ -334,10 +358,11 @@
   }
 
   // Launch the ball from where it is so that it lands on (tx, ty).
-  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false, curve = 1 } = {}) {
+  // side: world-x direction the sidespin pulls toward (default: away from the center line)
+  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false, curve = 1, side = 0 } = {}) {
     const sh = SHOTS[type];
     const ge = G * (1 + sh.sf);
-    const ax = sh.curve ? (tx > CX ? 1 : -1) * sh.curve * curve : 0; // slices curve away toward the sideline
+    const ax = sh.curve ? (side || (tx > CX ? 1 : -1)) * sh.curve * curve : 0;
     const dx = tx - ball.x, dy = ty - ball.y;
     let t = flight || Math.max(.35, Math.hypot(dx, dy) / speed);
     const f = (NET_Y - ball.y) / dy;
@@ -380,10 +405,11 @@
     const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
     const base = type === 'flat' ? [24, 50] : type === 'top' ? [17, 30] : [18, 33];
     const speed = lerp(base[0], base[1], power) * (.75 + .25 * q);
-    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: type === 'slice' ? 1.8 + power * 1.6 : 1 });
+    // a right-hander's slice serve curves to the server's left
+    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: type === 'slice' ? 1.8 + power * 1.6 : 1, side: leftOf(who) });
     if (type === 'top') { // kick serve: jumps up high and off to the server's right
-      ball.bz = .72 + power * .12; ball.bh = .95; ball.kick = (who === 'P' ? 1 : -1) * (1.8 + 2.7 * power);
-    } else if (type === 'flat') { ball.bz = .45; ball.bh = .95; } // flat serve skids through low
+      ball.bz = .72 + power * .12; ball.bh = .85; ball.kick = (who === 'P' ? 1 : -1) * (1.8 + 2.7 * power);
+    } else if (type === 'flat') { ball.bz = .45; ball.bh = .75; } // flat serve skids through low
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
@@ -462,6 +488,8 @@
       const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
     }
+    // forehand slice drifts to the hitter's left, backhand slice to the right
+    opts.side = leftOf('P') * (player.stroke.kind === 'bh' ? -1 : 1);
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'P', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
@@ -520,6 +548,7 @@
       else if (r < .75) ty = type === 'drop' ? NET_Y + rand(-.5, .2) : L + rand(.2, 2);
       else { type = 'flat'; ty = NET_Y + rand(1, 3); opts = { speed: 30, noClear: true }; }
     }
+    opts.side = leftOf('C') * (sideKind(cpu) === 'bh' ? -1 : 1);
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'C', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally);
