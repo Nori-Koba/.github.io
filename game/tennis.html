@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bumpy Tennis</title>
+<style>
+  :root { --ink: #1f2340; --accent: #ff5d73; --sub: #6b6f8f; --ball: #e8ff3a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #22304d; color: #fff;
+    font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", "Yu Gothic", system-ui, sans-serif; }
+  body { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #wrap { position: fixed; inset: 0; }
+  canvas { width: 100%; height: 100%; display: block; }
+  #board { position: absolute; top: 12px; left: 12px; background: rgba(15, 20, 40, .85); border-radius: 10px;
+    padding: 6px 10px; font-weight: bold; font-size: 15px; line-height: 1.6; min-width: 180px; }
+  #board .r { display: flex; align-items: center; gap: 8px; }
+  #board .srv { width: 10px; color: var(--ball); font-size: 11px; }
+  #board .n { flex: 1; }
+  #board .g { width: 22px; text-align: center; }
+  #board .p { min-width: 40px; text-align: center; background: var(--ball); color: var(--ink); border-radius: 5px; padding: 0 5px; }
+  #board .lv { font-size: 11px; color: #aab; font-weight: normal; }
+  #topR { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+  #topR button, #topR a { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(15, 20, 40, .85);
+    color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+  #swing { position: absolute; right: 18px; bottom: 24px; width: 100px; height: 100px; border-radius: 50%; border: 0;
+    background: rgba(255, 93, 115, .92); color: #fff; font: inherit; font-weight: bold; font-size: 22px;
+    box-shadow: 0 5px 0 #c9384d; display: none; }
+  #swing:active { transform: translateY(3px); box-shadow: 0 2px 0 #c9384d; }
+  .coarse #swing { display: block; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(20, 28, 50, .45); }
+  .card { background: #fff; color: var(--ink); border-radius: 18px; padding: 24px 22px; max-width: 440px; width: 100%;
+    text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); max-height: 100%; overflow: auto; }
+  .card h2 { margin: 0 0 6px; font-size: 28px; }
+  .card p { margin: 6px 0; line-height: 1.6; font-size: 14px; }
+  .card .how { text-align: left; background: #f6f3ee; border-radius: 12px; padding: 10px 14px; font-size: 13px; }
+  .card .big { font-size: 46px; font-weight: bold; color: var(--accent); margin: 2px 0; }
+  .btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .card button { font: inherit; font-weight: bold; font-size: 16px; border: 0; border-radius: 999px; padding: 11px 20px;
+    background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 4px 0 #c9384d; }
+  .card button.alt { background: #4a6fd1; box-shadow: 0 4px 0 #2f4ea3; }
+  .card button.gray { background: #8b8fa8; box-shadow: 0 4px 0 #666a82; }
+  .card button:active { transform: translateY(3px); box-shadow: none; }
+  .card label { font-size: 14px; display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; cursor: pointer; }
+  .card a { color: var(--sub); font-size: 13px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="board" class="hidden">
+    <div class="r"><span class="srv" id="srvP">●</span><span class="n">あなた</span><span class="g" id="gP">0</span><span class="p" id="pP">0</span></div>
+    <div class="r"><span class="srv" id="srvC">●</span><span class="n">CPU <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
+  </div>
+  <div id="topR">
+    <button id="mute" title="サウンド">🔊</button>
+    <a href="../index.html" title="ホームへ">🏠</a>
+  </div>
+  <button id="swing">打つ!</button>
+
+  <div class="overlay" id="menu">
+    <div class="card">
+      <h2>🎾 Bumpy Tennis</h2>
+      <p>CPU と 1 対 1 のテニス勝負！<b>3 ゲーム先取</b>で勝ち。</p>
+      <div class="how">
+        <b>移動</b>：マウス / 指でドラッグ / 矢印キー・WASD<br>
+        <b>打つ</b>：クリック / スペースキー / 「打つ!」ボタン<br>
+        <b>サーブ</b>：1 回押すとトス、ボールが一番高いところでもう 1 回！<br>
+        <b>コツ</b>：ボールの真横で打つとナイスショット。左右に動きながら打つと、その方向へ飛ぶよ。高いボールはスマッシュ！
+      </div>
+      <label><input type="checkbox" id="auto"> オートスイング（近くに来たら自動で打つ）</label>
+      <p style="margin-top:12px"><b>相手の強さを選んでスタート</b></p>
+      <div class="btns">
+        <button class="alt" data-level="easy">やさしい</button>
+        <button data-level="normal">ふつう</button>
+        <button class="gray" data-level="hard" style="background:#2b2f4a;box-shadow:0 4px 0 #111">つよい</button>
+      </div>
+      <p style="margin-top:14px"><a href="index.html">🎉 Bumpy Party! であそぶ</a></p>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="result">
+    <div class="card">
+      <h2 id="resTitle"></h2>
+      <div class="big" id="resScore"></div>
+      <p id="resDetail"></p>
+      <div class="btns">
+        <button id="again">もう一回</button>
+        <button class="alt" id="toMenu">メニュー</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- court (meters) ----------
+  const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
+  const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
+  const PSPEED = 7, REACH = 1.6, SWING = 0.28;
+  const LEVELS = {
+    easy:   { name: 'やさしい', speed: 3.4, react: .35, reach: 1.2, err: .20, shot: [14, 18], noise: .8, serve: [.45, .9] },
+    normal: { name: 'ふつう',   speed: 4.4, react: .25, reach: 1.3, err: .11, shot: [17, 22], noise: .5, serve: [.55, 1] },
+    hard:   { name: 'つよい',   speed: 5.4, react: .15, reach: 1.45, err: .05, shot: [20, 26], noise: .25, serve: [.7, 1] },
+  };
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('c'), ctx = canvas.getContext('2d');
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  if (coarse) { document.body.classList.add('coarse'); $('auto').checked = true; }
+
+  // ---------- projection ----------
+  let W, H, F, hy, camH;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // fit the court width first, then raise/lower the camera to fill the height
+    const dNear = 13, dFar = L + CAM_BACK + 3, k = 1 / dNear - 1 / dFar;
+    F = (W / 2) * dNear / 5.6;
+    camH = H * .8 / (F * k);
+    if (camH < 5) { camH = 5; F = H * .8 / (camH * k); }
+    camH = Math.min(camH, 20);
+    const span = camH * F * k;
+    hy = H - Math.max(8, (H * 0.9 - span) / 2) - camH * F / dNear;
+  }
+  addEventListener('resize', resize);
+  resize();
+  function P(x, y, z = 0) {
+    const s = F / Math.max(1, L + CAM_BACK - y);
+    return { x: W / 2 + (x - CX) * s, y: hy + (camH - z) * s, s };
+  }
+  function unproject(sx, sy) {
+    const d = camH * F / Math.max(1, sy - hy);
+    return { x: CX + (sx - W / 2) * d / F, y: L + CAM_BACK - d };
+  }
+
+  // ---------- sound ----------
+  let audio = null, muted = false;
+  function tone(freq, dur, type = 'triangle', vol = .12, delay = 0, slide = 0) {
+    if (muted) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + delay;
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur + .02);
+    } catch (e) {}
+  }
+  const sHit = big => { tone(big ? 300 : 420, .08, 'square', .07, 0, 120); tone(1400, .03, 'triangle', .05); };
+  const sBounce = () => tone(150, .06, 'sine', .15, 0, 90);
+  const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
+  const sLose = () => [392, 311].forEach((f, i) => tone(f, .18, 'triangle', .09, i * .12));
+  $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; };
+
+  // ---------- input ----------
+  const keys = {};
+  let ptr = null;
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (!keys[k] && (k === ' ' || k === 'z' || k === 'j')) doSwing();
+    keys[k] = true;
+    if (k.startsWith('arrow') || k === ' ') e.preventDefault();
+  });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  function setPtr(e) {
+    const r = canvas.getBoundingClientRect();
+    ptr = { x: e.clientX - r.left, y: e.clientY - r.top - (e.pointerType === 'mouse' ? 0 : 50) };
+  }
+  canvas.addEventListener('pointerdown', e => {
+    setPtr(e);
+    if (e.pointerType === 'mouse') { if (e.button === 0) doSwing(); }
+    else canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) setPtr(e); });
+  canvas.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') ptr = null; });
+  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') ptr = null; });
+  $('swing').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doSwing(); });
+
+  // ---------- state ----------
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const other = w => (w === 'P' ? 'C' : 'P');
+
+  let lvKey = 'normal', lv = LEVELS.normal, state = 'menu';
+  const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0 };
+  const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0 };
+  const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, live: false, held: false, serve: false,
+                 last: null, bounces: 0, rolling: false, trail: [] };
+  let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, tossing = false, cpuServeT = 0;
+  let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [];
+
+  const server = () => ((games[0] + games[1]) % 2 === 0 ? 'P' : 'C');
+  const deuce = () => (pts[0] + pts[1]) % 2 === 0;
+  function serveBox(recv, dc) {
+    const left = { x0: 0, x1: CX }, right = { x0: CX, x1: CW };
+    return recv === 'C'
+      ? { ...(dc ? left : right), y0: NET_Y - SVC, y1: NET_Y }
+      : { ...(dc ? right : left), y0: NET_Y, y1: NET_Y + SVC };
+  }
+  const T = .04; // line tolerance: touching the line is in
+  const inBox = b => ball.x >= b.x0 - T && ball.x <= b.x1 + T && ball.y >= b.y0 - T && ball.y <= b.y1 + T;
+  const inCourt = recv => ball.x >= -T && ball.x <= CW + T &&
+    (recv === 'C' ? ball.y >= -T && ball.y <= NET_Y : ball.y >= NET_Y && ball.y <= L + T);
+
+  function startMatch(key) {
+    lvKey = key; lv = LEVELS[key];
+    pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; popups = []; marks = [];
+    $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.remove('hidden');
+    $('lvName').textContent = lv.name;
+    setupServe();
+  }
+
+  function setupServe() {
+    const dc = deuce();
+    Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [] });
+    tossing = false; rally = 0; msg = null;
+    if (server() === 'P') {
+      Object.assign(player, { x: CX + (dc ? .9 : -.9), y: L + .4 });
+      Object.assign(cpu, { x: CX + (dc ? -2.6 : 2.6), y: -.8 });
+    } else {
+      Object.assign(cpu, { x: CX + (dc ? -.9 : .9), y: -.4 });
+      Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
+    }
+    player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null;
+    cpuServeT = 1.0;
+    state = 'serve';
+    updateBoard();
+  }
+
+  function holdBall() {
+    const s = server() === 'P' ? player : cpu, dir = s === player ? 1 : -1;
+    Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0 });
+  }
+  function toss() { ball.held = false; ball.z = 1.1; ball.vz = 5.2; ball.vx = ball.vy = 0; tossing = true; }
+
+  // launch the ball from where it is so that it lands on (tx, ty)
+  function shoot(tx, ty, speed, noClear) {
+    const dx = tx - ball.x, dy = ty - ball.y, dist = Math.hypot(dx, dy);
+    let t = Math.max(.35, dist / speed);
+    const f = (NET_Y - ball.y) / dy;
+    if (!noClear && f > 0 && f < 1) {
+      for (let i = 0; i < 60; i++) {
+        const vz = (.5 * G * t * t - ball.z) / t, tn = f * t;
+        if (ball.z + vz * tn - .5 * G * tn * tn > NET_H + .3) break;
+        t *= 1.04;
+      }
+    }
+    Object.assign(ball, { vx: dx / t, vy: dy / t, vz: (.5 * G * t * t - ball.z) / t, rolling: false, trail: [] });
+  }
+
+  function aimKeys() {
+    const l = keys['arrowleft'] || keys['a'], r = keys['arrowright'] || keys['d'];
+    return l && !r ? -1 : r && !l ? 1 : null;
+  }
+
+  function serveHit(who, q) {
+    const recv = other(who), box = serveBox(recv, deuce());
+    let aim = rand(-1, 1);
+    if (who === 'P') {
+      const k = aimKeys();
+      aim = k !== null ? k : ptr ? clamp((unproject(ptr.x, ptr.y).x - CX) / CX, -1, 1) : rand(-.5, .5);
+    }
+    const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45, err = (1 - q) * 1.8;
+    const tx = bx + aim * hw + rand(-err, err);
+    const deep = rand(.6, 2);
+    const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
+    shoot(tx, ty, 14 + 16 * q, q < .3);
+    Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
+    tossing = false; state = 'rally';
+    (who === 'P' ? player : cpu).swing = SWING;
+    sHit(q > .85);
+    if (who === 'P') {
+      popupAt(player.x, player.y, 2.4, q > .85 ? 'ナイスサーブ!' : q < .3 ? 'あっ…' : '', q > .85 ? '#e8ff3a' : '#fff');
+      cpu.plan = null; cpu.react = lv.react;
+    }
+  }
+
+  function doSwing() {
+    if (state === 'serve' && server() === 'P') {
+      if (ball.held) toss();
+      else if (tossing) serveHit('P', clamp(1 - Math.abs(ball.vz) / 4.5, 0, 1));
+      return;
+    }
+    if ((state === 'rally' || state === 'pause') && player.cool <= 0) { player.swing = SWING; player.cool = .42; }
+  }
+
+  function canHit(w) {
+    if (!ball.live || ball.last === w) return false;
+    if (ball.bounces === 1) return true;
+    return w === 'P' && ball.bounces === 0 && !ball.serve && ball.y > NET_Y; // volley
+  }
+
+  function playerHit(d) {
+    const smash = ball.z > 2 && ball.bounces === 0;
+    const q = clamp(1 - Math.max(0, d - .55) / (REACH - .55), 0, 1);
+    const k = aimKeys();
+    const aim = k !== null ? k : clamp(player.vx / PSPEED * 1.3, -1, 1);
+    const err = (1 - q) * 1.7;
+    const tx = CX + aim * (CX - .7) + rand(-err, err) + rand(-.4, .4);
+    const ty = (smash ? rand(2, 7) : rand(1, 4.5)) + rand(-err, err * .4);
+    shoot(tx, ty, smash ? 30 : 16 + 9 * q, q < .2);
+    Object.assign(ball, { last: 'P', bounces: 0, serve: false });
+    rally++; maxRally = Math.max(maxRally, rally);
+    sHit(smash || q > .85);
+    const txt = smash ? 'スマッシュ!' : q > .85 ? 'ナイス!' : q < .2 ? 'ミスヒット…' : '';
+    popupAt(player.x, player.y, 2.4, txt, smash ? '#ff5d73' : '#e8ff3a');
+    cpu.plan = null; cpu.react = lv.react;
+  }
+
+  function cpuHit(d) {
+    const incoming = Math.hypot(ball.vx, ball.vy);
+    const errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0);
+    let tx = player.x > CX ? rand(.5, CX - .3) : rand(CX + .3, CW - .5);
+    if (Math.random() < .3) tx = rand(.6, CW - .6);
+    let ty = L - rand(1, 5), speed = rand(...lv.shot), noClear = false;
+    if (Math.random() < errP) {
+      const r = Math.random();
+      if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
+      else if (r < .75) ty = L + rand(.2, 2);
+      else { ty = NET_Y + rand(1, 3); speed = 30; noClear = true; }
+    }
+    shoot(tx, ty, speed, noClear);
+    Object.assign(ball, { last: 'C', bounces: 0, serve: false });
+    rally++; maxRally = Math.max(maxRally, rally);
+    cpu.swing = SWING; sHit(false);
+  }
+
+  // where should the CPU go to meet the ball in time?
+  function planIntercept() {
+    const b = { ...ball }, step = 1 / 120;
+    let bounces = ball.bounces, t = 0, last = null;
+    for (let i = 0; i < 600; i++) {
+      b.vz -= G * step; b.x += b.vx * step; b.y += b.vy * step; b.z += b.vz * step; t += step;
+      if (b.z <= 0 && b.vz < 0) { b.z = 0; b.vz *= -.7; b.vx *= .85; b.vy *= .85; if (++bounces >= 2) break; }
+      if (bounces === 1 && b.z < 2.3) {
+        last = { x: b.x, y: b.y };
+        const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / lv.speed;
+        if (need <= t) break;
+      }
+    }
+    const p = last || { x: ball.x, y: ball.y };
+    return { x: p.x + rand(-lv.noise, lv.noise) * .6, y: p.y };
+  }
+
+  function predictBounce() {
+    const b = { ...ball }, step = 1 / 60;
+    for (let i = 0; i < 300; i++) {
+      b.vz -= G * step; b.x += b.vx * step; b.y += b.vy * step; b.z += b.vz * step;
+      if (b.z <= 0) return b;
+    }
+    return null;
+  }
+
+  // ---------- rules ----------
+  function onBounce() {
+    if (!ball.live) return;
+    ball.bounces++;
+    const recv = other(ball.last);
+    if (ball.bounces === 1) {
+      const ok = ball.serve ? inBox(serveBox(recv, deuce())) : inCourt(recv);
+      marks.push({ x: ball.x, y: ball.y, life: 1.2, ok });
+      if (!ok) ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
+    } else {
+      pointTo(ball.last, ball.last === 'P' ? 'ナイスショット!' : '取れなかった…');
+    }
+  }
+  function onNet() { ball.serve ? fault('ネット') : pointTo(other(ball.last), 'ネット!'); }
+
+  function fault(label) {
+    ball.live = false;
+    if (faults === 0) { faults = 1; pause(label, 'セカンドサーブ', 1.2, setupServe); }
+    else pointTo(other(ball.last), 'ダブルフォールト');
+  }
+
+  function pause(title, sub, sec, cb) { state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb; }
+
+  function pointTo(w, label) {
+    ball.live = false; faults = 0;
+    const i = w === 'P' ? 0 : 1;
+    pts[i]++;
+    w === 'P' ? sWin() : sLose();
+    if (navigator.vibrate && w === 'C') navigator.vibrate(60);
+    let title = w === 'P' ? 'あなたのポイント!' : 'CPU のポイント';
+    if (pts[i] >= 4 && pts[i] - pts[1 - i] >= 2) {
+      games[i]++; pts = [0, 0];
+      title = w === 'P' ? '🎾 あなたがゲームを取った!' : 'CPU がゲームを取った';
+      if (games[i] >= GAMES_TO_WIN) { updateBoard(); pause(title, label, 1.8, () => endMatch(w)); return; }
+    }
+    updateBoard();
+    pause(title, label, 1.6, setupServe);
+  }
+
+  function endMatch(w) {
+    state = 'over'; msg = null;
+    $('resTitle').textContent = w === 'P' ? '🏆 勝利!' : '😢 まけちゃった…';
+    $('resScore').textContent = `${games[0]} - ${games[1]}`;
+    $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回<br>` +
+      (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'もう一回挑戦してみよう！');
+    $('result').classList.remove('hidden');
+  }
+
+  function scoreText(a, b) {
+    if (a >= 3 && b >= 3) return a === b ? '40' : a > b ? 'Ad' : '40';
+    return ['0', '15', '30', '40'][Math.min(a, 3)];
+  }
+  function updateBoard() {
+    $('gP').textContent = games[0]; $('gC').textContent = games[1];
+    $('pP').textContent = scoreText(pts[0], pts[1]); $('pC').textContent = scoreText(pts[1], pts[0]);
+    $('srvP').style.visibility = server() === 'P' ? 'visible' : 'hidden';
+    $('srvC').style.visibility = server() === 'C' ? 'visible' : 'hidden';
+  }
+
+  function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1 }); }
+
+  // ---------- update ----------
+  function movePlayer(dt) {
+    let mx = 0, my = 0;
+    if (keys['arrowleft'] || keys['a']) mx--;
+    if (keys['arrowright'] || keys['d']) mx++;
+    if (keys['arrowup'] || keys['w']) my--;
+    if (keys['arrowdown'] || keys['s']) my++;
+    const serving = state === 'serve' && server() === 'P';
+    if (serving) my = 0;
+    let tvx = 0, tvy = 0;
+    if (mx || my) {
+      const l = Math.hypot(mx, my); tvx = mx / l * PSPEED; tvy = my / l * PSPEED;
+    } else if (ptr) {
+      const g = unproject(ptr.x, ptr.y), dx = g.x - player.x, dy = serving ? 0 : g.y - player.y, l = Math.hypot(dx, dy);
+      if (l > .05) { const s = Math.min(PSPEED, l * 8); tvx = dx / l * s; tvy = dy / l * s; }
+    }
+    const k = 1 - Math.exp(-dt * 14);
+    player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k;
+    player.x += player.vx * dt; player.y += player.vy * dt;
+    if (serving) {
+      const dc = deuce();
+      player.x = dc ? clamp(player.x, CX + .3, CX + 3.6) : clamp(player.x, CX - 3.6, CX - .3);
+    } else {
+      player.x = clamp(player.x, -3, CW + 3); player.y = clamp(player.y, NET_Y + .8, L + 3);
+    }
+  }
+
+  function moveCpu(dt) {
+    let target = null, speed = lv.speed;
+    if (state === 'rally' && ball.live && ball.last === 'P') {
+      if (cpu.react > 0) cpu.react -= dt;
+      else target = cpu.plan = cpu.plan || planIntercept();
+    } else if (state === 'rally' || state === 'pause') {
+      target = { x: CX + (player.x - CX) * .25, y: -1 }; speed *= .7;
+    }
+    if (target) {
+      const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
+      const s = Math.min(speed, l * 6);
+      cpu.vx = l > .01 ? dx / l * s : 0; cpu.vy = l > .01 ? dy / l * s : 0;
+    } else { cpu.vx = cpu.vy = 0; }
+    cpu.x = clamp(cpu.x + cpu.vx * dt, -3, CW + 3);
+    cpu.y = clamp(cpu.y + cpu.vy * dt, -4, NET_Y - 1.2);
+
+    if (state === 'serve' && server() === 'C') {
+      cpuServeT -= dt;
+      if (ball.held && cpuServeT <= 0) toss();
+      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve));
+    }
+  }
+
+  function moveBall(dt) {
+    if (ball.held) { holdBall(); return; }
+    const py = ball.y;
+    if (!ball.rolling) ball.vz -= G * dt;
+    ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.z += ball.vz * dt;
+    if (ball.rolling) { const f = Math.pow(.25, dt); ball.vx *= f; ball.vy *= f; }
+    if (tossing && ball.vz < 0 && ball.z < .8) { ball.held = true; tossing = false; return; } // missed toss: try again
+    if (ball.z <= 0 && ball.vz < 0) {
+      const impact = -ball.vz;
+      ball.z = 0; ball.vz = impact * .7; ball.vx *= .85; ball.vy *= .85;
+      if (ball.vz < 1) { ball.vz = 0; ball.rolling = true; }
+      if (impact > 2) sBounce();
+      onBounce();
+    }
+    if ((py - NET_Y) * (ball.y - NET_Y) < 0 && ball.x > -2.3 && ball.x < CW + 2.3) {
+      const nh = NET_H + Math.min(1, Math.abs(ball.x - CX) / (CX + 2.3)) * .155;
+      if (ball.z < nh) {
+        ball.y = NET_Y + Math.sign(py - NET_Y) * .06; ball.vy *= -.15; ball.vx *= .3;
+        if (ball.live) onNet();
+      }
+    }
+  }
+
+  function step(dt) {
+    movePlayer(dt);
+    moveCpu(dt);
+    moveBall(dt);
+    player.swing = Math.max(0, player.swing - dt); player.cool -= dt;
+    cpu.swing = Math.max(0, cpu.swing - dt);
+
+    if (state === 'rally') {
+      const dp = d2(ball, player);
+      if ($('auto').checked && canHit('P') && dp < REACH * .9 && ball.z < 2.6 && player.cool <= 0) doSwing();
+      if (player.swing > 0 && canHit('P') && dp < REACH && ball.z < 2.8) playerHit(dp);
+      const dc = d2(ball, cpu);
+      if (state === 'rally' && canHit('C') && dc < lv.reach && ball.z < 2.6) cpuHit(dc);
+    }
+  }
+
+  function update(dt) {
+    dt *= TS;
+    for (let i = 0; i < 3; i++) step(dt / 3);
+    if (ball.live || tossing) {
+      ball.trail.unshift({ x: ball.x, y: ball.y, z: ball.z });
+      ball.trail.length = Math.min(ball.trail.length, 8);
+    }
+    if (state === 'pause' && (pauseT -= dt) <= 0) { state = 'wait'; pauseCb(); }
+    popups.forEach(p => { p.z += dt * 1.2; p.life -= dt; });
+    popups = popups.filter(p => p.life > 0);
+    marks.forEach(m => (m.life -= dt));
+    marks = marks.filter(m => m.life > 0);
+  }
+
+  // ---------- drawing ----------
+  const crowd = Array.from({ length: 260 }, () => ({
+    u: Math.random(), v: Math.random(),
+    c: ['#ff5d73', '#ffd166', '#06d6a0', '#118ab2', '#f4f1de', '#ef8354', '#a78bfa'][Math.floor(Math.random() * 7)],
+  }));
+
+  function poly(pts, fill) {
+    ctx.beginPath();
+    pts.forEach(([x, y, z], i) => { const p = P(x, y, z || 0); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  }
+  function line(x1, y1, x2, y2, w = .06, color = 'rgba(255,255,255,.95)', z1 = 0, z2 = 0) {
+    const a = P(x1, y1, z1), b = P(x2, y2, z2);
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, w * (a.s + b.s) / 2);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  function drawCourt() {
+    const wallTop = P(0, -8, 2.2).y, wallBot = P(0, -8, 0).y;
+    const sky = ctx.createLinearGradient(0, 0, 0, wallTop);
+    sky.addColorStop(0, '#1b2440'); sky.addColorStop(1, '#2d3b63');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, wallTop);
+    const t = performance.now() / 1000;
+    crowd.forEach((c, i) => {
+      const y = c.v * (wallTop - 6) + 3 + (rally > 4 ? Math.sin(t * 9 + i) * 1.5 : 0);
+      ctx.fillStyle = c.c; ctx.beginPath(); ctx.arc(c.u * W, y, 2 + c.v * 2.5, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = '#1d5a3e'; ctx.fillRect(0, wallTop, W, wallBot - wallTop);
+    const mid = P(CX, -8, 1.1);
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `bold ${Math.max(10, mid.s * .9)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('BUMPY OPEN 🎾', mid.x, mid.y);
+    ctx.fillStyle = '#2f7d62'; ctx.fillRect(0, wallBot, W, H - wallBot);
+    poly([[-ALLEY, 0], [CW + ALLEY, 0], [CW + ALLEY, L], [-ALLEY, L]], '#3567b5');
+    // lines
+    [-ALLEY, 0, CW, CW + ALLEY].forEach(x => line(x, 0, x, L));
+    [0, L].forEach(y => line(-ALLEY, y, CW + ALLEY, y, .08));
+    [NET_Y - SVC, NET_Y + SVC].forEach(y => line(0, y, CW, y));
+    line(CX, NET_Y - SVC, CX, NET_Y + SVC);
+    line(CX, 0, CX, .25); line(CX, L, CX, L - .25);
+  }
+
+  function drawNet() {
+    const px = ALLEY + .91;
+    ctx.beginPath();
+    [[-px, 0], [-px, 1.07], [CX, NET_H], [CW + px, 1.07], [CW + px, 0]].forEach(([x, z], i) => {
+      const p = P(x, NET_Y, z); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y);
+    });
+    ctx.closePath(); ctx.fillStyle = 'rgba(15,18,30,.45)'; ctx.fill();
+    for (let x = -px; x <= CW + px; x += .5) {
+      const top = 1.07 - (1.07 - NET_H) * (1 - Math.abs(x - CX) / (CX + px));
+      line(x, NET_Y, x, NET_Y, .01, 'rgba(255,255,255,.18)', 0, top);
+    }
+    line(-px, NET_Y, CX, NET_Y, .07, '#fff', 1.07, NET_H);
+    line(CX, NET_Y, CW + px, NET_Y, .07, '#fff', NET_H, 1.07);
+    line(-px, NET_Y, -px, NET_Y, .1, '#333', 0, 1.07);
+    line(CW + px, NET_Y, CW + px, NET_Y, .1, '#333', 0, 1.07);
+  }
+
+  function figure(o, shirt, away) {
+    const b = P(o.x, o.y), s = b.s, zy = z => b.y - z * s;
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(b.x, b.y, .45 * s, .14 * s, 0, 0, Math.PI * 2); ctx.fill();
+    // legs
+    const run = Math.hypot(o.vx, o.vy) > .5 ? Math.sin(performance.now() / 70) * .08 : 0;
+    ctx.strokeStyle = '#f0c8a0'; ctx.lineWidth = .11 * s; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(b.x - .12 * s, zy(.05 + Math.max(0, run))); ctx.lineTo(b.x - .1 * s, zy(.75));
+    ctx.moveTo(b.x + .12 * s, zy(.05 + Math.max(0, -run))); ctx.lineTo(b.x + .1 * s, zy(.75));
+    ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillRect(b.x - .21 * s, zy(.9), .42 * s, .22 * s);
+    // body
+    ctx.fillStyle = shirt;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(b.x - .25 * s, zy(1.45), .5 * s, .6 * s, .12 * s) : ctx.rect(b.x - .25 * s, zy(1.45), .5 * s, .6 * s);
+    ctx.fill();
+    // head
+    const hx = b.x, hY = zy(1.64), hr = .17 * s;
+    ctx.fillStyle = '#f0c8a0'; ctx.beginPath(); ctx.arc(hx, hY, hr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a2a22';
+    ctx.beginPath();
+    if (away) ctx.arc(hx, hY - hr * .1, hr * 1.02, 0, Math.PI * 2);
+    else ctx.arc(hx, hY - hr * .25, hr * 1.02, Math.PI, Math.PI * 2);
+    ctx.fill();
+    if (!away) {
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(hx - hr * .4, hY, hr * .13, 0, 7); ctx.arc(hx + hr * .4, hY, hr * .13, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = shirt; ctx.fillRect(hx - hr, hY - hr * .55, hr * 2, hr * .3); // headband
+    // racket arm
+    const sgn = away ? 1 : -1, sx = b.x + sgn * .24 * s, sy = zy(1.32);
+    let a = sgn > 0 ? -1.2 : Math.PI + 1.2;
+    if (o.swing > 0) {
+      const p = 1 - o.swing / SWING;
+      a = sgn > 0 ? .7 - p * 3.4 : Math.PI - .7 + p * 3.4;
+    }
+    const ca = Math.cos(a), sa = Math.sin(a);
+    ctx.strokeStyle = '#f0c8a0'; ctx.lineWidth = .08 * s;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + ca * .32 * s, sy + sa * .32 * s); ctx.stroke();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = .05 * s;
+    ctx.beginPath(); ctx.moveTo(sx + ca * .32 * s, sy + sa * .32 * s); ctx.lineTo(sx + ca * .55 * s, sy + sa * .55 * s); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(sx + ca * .72 * s, sy + sa * .72 * s, .17 * s, .12 * s, a, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fill();
+    ctx.lineWidth = .045 * s; ctx.strokeStyle = '#222'; ctx.stroke();
+  }
+
+  function drawBall() {
+    ball.trail.forEach((t, i) => {
+      const p = P(t.x, t.y, t.z);
+      ctx.fillStyle = `rgba(232,255,58,${.25 - i * .03})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, .1 * p.s), 0, 7); ctx.fill();
+    });
+    const p = P(ball.x, ball.y, ball.z);
+    ctx.fillStyle = '#e8ff3a'; ctx.strokeStyle = '#7c8a10'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2.5, .1 * p.s), 0, 7); ctx.fill(); ctx.stroke();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    drawCourt();
+
+    // bounce marks
+    marks.forEach(m => {
+      const p = P(m.x, m.y);
+      ctx.globalAlpha = Math.min(1, m.life);
+      ctx.strokeStyle = m.ok ? '#e8ff3a' : '#ff4d4d'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, .25 * p.s, .1 * p.s, 0, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    // landing guide for incoming shots
+    if (state === 'rally' && ball.live && ball.last === 'C' && ball.bounces === 0) {
+      const b = predictBounce();
+      if (b) {
+        const p = P(b.x, b.y), pulse = 1 + Math.sin(performance.now() / 90) * .15;
+        ctx.strokeStyle = 'rgba(232,255,58,.7)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, .35 * p.s * pulse, .13 * p.s * pulse, 0, 0, 7); ctx.stroke();
+      }
+    }
+    if (state !== 'menu') {
+      const sp = P(ball.x, ball.y);
+      ctx.fillStyle = 'rgba(0,0,0,.3)';
+      ctx.beginPath(); ctx.ellipse(sp.x, sp.y, Math.max(2, .12 * sp.s), Math.max(1, .05 * sp.s), 0, 0, 7); ctx.fill();
+    }
+
+    const items = [
+      { y: NET_Y, f: drawNet },
+      { y: cpu.y, f: () => figure(cpu, '#4a6fd1', false) },
+      { y: player.y, f: () => figure(player, '#ff5d73', true) },
+    ];
+    if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
+    items.sort((a, b) => a.y - b.y).forEach(i => i.f());
+
+    popups.forEach(p => {
+      const s = P(p.x, p.y, p.z);
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.font = 'bold 20px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(p.text, s.x, s.y);
+      ctx.fillStyle = p.color; ctx.fillText(p.text, s.x, s.y);
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (rally >= 3 && (state === 'rally' || state === 'pause')) {
+      ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#e8ff3a';
+      ctx.fillText(`ラリー ${rally}`, W / 2, 24);
+    }
+    if (state === 'serve') {
+      const mine = server() === 'P';
+      const text = mine
+        ? (ball.held ? (coarse ? '「打つ!」でトス' : 'クリック / スペースでトス') : '今だ! 一番高いところで打て!')
+        : 'CPU のサーブ…';
+      const t2 = faults ? 'セカンドサーブ' : '';
+      ctx.font = 'bold 18px system-ui, sans-serif';
+      const w = ctx.measureText(text).width + 32, y = H - (coarse ? 150 : 40);
+      ctx.fillStyle = 'rgba(15,20,40,.75)';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W / 2 - w / 2, y - 20, w, 40, 20) : ctx.rect(W / 2 - w / 2, y - 20, w, 40); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(text, W / 2, y);
+      if (t2) { ctx.font = 'bold 14px system-ui, sans-serif'; ctx.fillStyle = '#ffd166'; ctx.fillText(t2, W / 2, y - 34); }
+    }
+    if (msg) {
+      const y = H - (coarse ? 260 : 150);
+      ctx.font = 'bold 28px system-ui, sans-serif';
+      const w = Math.max(ctx.measureText(msg.title).width, 160) + 48;
+      ctx.fillStyle = 'rgba(15,20,40,.82)';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W / 2 - w / 2, y - 42, w, msg.sub ? 92 : 64, 18) : ctx.rect(W / 2 - w / 2, y - 42, w, 92); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(msg.title, W / 2, y - 10);
+      if (msg.sub) { ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#e8ff3a'; ctx.fillText(msg.sub, W / 2, y + 26); }
+    }
+  }
+
+  let lastT = performance.now();
+  function loop(t) {
+    const dt = Math.min(.04, (t - lastT) / 1000);
+    lastT = t;
+    if (state !== 'menu' && state !== 'over') update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  document.querySelectorAll('[data-level]').forEach(b => (b.onclick = () => startMatch(b.dataset.level)));
+  $('again').onclick = () => startMatch(lvKey);
+  $('toMenu').onclick = () => { $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); $('board').classList.add('hidden'); state = 'menu'; };
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
