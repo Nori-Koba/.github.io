@@ -128,8 +128,10 @@
   // ---------- court (meters) ----------
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
-  const PSPEED = 7, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
-  const P_ACC = 17, P_DEC = 30, C_ACC = 13, C_DEC = 24; // m/s^2: people need time to start and stop
+  const PSPEED = 8.5, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
+  const BALL_TS = .72; // the ball runs slower than the people, for longer rallies
+  const FIG = .8;      // people are drawn at 80% size
+  const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
 
   // sf: extra "gravity" from spin (topspin dives, backspin floats)
@@ -536,7 +538,7 @@
       if (bounces === 1 && b.z < 2.3) {
         last = { x: b.x, y: b.y };
         const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / lv.speed + lv.speed / (2 * C_ACC);
-        if (need <= t) break;
+        if (need <= t / BALL_TS) break; // t is ball time, need is people time
       }
     }
     const p = last || { x: ball.x, y: ball.y };
@@ -702,7 +704,7 @@
   function step(dt) {
     movePlayer(dt);
     moveCpu(dt);
-    moveBall(dt);
+    moveBall(dt * BALL_TS);
     player.swing = Math.max(0, player.swing - dt); player.cool -= dt;
     cpu.swing = Math.max(0, cpu.swing - dt);
     if (charge) charge.t += dt;
@@ -883,7 +885,7 @@
     const lean = o.crouch * .1 + o.sp * .07;
     // body-local -> world (meters); yaw turns the shoulders, hips follow half way
     const rot = (l, a) => [l[0] * Math.cos(a) + l[1] * Math.sin(a), -l[0] * Math.sin(a) + l[1] * Math.cos(a), l[2]];
-    const W3 = l => [o.x + R[0] * l[0] + Fw[0] * l[1], o.y + R[1] * l[0] + Fw[1] * l[1], l[2]];
+    const W3 = l => [o.x + (R[0] * l[0] + Fw[0] * l[1]) * FIG, o.y + (R[1] * l[0] + Fw[1] * l[1]) * FIG, l[2] * FIG];
     const yaw = pose.yaw;
     const hipL = W3(rot([-.12, 0, hipZ], yaw * .5)), hipR = W3(rot([.12, 0, hipZ], yaw * .5));
     const shZ = hipZ + .55;
@@ -892,14 +894,14 @@
     const hand = W3([pose.hand[0], pose.hand[1], pose.hand[2] + hop]);
     let dir = [R[0] * pose.dir[0] + Fw[0] * pose.dir[1], R[1] * pose.dir[0] + Fw[1] * pose.dir[1], pose.dir[2]];
     const dl = Math.hypot(...dir); dir = dir.map(v => v / dl);
-    const at = (p, k) => p.map((v, i) => v + dir[i] * k);
+    const at = (p, k) => p.map((v, i) => v + dir[i] * k * FIG);
     let offT;
     if (pose.off === 'grip') offT = [hand[0] - dir[0] * .07, hand[1] - dir[1] * .07, hand[2] - dir[2] * .07 - .02];
     else if (pose.off === 'throat') offT = at(hand, .26);
     else offT = W3([pose.off[0], pose.off[1], pose.off[2] + hop]);
     const down = [0, 0, -1];
     const poleOut = s => [R[0] * s * .6 - Fw[0] * .3, R[1] * s * .6 - Fw[1] * .3, -1];
-    const armR = ik(shR, hand, .3, .28, poleOut(1)), armL = ik(shL, offT, .3, .28, poleOut(-1));
+    const armR = ik(shR, hand, .3 * FIG, .28 * FIG, poleOut(1)), armL = ik(shL, offT, .3 * FIG, .28 * FIG, poleOut(-1));
 
     // feet: stance, a step into the shot, running stride
     const sp = Math.hypot(o.vx, o.vy), md = sp > .1 ? [o.vx / sp, o.vy / sp] : [0, 0];
@@ -910,14 +912,14 @@
       const front = o.stroke.kind === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
       if (o.swing > 0 && i === front && o.stroke.kind !== 'serve') l = [l[0], l[1] + .32 * Math.min(1, swingP * 2.2)];
       const w = W3([l[0], l[1], 0]), ph = o.phase + (i > 0 ? Math.PI : 0);
-      const stride = .38 * o.sp;
+      const stride = .38 * o.sp * FIG;
       return [w[0] + md[0] * Math.sin(ph) * stride, w[1] + md[1] * Math.sin(ph) * stride,
-              Math.max(0, Math.cos(ph)) * .17 * o.sp + hop * .8];
+              (Math.max(0, Math.cos(ph)) * .17 * o.sp + hop * .8) * FIG];
     });
     const kneePole = [Fw[0] + md[0] * .5, Fw[1] + md[1] * .5, .1];
-    const legL = ik(hipL, feet[0], .47, .46, kneePole), legR = ik(hipR, feet[1], .47, .46, kneePole);
+    const legL = ik(hipL, feet[0], .47 * FIG, .46 * FIG, kneePole), legR = ik(hipR, feet[1], .47 * FIG, .46 * FIG, kneePole);
 
-    const base = P(o.x, o.y), s = base.s;
+    const base = P(o.x, o.y), s = base.s * FIG;
     const Q = p => P(p[0], p[1], p[2]);
     const parts = [];
     const limb = (a, b, w, color, depthBias = 0) => parts.push({
@@ -942,8 +944,8 @@
       limb(hip, leg.joint, .15, kit.skin);
       limb(leg.joint, foot, .12, kit.skin);
             limb(mid(leg.joint, foot, .75), foot, .115, '#fafafa', .01);
-      const toe = [foot[0] + Fw[0] * .12 + md[0] * .05, foot[1] + Fw[1] * .12 + md[1] * .05, foot[2]];
-      limb([foot[0], foot[1], foot[2] + .03], [toe[0], toe[1], toe[2] + .03], .12, kit.shoe, .02);
+      const toe = [foot[0] + (Fw[0] * .12 + md[0] * .05) * FIG, foot[1] + (Fw[1] * .12 + md[1] * .05) * FIG, foot[2]];
+      limb([foot[0], foot[1], foot[2] + .03 * FIG], [toe[0], toe[1], toe[2] + .03 * FIG], .12, kit.shoe, .02);
     });
     // shorts across the hips, then the torso over them
     const torsoY = (shL[1] + shR[1] + hipL[1] + hipR[1]) / 4;
@@ -1022,7 +1024,7 @@
 
     // charge meter
     if (ch) {
-      const p = Math.min(1, ch.t / ch.full), w = Math.max(44, .9 * s), y = P(o.x, o.y, 2.35).y, col = SHOTS[ch.type].color;
+      const p = Math.min(1, ch.t / ch.full), w = Math.max(44, 1.1 * s), y = P(o.x, o.y, 2.35 * FIG).y, col = SHOTS[ch.type].color;
       ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(base.x - w / 2 - 2, y - 5, w + 4, 10);
       ctx.fillStyle = p >= 1 && Math.floor(performance.now() / 80) % 2 ? '#fff' : col;
       ctx.fillRect(base.x - w / 2, y - 3, w * p, 6);
