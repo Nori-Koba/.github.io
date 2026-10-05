@@ -85,7 +85,7 @@
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
         <b>パワー</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。ためている間は動きが遅くなり、強く打つほどアウトしやすい。<br>
-        <b>サーブ</b>：1 回押してトス、一番高いところでもう 1 回。押したボタンで球種が変わる。
+        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。フラット＝速い、スライス＝曲がる、トップスピン＝高く弾む（一番安全）。
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>低く滑って横に曲がる。弾まない</small></span>
@@ -125,6 +125,7 @@
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
   const PSPEED = 7, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9;
+  const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
 
   // sf: extra "gravity" from spin (topspin dives, backspin floats)
   // bz / bh: how much height / forward speed survives the bounce
@@ -300,7 +301,7 @@
     const s = server() === 'P' ? player : cpu, dir = s === player ? 1 : -1;
     Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85 });
   }
-  function toss() { ball.held = false; ball.z = 1.1; ball.vz = 5.2; ball.vx = ball.vy = 0; tossing = true; }
+  function toss() { ball.held = false; ball.z = 1.1; ball.vz = TOSS_V; ball.vx = ball.vy = 0; tossing = true; }
 
   // One physics step, shared by the real ball and the AI's look-ahead. Returns impact speed on a bounce.
   function physStep(b, dt) {
@@ -319,10 +320,10 @@
   }
 
   // Launch the ball from where it is so that it lands on (tx, ty).
-  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false } = {}) {
+  function shoot(tx, ty, type, { speed = 20, flight = 0, noClear = false, curve = 1 } = {}) {
     const sh = SHOTS[type];
     const ge = G * (1 + sh.sf);
-    const ax = sh.curve ? (tx > CX ? 1 : -1) * sh.curve : 0; // slices curve away toward the sideline
+    const ax = sh.curve ? (tx > CX ? 1 : -1) * sh.curve * curve : 0; // slices curve away toward the sideline
     const dx = tx - ball.x, dy = ty - ball.y;
     let t = flight || Math.max(.35, Math.hypot(dx, dy) / speed);
     const f = (NET_Y - ball.y) / dy;
@@ -347,43 +348,58 @@
     return l && !r ? -1 : r && !l ? 1 : null;
   }
 
-  function serveHit(who, q, type) {
+  // q: toss timing (1 = hit at the top of the toss), power: how long the button was held
+  function serveHit(who, q, type, power) {
     if (type === 'lob') type = 'top';
     if (type === 'drop') type = 'slice';
-    const recv = other(who), box = serveBox(recv, deuce());
+    const recv = other(who), box = serveBox(recv, deuce()), sh = SHOTS[type];
     let aim = rand(-1, 1);
     if (who === 'P') {
       const k = aimKeys();
       aim = k !== null ? k : ptr ? clamp((unproject(ptr.x, ptr.y).x - CX) / CX, -1, 1) : rand(-.5, .5);
     }
     const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45;
-    const err = (1 - q) * 1.8 * (type === 'flat' ? 1.25 : type === 'top' ? .75 : 1);
+    // bad timing and big power both widen the error; topspin (kick) is the safest serve
+    const err = (1 - q) * 1.6 * (type === 'flat' ? 1.2 : type === 'top' ? .75 : 1) + power * power * sh.err * .85;
     const tx = bx + aim * hw + rand(-err, err);
     const deep = rand(.6, 2);
     const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
-    const speed = type === 'flat' ? 20 + 18 * q : type === 'top' ? 17 + 11 * q : 18 + 12 * q;
-    const kmh = shoot(tx, ty, type, { speed, noClear: q < .3 });
+    const base = type === 'flat' ? [20, 42] : type === 'top' ? [16, 29] : [17, 32];
+    const speed = lerp(base[0], base[1], power) * (.75 + .25 * q);
+    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25, curve: 1 + power * .8 });
+    if (type === 'top') { ball.bz = .8 + power * .12; ball.bh = .95; } // kick serve jumps up
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
     tossing = false; state = 'rally';
-    (who === 'P' ? player : cpu).swing = SWING;
-    sHit(q);
     const s = who === 'P' ? player : cpu;
-    popupAt(s.x, s.y, 2.6, `${kmh} km/h`, SHOTS[type].color);
+    s.swing = SWING;
+    sHit(power);
+    popupAt(s.x, s.y, 2.6, `${sh.name}サーブ ${kmh}km/h`, sh.color);
     if (who === 'P') {
-      if (q > .85) popupAt(player.x, player.y, 3.1, 'ナイスサーブ!', '#e8ff3a');
+      maxSpeed = Math.max(maxSpeed, kmh);
+      const t = q > .85 ? (power >= 1 ? 'ジャスト! MAX!' : 'ジャスト!') : q < .35 ? 'タイミングずれ…' : '';
+      popupAt(player.x, player.y, 3.2, t, q > .85 ? '#e8ff3a' : '#fff');
       cpu.plan = null; cpu.react = lv.react;
     }
+  }
+
+  const serveTiming = () => clamp(1 - Math.max(0, TOSS_PEAK - ball.z) / 1.1, 0, 1);
+  function serveRelease() {
+    const c = charge; charge = null;
+    serveHit('P', serveTiming(), c.type, Math.min(1, c.t / c.full));
   }
 
   function press(type) {
     if (state === 'serve' && server() === 'P') {
       if (ball.held) toss();
-      else if (tossing) serveHit('P', clamp(1 - Math.abs(ball.vz) / 4.5, 0, 1), type);
+      else if (tossing && !charge) charge = { type, t: 0, full: SERVE_CHARGE, serve: true };
       return;
     }
-    if ((state === 'rally' || state === 'pause') && !charge) charge = { type, t: 0 };
+    if ((state === 'rally' || state === 'pause') && !charge) charge = { type, t: 0, full: FULL_CHARGE };
   }
-  function release(type) { if (charge && charge.type === type) fireSwing(); }
+  function release(type) {
+    if (!charge || charge.type !== type) return;
+    charge.serve ? serveRelease() : fireSwing();
+  }
   function fireSwing() {
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
@@ -593,7 +609,7 @@
     if (state === 'serve' && server() === 'C') {
       cpuServeT -= dt;
       if (ball.held && cpuServeT <= 0) toss();
-      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 4, slice: 3, top: 3 }));
+      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 4, slice: 3, top: 3 }), rand(...lv.power));
     }
   }
 
@@ -621,6 +637,8 @@
     player.swing = Math.max(0, player.swing - dt); player.cool -= dt;
     cpu.swing = Math.max(0, cpu.swing - dt);
     if (charge) charge.t += dt;
+    // held too long: the toss drops and you have to swing anyway
+    if (charge && charge.serve && tossing && ball.vz < 0 && ball.z < 1.9) serveRelease();
 
     if (state === 'rally') {
       const dp = d2(ball, player), reachable = canHit('P') && ball.z < 3.2;
@@ -736,7 +754,7 @@
     // racket arm: idle / pulled back while charging / sweeping through a swing
     const sgn = away ? 1 : -1, sx = b.x + sgn * .24 * s, sy = zy(1.32);
     let a = sgn > 0 ? -1.2 : Math.PI + 1.2;
-    if (ch) { const back = Math.min(1, ch.t / FULL_CHARGE); a = sgn > 0 ? -1.2 + back * 2.1 : Math.PI + 1.2 - back * 2.1; }
+    if (ch) { const back = Math.min(1, ch.t / ch.full); a = sgn > 0 ? -1.2 + back * 2.1 : Math.PI + 1.2 - back * 2.1; }
     if (o.swing > 0) {
       const p = 1 - o.swing / SWING;
       a = sgn > 0 ? .9 - p * 3.6 : Math.PI - .9 + p * 3.6;
@@ -752,7 +770,7 @@
     ctx.lineWidth = .045 * s; ctx.strokeStyle = '#222'; ctx.stroke();
     // charge meter
     if (ch) {
-      const p = Math.min(1, ch.t / FULL_CHARGE), w = Math.max(44, .9 * s), y = zy(2.15), col = SHOTS[ch.type].color;
+      const p = Math.min(1, ch.t / ch.full), w = Math.max(44, .9 * s), y = zy(2.15), col = SHOTS[ch.type].color;
       ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(b.x - w / 2 - 2, y - 5, w + 4, 10);
       ctx.fillStyle = p >= 1 && Math.floor(performance.now() / 80) % 2 ? '#fff' : col;
       ctx.fillRect(b.x - w / 2, y - 3, w * p, 6);
@@ -830,7 +848,7 @@
     if (state === 'serve') {
       const mine = server() === 'P';
       const text = mine
-        ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '今だ! 球種を選んで打て!')
+        ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '球種を長押し → 一番高いところで離せ!')
         : 'CPU のサーブ…';
       const t2 = faults ? 'セカンドサーブ' : '';
       ctx.font = 'bold 18px system-ui, sans-serif';
