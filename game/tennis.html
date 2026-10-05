@@ -82,14 +82,14 @@
     <div class="card">
       <h2>🎾 Bumpy Tennis</h2>
       <p>CPU と 1 対 1 のテニス勝負！<b>3 ゲーム先取</b>で勝ち。</p>
-      <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（速い球と、低く滑るスライスを多用）</p>
+      <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）</p>
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
         <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間は移動キー / マウス / 指で狙いを動かす</b>（相手コートに的が出る。上で深く、下で短いアングル）。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br>
         <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。フラット＝最速（180km/h 近く）、スライス＝大きく外へ曲がって滑る、トップスピン＝キックして高く横に跳ねる（一番安全）。
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
-          <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>低く滑って横に曲がる。弾まない</small></span>
+          <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
           <span class="t" style="background:var(--flat)">フラット</span><span><span class="pc">C・L・ホイールクリック</span> <small>一番速い。でもミスしやすい</small></span>
           <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">V・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
           <span class="t" style="background:var(--drop)">ドロップ</span><span><span class="pc">B・O・Shift+右クリック</span> <small>ネット際にポトリ。後ろの相手に効く</small></span>
@@ -145,7 +145,7 @@
     lob:   { name: 'ロブ',         color: '#c77dff', sf: .3,  bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
     drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .35, margin: .25, speed: [0, 0],  err: .9 },
   };
-  // play styles: you hit heavy, dipping topspin; the CPU hits fast and lives on a skidding slice
+  // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
     P: { name: 'パワースピン型', top: { sf: 1.3, bz: .66, bh: .9, margin: 1, speed: [22, 35] } },
     C: { name: 'スライス型',
@@ -156,11 +156,11 @@
   const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
   const LEVELS = {
     easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
-              mix: { slice: 5, top: 2, flat: 1 }, tactic: .2 },
+              mix: { top: 5, slice: 3, flat: 1 }, tactic: .2 },
     normal: { name: 'ふつう',   speed: 4.8, react: .25, reach: 1.3,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
-              mix: { slice: 6, top: 1, flat: 3 }, tactic: .4 },
+              mix: { top: 5, slice: 3.5, flat: 1.5 }, tactic: .4 },
     hard:   { name: 'つよい',   speed: 5.8, react: .15, reach: 1.45, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
-              mix: { slice: 6, top: 1, flat: 4 }, tactic: .6 },
+              mix: { top: 5, slice: 3.5, flat: 2 }, tactic: .6 },
   };
 
   const $ = id => document.getElementById(id);
@@ -501,8 +501,7 @@
       const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
     }
-    // forehand slice drifts to the hitter's left, backhand slice to the right
-    opts.side = leftOf('P') * (player.stroke.kind === 'bh' ? -1 : 1); opts.who = 'P';
+    opts.curve = 0; opts.who = 'P'; // groundstroke slice goes straight and skids; only the slice serve curves
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'P', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
@@ -561,7 +560,7 @@
       else if (r < .75) ty = type === 'drop' ? NET_Y + rand(-.5, .2) : L + rand(.2, 2);
       else { type = 'flat'; ty = NET_Y + rand(1, 3); opts = { speed: 30, noClear: true }; }
     }
-    opts.side = leftOf('C') * (sideKind(cpu) === 'bh' ? -1 : 1); opts.who = 'C';
+    opts.curve = 0; opts.who = 'C';
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'C', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally);
