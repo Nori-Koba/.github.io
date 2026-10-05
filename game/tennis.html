@@ -84,7 +84,7 @@
       <p>CPU と 1 対 1 のテニス勝負！<b>3 ゲーム先取</b>で勝ち。</p>
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
-        <b>パワー</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。ためている間は動きが遅くなり、強く打つほどアウトしやすい。<br>
+        <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間は移動キー / マウス / 指で狙いを動かす</b>（相手コートに的が出る。上で深く、下で短いアングル）。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br>
         <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。フラット＝最速（180km/h 近く）、スライス＝大きく外へ曲がって滑る、トップスピン＝キックして高く横に跳ねる（一番安全）。
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
@@ -292,6 +292,7 @@
   const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
                  live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
   let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
+  let aimX = 0, aimD = 0; // where you are aiming while a shot is charged: -1..1 across, -1 short .. 1 deep
   let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null, history = [], cpuMod = { err: 0, react: 0, noise: 1 };
 
   const server = () => ((games[0] + games[1]) % 2 === 0 ? 'P' : 'C');
@@ -328,7 +329,7 @@
       Object.assign(cpu, { x: CX + (dc ? -.9 : .9), y: -.4 });
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
-    player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null;
+    player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -382,9 +383,16 @@
     return kmh;
   }
 
-  function aimKeys() {
-    const l = keys['arrowleft'] || keys['a'], r = keys['arrowright'] || keys['d'];
-    return l && !r ? -1 : r && !l ? 1 : null;
+  // the spot a charged shot is aimed at (without the random error), for the aim marker and the shot itself
+  function aimTarget(type, ax, ad) {
+    if (state === 'serve') {
+      const box = serveBox('C', deuce()), hw = (box.x1 - box.x0) / 2 - .45;
+      return { x: (box.x0 + box.x1) / 2 + ax * hw, y: box.y0 + 1.2 };
+    }
+    if (type === 'drop') return { x: CX + ax * (CX - 1), y: NET_Y - 2.2 };
+    if (type === 'lob') return { x: CX + ax * (CX - 1), y: lerp(2.2, .9, Math.max(0, ad)) };
+    const short = Math.max(0, -ad);
+    return { x: CX + ax * (CX - .7 + short * .4), y: ad >= 0 ? lerp(2.8, 1, ad) : lerp(2.8, 6.8, short) };
   }
 
   // q: toss timing (1 = hit at the top of the toss), power: how long the button was held
@@ -392,11 +400,7 @@
     if (type === 'lob') type = 'top';
     if (type === 'drop') type = 'slice';
     const recv = other(who), box = serveBox(recv, deuce()), sh = SHOTS[type];
-    let aim = rand(-1, 1);
-    if (who === 'P') {
-      const k = aimKeys();
-      aim = k !== null ? k : ptr ? clamp((unproject(ptr.x, ptr.y).x - CX) / CX, -1, 1) : rand(-.5, .5);
-    }
+    const aim = who === 'P' ? aimX : rand(-1, 1);
     const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45;
     // bad timing and big power both widen the error; topspin (kick) is the safest serve
     const err = (1 - q) * 1.6 * (type === 'flat' ? 1.2 : type === 'top' ? .75 : 1) + power * power * sh.err * .85;
@@ -434,10 +438,10 @@
   function press(type) {
     if (state === 'serve' && server() === 'P') {
       if (ball.held) toss();
-      else if (tossing && !charge) charge = { type, t: 0, full: SERVE_CHARGE, serve: true };
+      else if (tossing && !charge) { charge = { type, t: 0, full: SERVE_CHARGE, serve: true, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
       return;
     }
-    if ((state === 'rally' || state === 'pause') && !charge) charge = { type, t: 0, full: FULL_CHARGE };
+    if ((state === 'rally' || state === 'pause') && !charge) { charge = { type, t: 0, full: FULL_CHARGE, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
   }
   function release(type) {
     if (!charge || charge.type !== type) return;
@@ -447,7 +451,7 @@
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
     player.stroke = { kind: ball.z > 2.3 && ball.bounces === 0 ? 'smash' : sideKind(player), spin: charge.type };
-    player.swing = SWING; player.cool = .42;
+    player.swing = SWING; player.cool = .42; player.aimX = aimX; player.aimD = aimD;
     charge = null;
   }
 
@@ -464,8 +468,7 @@
     if (smash) type = 'flat';
     const sh = SHOTS[type];
     const q = clamp(1 - Math.max(0, d - .55) / (REACH - .55), 0, 1);
-    const k = aimKeys();
-    const aim = k !== null ? k : clamp(player.vx / PSPEED * 1.3, -1, 1);
+    const goal = aimTarget(type, player.aimX, player.aimD);
     // timing errors plus the risk of hitting hard
     let err = (1 - q) * 1.6 + power * power * sh.err * .9, speedMul = 1, note = '';
     // the height you meet the ball at decides which shot is safe
@@ -474,17 +477,17 @@
       else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = '高い球はトップスピンで!'; }
       else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = '打ちごろ! 強打!'; }
     }
-    let tx = CX + aim * (CX - .7) + rand(-err, err) + rand(-.3, .3);
+    let tx = goal.x + rand(-err, err) + rand(-.3, .3);
     let ty, opts;
     if (type === 'lob') {
-      tx = CX + aim * (CX - 1) + rand(-err * .6, err * .6);
-      ty = rand(.6, 3) + rand(-err * .8, err * .3) - power * 1.2;
+      tx = goal.x + rand(-err * .6, err * .6);
+      ty = goal.y + rand(-.6, .6) + rand(-err * .8, err * .3) - power * 1.2;
       opts = { flight: 1.75 + power * .25 + rand(0, .2) };
     } else if (type === 'drop') {
-      ty = NET_Y - rand(1.5, 3.2) + rand(-err * .6, err * .6);
+      ty = goal.y + rand(-.7, .7) + rand(-err * .6, err * .6);
       opts = { flight: 1.05 + rand(0, .15), noClear: q < .35 };
     } else {
-      ty = (smash ? rand(2, 7) : rand(1, type === 'slice' ? 5 : 4.5)) + rand(-err, err * .4);
+      ty = (smash ? rand(2, 7) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
       const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
     }
@@ -652,9 +655,19 @@
     if (keys['arrowdown'] || keys['s']) my++;
     const serving = state === 'serve' && server() === 'P';
     if (serving) my = 0;
-    const max = PSPEED * (charge ? .45 : 1); // charging a shot slows you down
+    const max = PSPEED;
     let tvx = 0, tvy = 0;
-    if (mx || my) {
+    if (charge) {
+      // while a shot is charged the controls aim instead of moving you
+      if (mx || -my) { aimX = clamp(aimX + mx * dt * 3.2, -1, 1); aimD = clamp(aimD - my * dt * 3.2, -1, 1); }
+      else if (ptr) {
+        if (!charge.p0) charge.p0 = { ...ptr };
+        aimX = clamp((ptr.x - charge.p0.x) / (W * .16), -1, 1);
+        aimD = clamp((charge.p0.y - ptr.y) / (H * .14), -1, 1);
+      }
+      const gx = charge.serve ? null : assistX();
+      if (gx !== null) { const dx = gx - player.x; tvx = clamp(dx * 6, -PSPEED * .6, PSPEED * .6); }
+    } else if (mx || my) {
       const l = Math.hypot(mx, my); tvx = mx / l * max; tvy = my / l * max;
     } else if (ptr) {
       const g = unproject(ptr.x, ptr.y), dx = g.x - player.x, dy = serving ? 0 : g.y - player.y, l = Math.hypot(dx, dy);
@@ -671,6 +684,19 @@
     animateBody(player, dt);
   }
 
+  // where to stand (x) to meet the incoming ball on the forehand or backhand side
+  function assistX() {
+    if (!ball.live || ball.last !== 'C') return null;
+    const b = { ...ball, trail: null }, step = 1 / 60;
+    let bounces = ball.bounces;
+    for (let i = 0; i < 240; i++) {
+      if (physStep(b, step) && ++bounces >= 2) break;
+      if (b.y >= player.y - .2) break;
+    }
+    const side = b.x >= player.x - .1 ? 1 : -1;
+    return b.x - side * .6;
+  }
+
   // accelerate toward a target velocity, braking harder than speeding up
   function accelTo(o, tvx, tvy, dt, acc, dec) {
     let dx = tvx - o.vx, dy = tvy - o.vy;
@@ -679,8 +705,50 @@
     if (dl > a) { dx = dx / dl * a; dy = dy / dl * a; }
     o.vx += dx; o.vy += dy;
   }
+  // Feet stay planted on the court and step to a new spot when the body leaves them behind.
+  function footIdeal(o, i) {
+    const { R, Fw } = facing(o);
+    const serving = state === 'serve' && isServer(o) && o.swing <= 0;
+    let l = serving ? (i < 0 ? [-.08, .3] : [.32, -.22]) : [i * (.19 + o.crouch * .07), 0];
+    const front = o.stroke.kind === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
+    if (o.swing > 0 && i === front && o.stroke.kind !== 'serve') l = [l[0], l[1] + .34];
+    return [o.x + (R[0] * l[0] + Fw[0] * l[1]) * FIG + o.vx * .1, o.y + (R[1] * l[0] + Fw[1] * l[1]) * FIG + o.vy * .1];
+  }
+  function stepFeet(o, dt) {
+    const sp = Math.hypot(o.vx, o.vy);
+    if (!o.feet) o.feet = [-1, 1].map(i => { const w = footIdeal(o, i); return { x: w[0], y: w[1], z: 0, step: 0 }; });
+    o.feet.forEach(f => {
+      if (!f.step) return;
+      f.step += dt / f.dur;
+      const p = Math.min(1, f.step), e = smooth(p);
+      f.x = lerp(f.fx, f.tx, e); f.y = lerp(f.fy, f.ty, e); f.z = Math.sin(Math.PI * p) * f.lift;
+      if (p >= 1) { f.step = 0; f.z = 0; }
+    });
+    // one foot at a time (the other may start once this one is half way through)
+    const busy = o.feet.some(f => f.step && f.step < .5);
+    if (busy) return;
+    let best = -1, worst = 0;
+    o.feet.forEach((f, k) => {
+      if (f.step) return;
+      const w = footIdeal(o, k ? 1 : -1), d = Math.hypot(w[0] - f.x, w[1] - f.y);
+      if (d > worst) { worst = d; best = k; }
+    });
+    if (best < 0 || worst < (sp > .6 ? .16 : .09) * FIG + .02) return;
+    const f = o.feet[best], w = footIdeal(o, best ? 1 : -1);
+    f.dur = clamp(.2 - sp * .013, .1, .2);
+    f.fx = f.x; f.fy = f.y; f.tx = w[0] + o.vx * f.dur * .5; f.ty = w[1] + o.vy * f.dur * .5;
+    f.lift = (.05 + Math.min(sp, 8) * .016) * FIG; f.step = 1e-4;
+  }
+
   function animateBody(o, dt) {
     const sp = Math.hypot(o.vx, o.vy);
+    stepFeet(o, dt);
+    // lean into acceleration, back when braking
+    const ax = (o.vx - (o.pvx || 0)) / dt, ay = (o.vy - (o.pvy || 0)) / dt;
+    o.pvx = o.vx; o.pvy = o.vy;
+    const k = Math.min(1, dt * 12);
+    o.lx = (o.lx || 0) + (clamp(ax * .006, -.14, .14) - (o.lx || 0)) * k;
+    o.ly = (o.ly || 0) + (clamp(ay * .006, -.14, .14) - (o.ly || 0)) * k;
     o.phase += sp * dt * 2.7;
     o.sp += (Math.min(1, sp / 5) - o.sp) * Math.min(1, dt * 10);
     o.hop = Math.max(0, o.hop - dt);
@@ -744,7 +812,7 @@
       const dp = d2(ball, player), reachable = canHit('P') && ball.z < 3.2;
       if (charge && reachable && dp < REACH * .95 && player.cool <= 0) fireSwing();      // charged shot fires on contact
       else if (!charge && $('auto').checked && reachable && dp < REACH * .9 && ball.z < 2.6 && player.cool <= 0) {
-        player.shot = 'top'; player.power = .45; player.swing = SWING; player.cool = .42;
+        player.shot = 'top'; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = rand(-.5, .5); player.aimD = 0;
         player.stroke = { kind: sideKind(player), spin: 'top' };
       }
       if (player.swing > 0 && reachable && dp < REACH) playerHit(dp);
@@ -909,7 +977,7 @@
     const { R, Fw } = facing(o);
     const pose = poseOf(o, ch);
     const hop = o.hop > 0 ? Math.sin(Math.PI * (1 - o.hop / HOP)) * .09 : 0;
-    const bob = Math.abs(Math.sin(o.phase)) * .05 * o.sp;
+    const bob = (o.feet ? Math.max(...o.feet.map(f => f.z)) : 0) / FIG * .35 - o.sp * .03;
     const hipZ = .93 - o.crouch * .17 + hop + bob;
     const lean = o.crouch * .1 + o.sp * .07;
     // body-local -> world (meters); yaw turns the shoulders, hips follow half way
@@ -919,32 +987,26 @@
     const hipL = W3(rot([-.12, 0, hipZ], yaw * .5)), hipR = W3(rot([.12, 0, hipZ], yaw * .5));
     const shZ = hipZ + .55;
     const shL = W3(rot([-.21, lean, shZ], yaw)), shR = W3(rot([.21, lean, shZ], yaw));
-    const neck = W3([0, lean * 1.2, shZ + .06]), head = W3([0, lean * 1.3, shZ + .25]);
-    const hand = W3([pose.hand[0], pose.hand[1], pose.hand[2] + hop]);
+    // upper body sways with acceleration
+    const sway = p => [p[0] + (o.lx || 0) * FIG, p[1] + (o.ly || 0) * FIG, p[2]];
+    [shL, shR].forEach((p, i) => { const q = sway(p); p[0] = q[0]; p[1] = q[1]; });
+    const neck = sway(W3([0, lean * 1.2, shZ + .06])), head = sway(W3([0, lean * 1.3, shZ + .25]));
+    const hand = sway(W3([pose.hand[0], pose.hand[1], pose.hand[2] + hop]));
     let dir = [R[0] * pose.dir[0] + Fw[0] * pose.dir[1], R[1] * pose.dir[0] + Fw[1] * pose.dir[1], pose.dir[2]];
     const dl = Math.hypot(...dir); dir = dir.map(v => v / dl);
     const at = (p, k) => p.map((v, i) => v + dir[i] * k * FIG);
     let offT;
     if (pose.off === 'grip') offT = [hand[0] - dir[0] * .07, hand[1] - dir[1] * .07, hand[2] - dir[2] * .07 - .02];
     else if (pose.off === 'throat') offT = at(hand, .26);
-    else offT = W3([pose.off[0], pose.off[1], pose.off[2] + hop]);
+    else offT = sway(W3([pose.off[0], pose.off[1], pose.off[2] + hop]));
     const down = [0, 0, -1];
     const poleOut = s => [R[0] * s * .6 - Fw[0] * .3, R[1] * s * .6 - Fw[1] * .3, -1];
     const armR = ik(shR, hand, .3 * FIG, .28 * FIG, poleOut(1)), armL = ik(shL, offT, .3 * FIG, .28 * FIG, poleOut(-1));
 
-    // feet: stance, a step into the shot, running stride
+    // feet come from the planted-foot stepper
     const sp = Math.hypot(o.vx, o.vy), md = sp > .1 ? [o.vx / sp, o.vy / sp] : [0, 0];
-    const serving = state === 'serve' && isServer(o) && o.swing <= 0;
-    const swingP = o.swing > 0 ? 1 - o.swing / SWING : 0;
-    const feet = [-1, 1].map(i => {
-      let l = serving ? (i < 0 ? [-.08, .3] : [.32, -.22]) : [i * (.19 + o.crouch * .07), 0];
-      const front = o.stroke.kind === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
-      if (o.swing > 0 && i === front && o.stroke.kind !== 'serve') l = [l[0], l[1] + .32 * Math.min(1, swingP * 2.2)];
-      const w = W3([l[0], l[1], 0]), ph = o.phase + (i > 0 ? Math.PI : 0);
-      const stride = .38 * o.sp * FIG;
-      return [w[0] + md[0] * Math.sin(ph) * stride, w[1] + md[1] * Math.sin(ph) * stride,
-              (Math.max(0, Math.cos(ph)) * .17 * o.sp + hop * .8) * FIG];
-    });
+    if (!o.feet) stepFeet(o, 0);
+    const feet = o.feet.map(f => [f.x, f.y, f.z + hop * .8 * FIG]);
     const kneePole = [Fw[0] + md[0] * .5, Fw[1] + md[1] * .5, .1];
     const legL = ik(hipL, feet[0], .47 * FIG, .46 * FIG, kneePole), legR = ik(hipR, feet[1], .47 * FIG, .46 * FIG, kneePole);
 
@@ -1101,6 +1163,13 @@
         ctx.strokeStyle = 'rgba(232,255,58,.7)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.ellipse(p.x, p.y, .35 * p.s * pulse, .13 * p.s * pulse, 0, 0, 7); ctx.stroke();
       }
+    }
+    if (charge && (state === 'rally' || state === 'pause' || state === 'serve')) {
+      const g = aimTarget(charge.type, aimX, aimD), p = P(g.x, g.y), col = SHOTS[charge.type].color;
+      const pulse = 1 + Math.sin(performance.now() / 110) * .12, rx = .65 * p.s * pulse, ry = .26 * p.s * pulse;
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x - rx * 1.4, p.y); ctx.lineTo(p.x + rx * 1.4, p.y); ctx.moveTo(p.x, p.y - ry * 1.6); ctx.lineTo(p.x, p.y + ry * 1.6); ctx.stroke();
     }
     if (state !== 'menu') {
       const sp = P(ball.x, ball.y);
