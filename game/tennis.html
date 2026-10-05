@@ -128,7 +128,8 @@
   // ---------- court (meters) ----------
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
-  const PSPEED = 7, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9;
+  const PSPEED = 7, REACH = 1.6, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
+  const P_ACC = 17, P_DEC = 30, C_ACC = 13, C_DEC = 24; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
 
   // sf: extra "gravity" from spin (topspin dives, backspin floats)
@@ -142,11 +143,11 @@
     drop:  { name: 'ドロップ',     color: '#80ed99', sf: -.45, bz: .35, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
   };
   const LEVELS = {
-    easy:   { name: 'やさしい', speed: 3.4, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
+    easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
               mix: { top: 5, slice: 3, flat: 1 }, tactic: .2 },
-    normal: { name: 'ふつう',   speed: 4.4, react: .25, reach: 1.3,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
+    normal: { name: 'ふつう',   speed: 4.8, react: .25, reach: 1.3,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
               mix: { top: 5, slice: 3, flat: 2 }, tactic: .4 },
-    hard:   { name: 'つよい',   speed: 5.4, react: .15, reach: 1.45, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
+    hard:   { name: 'つよい',   speed: 5.8, react: .15, reach: 1.45, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
               mix: { top: 5, slice: 3, flat: 3 }, tactic: .6 },
   };
 
@@ -255,8 +256,9 @@
   };
 
   let lvKey = 'normal', lv = LEVELS.normal, state = 'menu';
-  const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0, shot: 'top', power: 0 };
-  const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0 };
+  const body = () => ({ phase: 0, sp: 0, hop: 0, crouch: 0, stroke: { kind: 'fh', spin: 'top' } });
+  const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0, shot: 'top', power: 0, ...body() };
+  const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0, ...body() };
   const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, ge: G, sf: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
                  live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
   let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
@@ -378,7 +380,8 @@
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
-    s.swing = SWING;
+    s.stroke = { kind: 'serve', spin: type }; s.swing = SWING * .7;
+    (who === 'P' ? cpu : player).hop = HOP;
     sHit(power);
     popupAt(s.x, s.y, 2.6, `${sh.name}サーブ ${kmh}km/h`, sh.color);
     if (who === 'P') {
@@ -410,6 +413,7 @@
   function fireSwing() {
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
+    player.stroke = { kind: ball.z > 2.3 && ball.bounces === 0 ? 'smash' : sideKind(player), spin: charge.type };
     player.swing = SWING; player.cool = .42;
     charge = null;
   }
@@ -460,6 +464,8 @@
     if (q > .85 && !smash) popupAt(player.x, player.y, 3.1, 'ナイス!', '#e8ff3a');
     else if (q < .2) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
     if (note) popupAt(player.x, player.y, 3.6, note, '#fff');
+    if (smash) player.stroke.kind = 'smash';
+    cpu.hop = HOP;
     readPlayer(smash ? 'smash' : type);
   }
 
@@ -510,7 +516,8 @@
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'C', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally);
-    cpu.swing = SWING; sHit(power);
+    cpu.stroke = { kind: ball.z > 2.3 ? 'smash' : sideKind(cpu), spin: type };
+    cpu.swing = SWING * .6; player.hop = HOP; sHit(power); // CPU swing starts near contact
     if (type === 'lob' || type === 'drop' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
@@ -523,7 +530,7 @@
       t += step;
       if (bounces === 1 && b.z < 2.3) {
         last = { x: b.x, y: b.y };
-        const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / lv.speed;
+        const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / lv.speed + lv.speed / (2 * C_ACC);
         if (need <= t) break;
       }
     }
@@ -617,8 +624,8 @@
       const g = unproject(ptr.x, ptr.y), dx = g.x - player.x, dy = serving ? 0 : g.y - player.y, l = Math.hypot(dx, dy);
       if (l > .05) { const s = Math.min(max, l * 8); tvx = dx / l * s; tvy = dy / l * s; }
     }
-    const k = 1 - Math.exp(-dt * 14);
-    player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k;
+    if (player.swing > 0) { tvx *= .25; tvy *= .25; } // planted while swinging
+    accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
     player.x += player.vx * dt; player.y += player.vy * dt;
     if (serving) {
       const dc = deuce();
@@ -626,6 +633,24 @@
     } else {
       player.x = clamp(player.x, -3, CW + 3); player.y = clamp(player.y, NET_Y + .8, L + 3);
     }
+    animateBody(player, dt);
+  }
+
+  // accelerate toward a target velocity, braking harder than speeding up
+  function accelTo(o, tvx, tvy, dt, acc, dec) {
+    let dx = tvx - o.vx, dy = tvy - o.vy;
+    const dl = Math.hypot(dx, dy), braking = tvx * o.vx + tvy * o.vy < (o.vx * o.vx + o.vy * o.vy) * .7;
+    const a = (braking ? dec : acc) * dt;
+    if (dl > a) { dx = dx / dl * a; dy = dy / dl * a; }
+    o.vx += dx; o.vy += dy;
+  }
+  function animateBody(o, dt) {
+    const sp = Math.hypot(o.vx, o.vy);
+    o.phase += sp * dt * 2.7;
+    o.sp += (Math.min(1, sp / 5) - o.sp) * Math.min(1, dt * 10);
+    o.hop = Math.max(0, o.hop - dt);
+    const target = state === 'serve' ? (isServer(o) ? .1 : .75) : state === 'rally' ? .65 : .3;
+    o.crouch += (target - o.crouch) * Math.min(1, dt * 5);
   }
 
   function moveCpu(dt) {
@@ -638,11 +663,12 @@
     }
     if (target) {
       const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
-      const s = Math.min(speed, l * 6);
-      cpu.vx = l > .01 ? dx / l * s : 0; cpu.vy = l > .01 ? dy / l * s : 0;
-    } else { cpu.vx = cpu.vy = 0; }
+      const s = Math.min(speed, l * 5), sw = cpu.swing > 0 ? .25 : 1;
+      accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
+    } else accelTo(cpu, 0, 0, dt, C_ACC, C_DEC);
     cpu.x = clamp(cpu.x + cpu.vx * dt, -3, CW + 3);
     cpu.y = clamp(cpu.y + cpu.vy * dt, -4, NET_Y - 1.2);
+    animateBody(cpu, dt);
 
     if (state === 'serve' && server() === 'C') {
       cpuServeT -= dt;
@@ -683,6 +709,7 @@
       if (charge && reachable && dp < REACH * .95 && player.cool <= 0) fireSwing();      // charged shot fires on contact
       else if (!charge && $('auto').checked && reachable && dp < REACH * .9 && ball.z < 2.6 && player.cool <= 0) {
         player.shot = 'top'; player.power = .45; player.swing = SWING; player.cool = .42;
+        player.stroke = { kind: sideKind(player), spin: 'top' };
       }
       if (player.swing > 0 && reachable && dp < REACH) playerHit(dp);
       const dc = d2(ball, cpu);
@@ -762,60 +789,244 @@
     line(CW + px, NET_Y, CW + px, NET_Y, .1, '#333', 0, 1.07);
   }
 
-  function figure(o, shirt, away, ch) {
-    const b = P(o.x, o.y), s = b.s, zy = z => b.y - z * s;
-    ctx.fillStyle = 'rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.ellipse(b.x, b.y, .45 * s, .14 * s, 0, 0, Math.PI * 2); ctx.fill();
-    const run = Math.hypot(o.vx, o.vy) > .5 ? Math.sin(performance.now() / 70) * .08 : 0;
-    ctx.strokeStyle = '#f0c8a0'; ctx.lineWidth = .11 * s; ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(b.x - .12 * s, zy(.05 + Math.max(0, run))); ctx.lineTo(b.x - .1 * s, zy(.75));
-    ctx.moveTo(b.x + .12 * s, zy(.05 + Math.max(0, -run))); ctx.lineTo(b.x + .1 * s, zy(.75));
-    ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.fillRect(b.x - .21 * s, zy(.9), .42 * s, .22 * s);
-    ctx.fillStyle = shirt;
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(b.x - .25 * s, zy(1.45), .5 * s, .6 * s, .12 * s) : ctx.rect(b.x - .25 * s, zy(1.45), .5 * s, .6 * s);
-    ctx.fill();
-    const hx = b.x, hY = zy(1.64), hr = .17 * s;
-    ctx.fillStyle = '#f0c8a0'; ctx.beginPath(); ctx.arc(hx, hY, hr, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#3a2a22';
-    ctx.beginPath();
-    if (away) ctx.arc(hx, hY - hr * .1, hr * 1.02, 0, Math.PI * 2);
-    else ctx.arc(hx, hY - hr * .25, hr * 1.02, Math.PI, Math.PI * 2);
-    ctx.fill();
-    if (!away) {
-      ctx.fillStyle = '#222';
-      ctx.beginPath(); ctx.arc(hx - hr * .4, hY, hr * .13, 0, 7); ctx.arc(hx + hr * .4, hY, hr * .13, 0, 7); ctx.fill();
+  // ---------- people ----------
+  // Poses are keyframes in the body's own frame: x = to the player's right, y = forward (toward the net), z = up.
+  // hand / dir: racket hand and racket direction, off: the other hand ('grip' = both hands on the racket,
+  // 'throat' = resting on the racket throat), yaw: how far the shoulders are turned (+ = right shoulder back).
+  const K = (t, yaw, hand, dir, off) => ({ t, yaw, hand, dir, off });
+  const READY = K(0, 0, [.2, .38, 1], [-.3, .75, .55], 'throat');
+  const FH = {
+    top:   [K(0, .95, [.5, -.35, .95], [.25, -.8, .5], [.05, .55, 1.25]), K(.45, 0, [.45, .45, .82], [.85, .45, .25], [-.15, .3, 1.05]),
+            K(1, -.85, [-.3, .15, 1.7], [-.35, -.55, .75], [-.25, .1, 1.3])],
+    flat:  [K(0, .95, [.5, -.35, 1.05], [.25, -.85, .4], [.05, .55, 1.25]), K(.45, 0, [.45, .45, .95], [.9, .4, .05], [-.15, .3, 1.05]),
+            K(1, -.85, [-.3, .2, 1.45], [-.4, -.6, .6], [-.25, .1, 1.2])],
+    slice: [K(0, .9, [.45, -.3, 1.4], [.2, -.6, .75], [.05, .55, 1.3]), K(.45, .1, [.45, .45, 1], [.85, .45, -.15], [-.15, .3, 1.1]),
+            K(1, -.3, [.1, .65, .85], [.6, .75, -.1], [-.3, -.1, 1.1])],
+  };
+  FH.lob = [FH.top[0], K(.45, 0, [.45, .4, .75], [.8, .4, .45], [-.15, .3, 1.05]), K(1, -.7, [-.15, .25, 1.95], [-.2, -.3, .9], [-.25, .1, 1.3])];
+  FH.drop = [FH.slice[0], K(.45, .1, [.4, .4, 1.05], [.8, .5, -.25], [-.15, .3, 1.1]), K(1, -.1, [.25, .55, .95], [.6, .7, -.3], [-.3, -.1, 1.1])];
+  const mirror = k => K(k.t, -k.yaw, [-k.hand[0], k.hand[1], k.hand[2]], [-k.dir[0], k.dir[1], k.dir[2]],
+    typeof k.off === 'string' ? k.off : [-k.off[0], k.off[1], k.off[2]]);
+  // two-handed backhand for drives, one-handed for slice / drop
+  const BH = {};
+  for (const sp in FH) BH[sp] = FH[sp].map(k => { const m = mirror(k); if (sp !== 'slice' && sp !== 'drop') m.off = 'grip'; return m; });
+  BH.slice[2] = K(1, .3, [-.1, .65, .9], [-.6, .75, -.1], [.35, -.35, 1.15]);
+  const SERVE_STANCE = K(0, .95, [.3, -.05, .8], [.15, .35, -.9], [.1, .4, 1.05]);
+  const TROPHY = K(0, .95, [.4, -.25, 1.6], [.15, -.35, .9], [.05, .3, 2.05]);
+  const RACKET_DROP = K(0, .9, [.3, -.2, 1.7], [0, -.25, -1], [.05, .3, 2]);
+  const OVERHEAD = [RACKET_DROP, K(.4, .1, [.15, .35, 2.3], [.05, .3, 1], [-.15, .25, 1.3]),
+                    K(1, -.8, [-.3, .3, .85], [-.25, -.35, -.9], [-.25, .05, 1.05])];
+  const keysFor = st => st.kind === 'serve' || st.kind === 'smash' ? OVERHEAD : (st.kind === 'bh' ? BH : FH)[st.spin] || FH.top;
+
+  const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  const smooth = t => t * t * (3 - 2 * t);
+  function blendKey(a, b, t) {
+    t = smooth(clamp(t, 0, 1));
+    const off = typeof a.off === 'string' || typeof b.off === 'string' ? (t < .5 ? a.off : b.off) : lerp3(a.off, b.off, t);
+    return K(0, lerp(a.yaw, b.yaw, t), lerp3(a.hand, b.hand, t), lerp3(a.dir, b.dir, t), off);
+  }
+  function sample(keys, p) {
+    for (let i = 1; i < keys.length; i++)
+      if (p <= keys[i].t) return blendKey(keys[i - 1], keys[i], (p - keys[i - 1].t) / (keys[i].t - keys[i - 1].t));
+    return keys[keys.length - 1];
+  }
+  const facing = o => (o === player ? { R: [1, 0], Fw: [0, -1] } : { R: [-1, 0], Fw: [0, 1] });
+  const sideKind = o => ((ball.x - o.x) * facing(o).R[0] >= 0 ? 'fh' : 'bh');
+  const isServer = o => (server() === 'P') === (o === player);
+
+  function poseOf(o, ch) {
+    if (o.swing > 0) return sample(keysFor(o.stroke), 1 - o.swing / SWING);
+    if (state === 'serve' && isServer(o)) {
+      if (ball.held) return SERVE_STANCE;
+      const up = blendKey(SERVE_STANCE, TROPHY, (ball.z - 1.1) / (TOSS_PEAK - 1.1) * 1.4);
+      return ch ? blendKey(up, RACKET_DROP, ch.t / ch.full) : up;
     }
-    ctx.fillStyle = shirt; ctx.fillRect(hx - hr, hY - hr * .55, hr * 2, hr * .3);
-    // racket arm: idle / pulled back while charging / sweeping through a swing
-    const sgn = away ? 1 : -1, sx = b.x + sgn * .24 * s, sy = zy(1.32);
-    let a = sgn > 0 ? -1.2 : Math.PI + 1.2;
-    if (ch) { const back = Math.min(1, ch.t / ch.full); a = sgn > 0 ? -1.2 + back * 2.1 : Math.PI + 1.2 - back * 2.1; }
-    if (o.swing > 0) {
-      const p = 1 - o.swing / SWING;
-      a = sgn > 0 ? .9 - p * 3.6 : Math.PI - .9 + p * 3.6;
+    // get the racket back as the ball comes in (or while charging)
+    const mine = o === player ? 'P' : 'C';
+    let prep = 0, st = { kind: sideKind(o), spin: ch ? ch.type : 'top' };
+    if (ball.live && ball.last !== mine) prep = clamp((5.5 - d2(ball, o)) / 3.5, 0, 1);
+    if (ch) prep = Math.max(prep, .4 + .6 * Math.min(1, ch.t / ch.full));
+    if (prep > 0 && ball.z > 2.3 && ball.bounces === 0) st.kind = 'smash';
+    let pose = prep > 0 ? blendKey(READY, keysFor(st)[0], prep) : READY;
+    if (o.sp > .25 && prep < .3) { // pump the arms while running
+      const sw = Math.sin(o.phase) * .28 * o.sp;
+      pose = { ...pose, hand: [pose.hand[0] + .05, pose.hand[1] - sw * .5, pose.hand[2] - .05], off: [-.28, .15 + sw, 1.02] };
     }
-    const ca = Math.cos(a), sa = Math.sin(a);
-    ctx.strokeStyle = '#f0c8a0'; ctx.lineWidth = .08 * s;
-    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + ca * .32 * s, sy + sa * .32 * s); ctx.stroke();
-    ctx.strokeStyle = '#333'; ctx.lineWidth = .05 * s;
-    ctx.beginPath(); ctx.moveTo(sx + ca * .32 * s, sy + sa * .32 * s); ctx.lineTo(sx + ca * .55 * s, sy + sa * .55 * s); ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(sx + ca * .72 * s, sy + sa * .72 * s, .17 * s, .12 * s, a, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fill();
-    ctx.lineWidth = .045 * s; ctx.strokeStyle = '#222'; ctx.stroke();
+    return pose;
+  }
+
+  // two-bone IK: from root toward target with segment lengths a, b; the joint bends toward `pole`
+  function ik(root, target, a, b, pole) {
+    let d = [target[0] - root[0], target[1] - root[1], target[2] - root[2]];
+    let dl = Math.hypot(...d);
+    const reach = a + b - .001;
+    if (dl > reach) { d = d.map(v => v / dl * reach); dl = reach; target = root.map((v, i) => v + d[i]); }
+    const n = d.map(v => v / (dl || 1));
+    const along = (a * a - b * b + dl * dl) / (2 * dl || 1), h = Math.sqrt(Math.max(0, a * a - along * along));
+    const pd = pole[0] * n[0] + pole[1] * n[1] + pole[2] * n[2];
+    let pp = pole.map((v, i) => v - n[i] * pd); const pl = Math.hypot(...pp) || 1; pp = pp.map(v => v / pl);
+    return { joint: root.map((v, i) => v + n[i] * along + pp[i] * h), end: target };
+  }
+
+  const OUTLINE = 'rgba(18,20,38,.6)';
+  function figure(o, kit, ch) {
+    const { R, Fw } = facing(o);
+    const pose = poseOf(o, ch);
+    const hop = o.hop > 0 ? Math.sin(Math.PI * (1 - o.hop / HOP)) * .09 : 0;
+    const bob = Math.abs(Math.sin(o.phase)) * .05 * o.sp;
+    const hipZ = .93 - o.crouch * .17 + hop + bob;
+    const lean = o.crouch * .1 + o.sp * .07;
+    // body-local -> world (meters); yaw turns the shoulders, hips follow half way
+    const rot = (l, a) => [l[0] * Math.cos(a) + l[1] * Math.sin(a), -l[0] * Math.sin(a) + l[1] * Math.cos(a), l[2]];
+    const W3 = l => [o.x + R[0] * l[0] + Fw[0] * l[1], o.y + R[1] * l[0] + Fw[1] * l[1], l[2]];
+    const yaw = pose.yaw;
+    const hipL = W3(rot([-.12, 0, hipZ], yaw * .5)), hipR = W3(rot([.12, 0, hipZ], yaw * .5));
+    const shZ = hipZ + .55;
+    const shL = W3(rot([-.21, lean, shZ], yaw)), shR = W3(rot([.21, lean, shZ], yaw));
+    const neck = W3([0, lean * 1.2, shZ + .06]), head = W3([0, lean * 1.3, shZ + .25]);
+    const hand = W3([pose.hand[0], pose.hand[1], pose.hand[2] + hop]);
+    let dir = [R[0] * pose.dir[0] + Fw[0] * pose.dir[1], R[1] * pose.dir[0] + Fw[1] * pose.dir[1], pose.dir[2]];
+    const dl = Math.hypot(...dir); dir = dir.map(v => v / dl);
+    const at = (p, k) => p.map((v, i) => v + dir[i] * k);
+    let offT;
+    if (pose.off === 'grip') offT = [hand[0] - dir[0] * .07, hand[1] - dir[1] * .07, hand[2] - dir[2] * .07 - .02];
+    else if (pose.off === 'throat') offT = at(hand, .26);
+    else offT = W3([pose.off[0], pose.off[1], pose.off[2] + hop]);
+    const down = [0, 0, -1];
+    const poleOut = s => [R[0] * s * .6 - Fw[0] * .3, R[1] * s * .6 - Fw[1] * .3, -1];
+    const armR = ik(shR, hand, .3, .28, poleOut(1)), armL = ik(shL, offT, .3, .28, poleOut(-1));
+
+    // feet: stance, a step into the shot, running stride
+    const sp = Math.hypot(o.vx, o.vy), md = sp > .1 ? [o.vx / sp, o.vy / sp] : [0, 0];
+    const serving = state === 'serve' && isServer(o) && o.swing <= 0;
+    const swingP = o.swing > 0 ? 1 - o.swing / SWING : 0;
+    const feet = [-1, 1].map(i => {
+      let l = serving ? (i < 0 ? [-.08, .3] : [.32, -.22]) : [i * (.19 + o.crouch * .07), 0];
+      const front = o.stroke.kind === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
+      if (o.swing > 0 && i === front && o.stroke.kind !== 'serve') l = [l[0], l[1] + .32 * Math.min(1, swingP * 2.2)];
+      const w = W3([l[0], l[1], 0]), ph = o.phase + (i > 0 ? Math.PI : 0);
+      const stride = .38 * o.sp;
+      return [w[0] + md[0] * Math.sin(ph) * stride, w[1] + md[1] * Math.sin(ph) * stride,
+              Math.max(0, Math.cos(ph)) * .17 * o.sp + hop * .8];
+    });
+    const kneePole = [Fw[0] + md[0] * .5, Fw[1] + md[1] * .5, .1];
+    const legL = ik(hipL, feet[0], .47, .46, kneePole), legR = ik(hipR, feet[1], .47, .46, kneePole);
+
+    const base = P(o.x, o.y), s = base.s;
+    const Q = p => P(p[0], p[1], p[2]);
+    const parts = [];
+    const limb = (a, b, w, color, depthBias = 0) => parts.push({
+      y: (a[1] + b[1]) / 2 + depthBias,
+      f: () => {
+        const A = Q(a), B = Q(b);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = w * s + 2;
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        ctx.strokeStyle = color; ctx.lineWidth = w * s;
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+      },
+    });
+    const mid = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.beginPath(); ctx.ellipse(base.x, base.y, .5 * s * (1 - hop), .16 * s * (1 - hop), 0, 0, Math.PI * 2); ctx.fill();
+
+    // legs (skin, shorts over the thigh, sock and shoe)
+    [[hipL, legL, feet[0]], [hipR, legR, feet[1]]].forEach(([hip, leg, foot]) => {
+      limb(hip, leg.joint, .15, kit.skin);
+      limb(leg.joint, foot, .12, kit.skin);
+            limb(mid(leg.joint, foot, .75), foot, .115, '#fafafa', .01);
+      const toe = [foot[0] + Fw[0] * .12 + md[0] * .05, foot[1] + Fw[1] * .12 + md[1] * .05, foot[2]];
+      limb([foot[0], foot[1], foot[2] + .03], [toe[0], toe[1], toe[2] + .03], .12, kit.shoe, .02);
+    });
+    // shorts across the hips, then the torso over them
+    const torsoY = (shL[1] + shR[1] + hipL[1] + hipR[1]) / 4;
+    parts.push({
+      y: torsoY - .002,
+      f: () => {
+        const pts = [hipL, hipR, mid(hipR, legR.joint, .5), mid(hipL, legL.joint, .5)].map(Q);
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+        ctx.lineJoin = 'round'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = .16 * s + 2; ctx.stroke();
+        ctx.fillStyle = kit.shorts; ctx.fill(); ctx.strokeStyle = kit.shorts; ctx.lineWidth = .16 * s; ctx.stroke();
+      },
+    });
+    parts.push({
+      y: torsoY,
+      f: () => {
+        const pts = [shL, shR, hipR, hipL].map(Q);
+        ctx.lineJoin = 'round';
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = .13 * s + 2; ctx.stroke();
+        ctx.fillStyle = kit.shirt; ctx.fill();
+        ctx.strokeStyle = kit.shirt; ctx.lineWidth = .13 * s; ctx.stroke();
+        // stripe across the shirt, shaded as the shoulders turn
+        const a = Q(mid(shL, hipL, .35)), b = Q(mid(shR, hipR, .35));
+        ctx.strokeStyle = kit.trim; ctx.lineWidth = .05 * s;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        const shade = Math.abs(Math.sin(yaw)) * .25;
+        if (shade > .02) { ctx.fillStyle = `rgba(0,0,0,${shade})`; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.fill(); }
+      },
+    });
+    // head (always over the torso it sits on)
+    parts.push({
+      y: torsoY + .003,
+      f: () => {
+        const N = Q(neck), Hd = Q(head), r = .125 * s;
+        ctx.strokeStyle = kit.skin; ctx.lineWidth = .09 * s; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(N.x, N.y); ctx.lineTo(Hd.x, Hd.y + r * .5); ctx.stroke();
+        ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(Hd.x, Hd.y, r + 1, 0, 7); ctx.fill();
+        ctx.fillStyle = kit.skin; ctx.beginPath(); ctx.arc(Hd.x, Hd.y, r, 0, 7); ctx.fill();
+        const turn = Math.sin(yaw) * r * .5 * (o === player ? 1 : -1);
+        if (o === player) { // seen from behind: hair and a cap
+          ctx.fillStyle = kit.hair; ctx.beginPath(); ctx.arc(Hd.x, Hd.y, r * .97, 0, 7); ctx.fill();
+          ctx.fillStyle = kit.cap; ctx.beginPath(); ctx.arc(Hd.x, Hd.y - r * .15, r * 1.02, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+          ctx.fillRect(Hd.x - r * 1.02, Hd.y - r * .45, r * 2.04, r * .32);
+        } else {            // seen from the front: face and a headband
+          ctx.fillStyle = kit.hair; ctx.beginPath(); ctx.arc(Hd.x, Hd.y - r * .2, r * 1.02, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+          ctx.fillStyle = kit.trim; ctx.fillRect(Hd.x - r, Hd.y - r * .5, r * 2, r * .25);
+          ctx.fillStyle = '#1a1a1a';
+          ctx.beginPath(); ctx.arc(Hd.x - r * .38 + turn, Hd.y + r * .05, r * .11, 0, 7); ctx.arc(Hd.x + r * .38 + turn, Hd.y + r * .05, r * .11, 0, 7); ctx.fill();
+          ctx.strokeStyle = 'rgba(80,30,30,.7)'; ctx.lineWidth = Math.max(1, r * .1);
+          ctx.beginPath(); ctx.arc(Hd.x + turn, Hd.y + r * .35, r * .25, .2, Math.PI - .2); ctx.stroke();
+        }
+      },
+    });
+    // arms (short sleeve, forearm, hand)
+    [[shR, armR], [shL, armL]].forEach(([sh, arm]) => {
+      limb(sh, arm.joint, .1, kit.skin);
+      limb(sh, mid(sh, arm.joint, .45), .14, kit.shirt, .005);
+      limb(arm.joint, arm.end, .085, kit.skin);
+      limb(arm.end, arm.end, .1, kit.skin, .006);
+    });
+    // racket
+    parts.push({
+      y: at(hand, .45)[1] + .01,
+      f: () => {
+        const A = Q(hand), B = Q(at(hand, .25)), C = Q(at(hand, .5)), D = Q(at(hand, .72));
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#222'; ctx.lineWidth = Math.max(2, .045 * s);
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        const len = Math.max(3, Math.hypot(D.x - B.x, D.y - B.y) / 2), ang = Math.atan2(D.y - B.y, D.x - B.x);
+        ctx.beginPath(); ctx.ellipse(C.x, C.y, len, Math.max(2, .12 * s), ang, 0, 7);
+        ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fill();
+        ctx.strokeStyle = kit.racket; ctx.lineWidth = Math.max(1.5, .035 * s); ctx.stroke();
+      },
+    });
+    parts.sort((a, b) => a.y - b.y).forEach(p => p.f());
+
     // charge meter
     if (ch) {
-      const p = Math.min(1, ch.t / ch.full), w = Math.max(44, .9 * s), y = zy(2.15), col = SHOTS[ch.type].color;
-      ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(b.x - w / 2 - 2, y - 5, w + 4, 10);
+      const p = Math.min(1, ch.t / ch.full), w = Math.max(44, .9 * s), y = P(o.x, o.y, 2.35).y, col = SHOTS[ch.type].color;
+      ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(base.x - w / 2 - 2, y - 5, w + 4, 10);
       ctx.fillStyle = p >= 1 && Math.floor(performance.now() / 80) % 2 ? '#fff' : col;
-      ctx.fillRect(b.x - w / 2, y - 3, w * p, 6);
+      ctx.fillRect(base.x - w / 2, y - 3, w * p, 6);
       ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillStyle = col; ctx.fillText(SHOTS[ch.type].name + (p >= 1 ? ' MAX' : ''), b.x, y - 7);
+      ctx.fillStyle = col; ctx.fillText(SHOTS[ch.type].name + (p >= 1 ? ' MAX' : ''), base.x, y - 7);
     }
   }
+  const KIT_P = { shirt: '#ff5d73', trim: '#fff', shorts: '#f4f4f4', skin: '#f0c8a0', hair: '#3a2a22', cap: '#c9384d', shoe: '#ffffff', racket: '#d7263d' };
+  const KIT_C = { shirt: '#4a6fd1', trim: '#ffd166', shorts: '#1f2b55', skin: '#c68a5a', hair: '#1b1b1b', cap: '#1b1b1b', shoe: '#ffd166', racket: '#2b2f4a' };
 
   function drawBall() {
     const col = ball.live ? SHOTS[ball.type].color : '#e8ff3a';
@@ -863,8 +1074,8 @@
 
     const items = [
       { y: NET_Y, f: drawNet },
-      { y: cpu.y, f: () => figure(cpu, '#4a6fd1', false) },
-      { y: player.y, f: () => figure(player, '#ff5d73', true, charge) },
+      { y: cpu.y, f: () => figure(cpu, KIT_C) },
+      { y: player.y, f: () => figure(player, KIT_P, charge) },
     ];
     if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
     items.sort((a, b) => a.y - b.y).forEach(i => i.f());
