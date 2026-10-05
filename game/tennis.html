@@ -205,10 +205,14 @@
   // ---------- input ----------
   const KEYMAP = { ' ': 'top', z: 'top', j: 'top', x: 'slice', k: 'slice', c: 'flat', l: 'flat', v: 'lob', i: 'lob', b: 'drop', o: 'drop' };
   const keys = {};
+  const MOVE_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'];
+  // switching windows can swallow keyup events: forget every held key and charge
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; charge = null; ptr = null; });
   let ptr = null, mouseShot = null;
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
+    if (MOVE_KEYS.includes(k)) ptr = null; // keyboard takes over from the mouse until it moves again
     keys[k] = true;
     if (k.startsWith('arrow') || k === ' ') e.preventDefault();
   });
@@ -230,7 +234,7 @@
       e.preventDefault();
     } else canvas.setPointerCapture(e.pointerId);
   });
-  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) setPtr(e); });
+  canvas.addEventListener('pointermove', e => { if ((e.pointerType === 'mouse' && (e.movementX || e.movementY)) || e.buttons) setPtr(e); });
   canvas.addEventListener('pointerup', e => {
     if (e.pointerType === 'mouse') { if (mouseShot) release(mouseShot); mouseShot = null; }
     else ptr = null;
@@ -280,6 +284,7 @@
   function startMatch(key) {
     lvKey = key; lv = LEVELS[key];
     pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; maxSpeed = 0; popups = []; marks = [];
+    ptr = null; // the click on the menu button is not a move order
     $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.remove('hidden');
     $('lvName').textContent = lv.name;
     setupServe();
@@ -297,7 +302,7 @@
       Object.assign(cpu, { x: CX + (dc ? -.9 : .9), y: -.4 });
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
-    player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null;
+    player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null;
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -627,12 +632,11 @@
     if (player.swing > 0) { tvx *= .25; tvy *= .25; } // planted while swinging
     accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
     player.x += player.vx * dt; player.y += player.vy * dt;
-    if (serving) {
-      const dc = deuce();
-      player.x = dc ? clamp(player.x, CX + .3, CX + 3.6) : clamp(player.x, CX - 3.6, CX - .3);
-    } else {
-      player.x = clamp(player.x, -3, CW + 3); player.y = clamp(player.y, NET_Y + .8, L + 3);
-    }
+    const [x0, x1, y0, y1] = serving
+      ? (deuce() ? [CX + .3, CX + 3.6] : [CX - 3.6, CX - .3]).concat([player.y, player.y])
+      : [-3, CW + 3, NET_Y + .8, L + 3];
+    if (player.x < x0 || player.x > x1) { player.x = clamp(player.x, x0, x1); player.vx = 0; }
+    if (player.y < y0 || player.y > y1) { player.y = clamp(player.y, y0, y1); player.vy = 0; }
     animateBody(player, dt);
   }
 
@@ -666,8 +670,9 @@
       const s = Math.min(speed, l * 5), sw = cpu.swing > 0 ? .25 : 1;
       accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
     } else accelTo(cpu, 0, 0, dt, C_ACC, C_DEC);
-    cpu.x = clamp(cpu.x + cpu.vx * dt, -3, CW + 3);
-    cpu.y = clamp(cpu.y + cpu.vy * dt, -4, NET_Y - 1.2);
+    cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt;
+    if (cpu.x < -3 || cpu.x > CW + 3) { cpu.x = clamp(cpu.x, -3, CW + 3); cpu.vx = 0; }
+    if (cpu.y < -4 || cpu.y > NET_Y - 1.2) { cpu.y = clamp(cpu.y, -4, NET_Y - 1.2); cpu.vy = 0; }
     animateBody(cpu, dt);
 
     if (state === 'serve' && server() === 'C') {
