@@ -354,7 +354,7 @@
       gotBolt: '⚡ ダッシュボタンを おすと いなずまダッシュ！ 空中でも できるよ',
       bossIntro: 'ボスの Himawari が あらわれた！ 上から 3回 ふもう！',
       bossIntro3: 'ボスの ちびDino が あらわれた！ つかれて すわったら チャンス！ 3回 ふもう！', miniName: 'ちびDino',
-      bossIntro2: 'ボスの Onigiri が あらわれた！ ドスンと おりてきた ときが チャンス！ 3回 ふもう！', bossDown: 'まいった〜！', boss: 'ボス',
+      bossIntro2: 'ボスの Onigiri が あらわれた！ ドスンと おりてきた ときが チャンス！ 3回 ふもう！', bossDown: 'まいった〜！', boss: 'ボス', duoKO: 'ダブル ふみつけ！',
       tip: '📱 スマホは よこむきが おすすめ', jump: 'ジャンプ', dash: 'ダッシュ',
       courses: ['ぽかぽか そうげん', 'ふわふわ くものうえ', 'よぞらの おかしの おしろ', 'びゅんびゅん ハイウェイ'],
       autoHint: '→ を おしっぱなしに するだけで クリアできるよ！',
@@ -371,7 +371,7 @@
       gotBolt: '⚡ Tap Dash for a lightning dash — works in the air too!',
       bossIntro: 'Boss Himawari appears! Stomp on Himawari 3 times!',
       bossIntro3: 'Boss Mini Dino appears! When Mini Dino sits down tired, stomp — 3 times!', miniName: 'Mini Dino',
-      bossIntro2: 'Boss Onigiri appears! Stomp when Onigiri lands with a thud — 3 times!', bossDown: 'You got me~!', boss: 'Boss',
+      bossIntro2: 'Boss Onigiri appears! Stomp when Onigiri lands with a thud — 3 times!', bossDown: 'You got me~!', boss: 'Boss', duoKO: 'Double stomp!',
       tip: '📱 Landscape works best on phones', jump: 'Jump', dash: 'Dash',
       courses: ['Sunny Meadow', 'Fluffy Cloud Land', 'Candy Castle at Night', 'Zoom Zoom Highway'],
       autoHint: 'Just hold → and you will reach the goal!',
@@ -388,7 +388,7 @@
       gotBolt: '⚡ Tekan Dash untuk dash kilat — bisa juga di udara!',
       bossIntro: 'Bos Himawari muncul! Injak dari atas 3 kali!',
       bossIntro3: 'Bos Dino Kecil muncul! Saat Dino Kecil duduk kelelahan, injak — 3 kali!', miniName: 'Dino Kecil',
-      bossIntro2: 'Bos Onigiri muncul! Injak saat Onigiri jatuh ke tanah — 3 kali!', bossDown: 'Aku menyerah~!', boss: 'Bos',
+      bossIntro2: 'Bos Onigiri muncul! Injak saat Onigiri jatuh ke tanah — 3 kali!', bossDown: 'Aku menyerah~!', boss: 'Bos', duoKO: 'Injak ganda!',
       tip: '📱 Di HP lebih seru dalam posisi miring', jump: 'Lompat', dash: 'Dash',
       courses: ['Padang Rumput Cerah', 'Negeri Awan Empuk', 'Istana Permen Malam Hari', 'Jalan Tol Wus Wus'],
       autoHint: 'Cukup tahan → saja, pasti sampai tujuan!',
@@ -431,6 +431,7 @@
       check(x) { ents.push({ k: 'check', x }); },
       spring(x) { grid[GROUND][x] = 'J'; },
       star(x, y) { ents.push({ k: 'staritem', x, y }); },
+      duo(x) { ents.push({ k: 'duo', x }); },
       // バネや ふみつけの とびかた（はかったもの）に そって いちごを ならべる
       arc(x0, h0, pts) { for (const [dx, hh] of pts) ents.push({ k: 'berryAt', px: (x0 + dx) * TS, py: (GROUND - h0 - hh - 0.45) * TS }); },
       hole(a, b) { for (let x = a; x <= b; x++) for (let y = 0; y < ROWS; y++) grid[y][x] = '.'; },
@@ -549,11 +550,14 @@
       B.spring(140); B.hole(142, 146); B.spring(147); B.hole(149, 153); B.spring(155); B.hole(157, 161);
       B.arc(140.1, 0, SPRING); B.arc(147.7, 0, SPRING); B.arc(155.3, 0, SPRING);
       // ⑥ さいごは バネで はたの てっぺんへ
-      B.berries(164, GROUND - 1, 3);
-      B.spring(168); B.arc(168.1, 0, SPRING.slice(0, 5));
-      B.tower(173, 3, 5); B.set(176, GROUND - 3, 'J'); B.arc(176.1, 3, SPRING.slice(0, 3));
-      B.pole(180);
-      return { ...B, theme: 3, house: 185, start: 3, auto: true };
+      // ⑥ Himawari と Onigiri の 2だんがさねを バネから ふみつけ！
+      B.berries(164, GROUND - 1, 2);
+      B.spring(166); B.arc(166.1, 0, SPRING.slice(0, 5));
+      B.duo(172); B.arc(172.6, 3.5, [[1, 2.1], [2, 3.4], [3, 3.8], [4, 2.6]]);
+      // ⑦ さいごは 塔の上の バネで はたの てっぺんへ
+      B.tower(177, 3, 5); B.set(179, GROUND - 3, 'J'); B.arc(179.1, 3, SPRING.slice(0, 3));
+      B.pole(183);
+      return { ...B, theme: 3, house: 188, start: 3, auto: true };
     },
   ];
 
@@ -574,7 +578,7 @@
   };
 
   let C = null, P = null;
-  let boss = null, puffs = [];   // puffs: Onigiri の わたぐも
+  let boss = null, puffs = [], duo = null;   // duo: 1-4 の Himawari と Onigiri（2だんがさね）   // puffs: Onigiri の わたぐも
   let enemies = [], items = [], berries = [], plats = [], checks = [], pole = null;
   let particles = [], popups = [], bumps = {}, shots = [];
   let carry = null;   // つぎのコースへ もちこす パワー
@@ -597,7 +601,7 @@
     courseIdx = i;
     C = COURSES[i]();
     C.theme = THEMES[C.theme];
-    enemies = []; items = []; berries = []; plats = []; checks = []; pole = null; boss = null; puffs = [];
+    enemies = []; items = []; berries = []; plats = []; checks = []; pole = null; boss = null; puffs = []; duo = null;
     particles = []; popups = []; bumps = {}; shots = [];
     for (const e of C.ents) {
       if (ENEMY[e.k]) {
@@ -608,6 +612,8 @@
         if (C.auto) { en.vx = 0; en.still = true; }   // 1-4 の てきは その場で まつ
         enemies.push(en);
       } else if (e.k === 'berryAt') berries.push({ x: e.px, y: e.py, got: false });
+      else if (e.k === 'duo') duo = { x: e.x * TS + TS / 2 - 25, y: GROUND * TS - 112, w: 50, h: 112, state: 'wait', t: 0,
+                                       ox: 0, oy: 0, ovx: 0, ovy: 0 };
       else if (e.k === 'staritem') items.push({ type: 'star', x: e.x * TS + 4, y: e.y * TS + 5, w: 24, h: 22, vx: 0, vy: 0, emerge: 0, still: true });
       else if (e.k === 'berry') berries.push({ x: e.x * TS + TS / 2, y: e.y * TS + TS / 2, got: false });
       else if (e.k === 'plat') {
@@ -783,7 +789,7 @@
       if (P.dieT <= 0) afterDeath();
     } else if (state === 'goal') updateGoal(h);
 
-    if (state === 'play' || state === 'goal') { updateEnemies(h); updateItems(h); updateShots(h); updateBoss(h); }
+    if (state === 'play' || state === 'goal') { updateEnemies(h); updateItems(h); updateShots(h); updateBoss(h); updateDuo(h); }
 
     const target = clampCam(P.x + P.w / 2 - viewW * 0.4);
     if (state !== 'dying') camX += (target - camX) * Math.min(1, h * 8);
@@ -1043,6 +1049,63 @@
     popup(pole.x + 18, P.y, '' + bonus, '#f0a020');
     sfx.flag();
     updateHud();
+  }
+
+  // Himawari の 上に Onigiri。上から ふむと 2人 いっしょに たおせる
+  function updateDuo(h) {
+    const d = duo;
+    if (!d) return;
+    d.t += h;
+    if (d.state === 'wait' && P.x > d.x - 8 * TS) { d.state = 'alert'; d.t = 0; }
+    if (d.state === 'ko') {
+      // Onigiri は ころころ とんで 地面へ
+      d.ovy += G * h; d.ox += d.ovx * h; d.oy += d.ovy * h;
+      if (d.oy > 56) { d.oy = 56; d.ovy = 0; d.ovx = 0; }
+      if (d.t > 1.1 && !d.said) {
+        d.said = true;
+        popup(d.x + 25, d.y + 20, T().bossDown, '#ff8fa3');
+        sfx.clear();
+      }
+      if (d.t > 0.4 && d.t < 2.4 && Math.random() < 0.08) fireworks(d.x + 25 + (Math.random() - 0.5) * 200, d.y - 40 - Math.random() * 80);
+      return;
+    }
+    if (state !== 'play' || !overlap(P, d)) return;
+    if (P.vy > 0 && P.prevBottom <= d.y + 16) {
+      d.state = 'ko'; d.t = 0; d.ovx = -110; d.ovy = -420;
+      P.vy = -650; P.springRise = true; P.y = d.y - P.h;
+      score += 10000;
+      popup(d.x + 25, d.y - 20, T().duoKO + ' 10000', '#f0a020');
+      for (let i = 0; i < 24; i++) particles.push({ x: d.x + 25, y: d.y, vx: (Math.random() - 0.5) * 420, vy: -Math.random() * 380, life: 0.9, col: ['#ffe066', '#ff8fa3', '#9ad7ff'][i % 3], r: 3.5, star: true });
+      sfx.stomp(); sfx.bossHit(); sfx.oneup();
+      updateHud();
+    }
+    // よこから ぶつかっても いたくない（なかよしなので とおりぬける）
+  }
+
+  function drawDuo(t) {
+    const d = duo;
+    if (!d || d.x > camX + viewW + 80 || d.x < camX - 200) return;
+    const cx = d.x + 25 - camX, ground = GROUND * TS + offY;
+    const ko = d.state === 'ko', happy = ko && d.t > 1.0;
+    const moodH = happy ? 'happy' : ko ? 'ouch' : d.state === 'alert' ? 'fever' : 'normal';
+    // Himawari（した）
+    ctx.save(); ctx.translate(cx, ground); ctx.scale(-1, 1);
+    if (ko && !happy) ctx.scale(1.15, 0.8);
+    drawChar(ctx, 'lion', 0, -33, 0.5, t, moodH, happy ? 1 : (d.state === 'alert' ? 0.5 : 0));
+    ctx.restore();
+    // Onigiri（うえ）
+    ctx.save(); ctx.translate(cx + d.ox, ground - 56 + d.oy); ctx.scale(-1, 1);
+    if (ko && !happy) ctx.rotate(d.t * 10);
+    drawChar(ctx, 'moko', 0, -32, 0.48, t + 1, moodH, happy ? 1 : (d.state === 'alert' ? 0.5 : 0));
+    ctx.restore();
+    if (d.state === 'alert') {
+      ctx.fillStyle = '#ff5c7a'; ctx.font = '800 22px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('!', cx - 30, ground - 130 + Math.sin(t * 12) * 3);
+    }
+    if (ko && !happy) {
+      ctx.fillStyle = '#ffe066';
+      for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1; star(ctx, cx + Math.cos(a) * 24, ground - 66 + Math.sin(a) * 6, 5); }
+    }
   }
 
   function updateBoss(h) {
@@ -1845,6 +1908,7 @@
     }
     for (const e of enemies) if (e.x > camX - 60 && e.x < camX + viewW + 60) drawEnemy(e, t);
     drawBoss(t);
+    drawDuo(t);
     drawDino(t);
     for (const p of particles) {
       ctx.globalAlpha = Math.min(1, p.life * 2);
