@@ -41,6 +41,8 @@
   #dpad.l .al, #dpad.r .ar { color: var(--accent-dark); transform: scale(1.2); }
   #acts { display: flex; gap: 12px; align-items: flex-end; }
   .pbtn { border: none; border-radius: 50%; font-weight: 800; color: #fff; touch-action: none; }
+  #fireBtn { width: 66px; height: 66px; background: rgba(255,112,67,.9); font-size: 13px; box-shadow: 0 4px 0 rgba(200,70,30,.9); margin-bottom: 30px; }
+  #dashBtn.bolt { background: rgba(255,210,63,.95); color: #6b4a3a; box-shadow: 0 4px 0 rgba(214,160,0,.95); }
   #dashBtn { width: 66px; height: 66px; background: rgba(249,178,58,.85); font-size: 13px; box-shadow: 0 4px 0 rgba(217,140,18,.85); margin-bottom: 30px; }
   #jumpBtn { width: 86px; height: 86px; background: rgba(255,143,163,.9); font-size: 15px; box-shadow: 0 4px 0 rgba(224,104,127,.9); }
   .pbtn.down { transform: translateY(3px); box-shadow: none !important; filter: brightness(1.05); }
@@ -89,6 +91,7 @@
     <span class="chip" id="hudLives"></span>
     <span class="chip" id="hudBerry"></span>
     <span class="chip" id="hudCourse"></span>
+    <span class="chip hidden" id="hudPower"></span>
   </div>
   <div id="hudR">
     <span class="chip" id="hudScore"></span>
@@ -99,6 +102,7 @@
 <div id="pad" class="hidden">
   <div id="dpad"><span class="al">◀</span><span class="ar">▶</span></div>
   <div id="acts">
+    <button class="pbtn hidden" id="fireBtn" data-i18n="fire"></button>
     <button class="pbtn" id="dashBtn" data-i18n="dash"></button>
     <button class="pbtn" id="jumpBtn" data-i18n="jump"></button>
   </div>
@@ -116,7 +120,7 @@
   <p class="sub" data-i18n="subtitle"></p>
   <div class="courses" id="courses"></div>
   <div class="num" id="bestLine" style="margin-top:6px;"></div>
-  <div class="help"><span data-i18n="controlsTouch"></span><br><span data-i18n="keys"></span><br><span data-i18n="tip"></span></div>
+  <div class="help"><span data-i18n="items"></span><br><span data-i18n="controlsTouch"></span><br><span data-i18n="keys"></span><br><span data-i18n="tip"></span></div>
 </div>
 
 <div id="intro" class="screen dim hidden">
@@ -343,7 +347,10 @@
     ja: {
       title: 'Dino の だいぼうけん', subtitle: 'はしって とんで、ゴールの はたを めざそう！',
       controlsTouch: 'タッチ：◀ ▶ いどう ／ ジャンプ（長押しで 高く）／ ダッシュ',
-      keys: 'キー：← → いどう ／ スペース ジャンプ ／ X か Shift ダッシュ ／ P ポーズ',
+      keys: 'キー：← → いどう ／ スペース ジャンプ ／ X か Shift ダッシュ ／ C ほのお ／ P ポーズ',
+      items: '🎁 から でるもの：🍰 大きくなる ／ 🔥 ほのおを とばせる ／ ⚡ いなずまダッシュ ／ ⭐ むてき',
+      fire: 'ほのお', gotFire: '🔥 ほのおボタン（C キー）で ほのおを とばそう！',
+      gotBolt: '⚡ ダッシュボタンを おすと いなずまダッシュ！ 空中でも できるよ',
       tip: '📱 スマホは よこむきが おすすめ', jump: 'ジャンプ', dash: 'ダッシュ',
       courses: ['ぽかぽか そうげん', 'ふわふわ くものうえ', 'よぞらの おかしの おしろ'],
       lives: n => `のこり ${n}`, clear: 'コース クリア！', next: 'つぎへ', gameover: 'ゲームオーバー',
@@ -353,7 +360,10 @@
     en: {
       title: "Dino's Big Adventure", subtitle: 'Run, jump, and reach the goal flag!',
       controlsTouch: 'Touch: ◀ ▶ move / Jump (hold to go higher) / Dash',
-      keys: 'Keys: ← → move / Space jump / X or Shift dash / P pause',
+      keys: 'Keys: ← → move / Space jump / X or Shift dash / C fire / P pause',
+      items: '🎁 can hold: 🍰 grow big / 🔥 throw fireballs / ⚡ lightning dash / ⭐ invincible',
+      fire: 'Fire', gotFire: '🔥 Press Fire (C key) to throw fireballs!',
+      gotBolt: '⚡ Tap Dash for a lightning dash — works in the air too!',
       tip: '📱 Landscape works best on phones', jump: 'Jump', dash: 'Dash',
       courses: ['Sunny Meadow', 'Fluffy Cloud Land', 'Candy Castle at Night'],
       lives: n => `Lives ${n}`, clear: 'Course clear!', next: 'Next', gameover: 'Game over',
@@ -363,7 +373,10 @@
     id: {
       title: 'Petualangan Besar Dino', subtitle: 'Lari, lompat, dan capai bendera tujuan!',
       controlsTouch: 'Sentuh: ◀ ▶ gerak / Lompat (tahan agar lebih tinggi) / Dash',
-      keys: 'Tombol: ← → gerak / Spasi lompat / X atau Shift dash / P jeda',
+      keys: 'Tombol: ← → gerak / Spasi lompat / X atau Shift dash / C api / P jeda',
+      items: '🎁 bisa berisi: 🍰 jadi besar / 🔥 lempar bola api / ⚡ dash kilat / ⭐ kebal',
+      fire: 'Api', gotFire: '🔥 Tekan Api (tombol C) untuk melempar bola api!',
+      gotBolt: '⚡ Tekan Dash untuk dash kilat — bisa juga di udara!',
       tip: '📱 Di HP lebih seru dalam posisi miring', jump: 'Lompat', dash: 'Dash',
       courses: ['Padang Rumput Cerah', 'Negeri Awan Empuk', 'Istana Permen Malam Hari'],
       lives: n => `Nyawa ${n}`, clear: 'Lintasan selesai!', next: 'Lanjut', gameover: 'Permainan berakhir',
@@ -381,8 +394,8 @@
 
   // ---------- コース ----------
   const TS = 32, ROWS = 14, GROUND = 12;
-  // タイル: # 地面  = かたいブロック  b レンガ  ? いちご箱  P ケーキ箱  S スター箱  u からっぽ  - くも（下から通れる）  ^ トゲ
-  const SOLID = new Set(['#', '=', 'b', '?', 'P', 'S', 'u']);
+  // タイル: # 地面  = かたいブロック  b レンガ  ? いちご箱  P ケーキ箱  S スター箱  F ほのお箱  T いなずま箱  u からっぽ  - くも（下から通れる）  ^ トゲ
+  const SOLID = new Set(['#', '=', 'b', '?', 'P', 'S', 'F', 'T', 'u']);
 
   function makeBuilder(len) {
     const grid = Array.from({ length: ROWS }, () => Array(len).fill('.'));
@@ -414,7 +427,7 @@
       const B = makeBuilder(220);
       B.ground(0, 68); B.ground(71, 88); B.ground(92, 150); B.ground(153, 219);
       B.set(16, 8, '?');
-      B.row(20, 8, 'bPb?b'); B.set(22, 4, '?');
+      B.row(20, 8, 'bPb?b'); B.set(22, 4, 'F');
       B.enemy('chili', 24);
       B.tower(28, 2); B.tower(38, 3); B.tower(47, 3); B.tower(57, 2);
       B.enemy('chili', 42); B.enemy('chili', 51); B.enemy('chili', 53);
@@ -428,7 +441,7 @@
       B.check(106);
       B.set(110, 8, '?'); B.set(113, 8, '?'); B.set(116, 8, '?'); B.set(113, 4, 'P');
       B.enemy('chili', 114); B.enemy('chili', 116); B.enemy('hog', 121); B.enemy('chili', 124);
-      B.row(127, 8, 'b??b'); B.berries(127, 5, 4);
+      B.row(127, 8, 'bT?b'); B.berries(127, 5, 4);
       B.stairs(134, 4, 1); B.stairs(140, 4, -1);
       B.stairs(147, 4, 1); B.stairs(153, 4, -1);
       B.berries(151, 6, 2);
@@ -451,12 +464,12 @@
       B.berries(61, 5, 3);
       B.ground(66, 85); B.enemy('bee', 71, 8); B.enemy('bee', 78, 7); B.check(82);
       B.plat(86, GROUND, 3, 'x', 86, 93, 60);
-      B.ground(96, 110); B.row(100, 8, '?S?'); B.enemy('chili', 104); B.enemy('chili', 106); B.enemy('hog', 108);
+      B.ground(96, 110); B.row(100, 8, 'FS?'); B.enemy('chili', 104); B.enemy('chili', 106); B.enemy('hog', 108);
       B.row(112, 9, '--------'); B.enemy('bee', 115, 6); B.enemy('bee', 119, 6); B.berries(113, 8, 6);
       B.ground(121, 135); B.tower(126, 2); B.enemy('chili', 130); B.enemy('chili', 133);
       B.plat(136, GROUND, 3, 'x', 136, 141, 65);
       B.plat(146, 7, 2, 'y', 3, 9, 40); B.berries(146, 3, 2);
-      B.ground(144, 199); B.row(152, 8, 'b?bPb'); B.enemy('chili', 155); B.enemy('hog', 160); B.enemy('chili', 165);
+      B.ground(144, 199); B.row(152, 8, 'b?bTb'); B.enemy('chili', 155); B.enemy('hog', 160); B.enemy('chili', 165);
       B.stairs(170, 6, 1, 1);
       B.pole(184);
       return { ...B, theme: 1, house: 189, start: 3 };
@@ -468,7 +481,7 @@
       B.ground(21, 45); B.row(23, GROUND - 1, '^^^'); B.berries(23, 8, 3);
       B.tower(30, 2); B.enemy('hog', 34); B.tower(38, 2); B.enemy('chili', 42);
       B.ground(48, 70); B.tower(59, 6, 4); B.plat(56, 11, 2, 'y', 5, GROUND, 45);
-      B.berries(59, 4, 4); B.set(61, 2, 'P');
+      B.berries(59, 4, 4); B.set(61, 2, 'F');
       B.enemy('chili', 66); B.enemy('chili', 68);
       B.ground(71, 100); B.check(72);
       B.enemy('hog', 78); B.enemy('chili', 80); B.enemy('hog', 84);
@@ -477,7 +490,7 @@
       B.plat(101, GROUND, 3, 'x', 101, 106, 60);
       B.ground(109, 199);
       B.enemy('hog', 115); B.enemy('chili', 118); B.enemy('chili', 120); B.enemy('bee', 125, 8);
-      B.row(128, 8, 'b?b?b'); B.row(130, 4, '?');
+      B.row(128, 8, 'bTbPb'); B.row(130, 4, '?');
       B.row(136, GROUND - 1, '^^'); B.row(140, GROUND - 1, '^^'); B.berries(136, 8, 2); B.berries(140, 8, 2);
       B.tower(146, 3); B.enemy('hog', 150); B.tower(154, 3); B.enemy('chili', 158); B.enemy('bee', 162, 7);
       B.stairs(170, 8, 1, 1);
@@ -503,13 +516,14 @@
 
   let C = null, P = null;
   let enemies = [], items = [], berries = [], plats = [], checks = [], pole = null;
-  let particles = [], popups = [], bumps = {};
+  let particles = [], popups = [], bumps = {}, shots = [];
+  let carry = null;   // つぎのコースへ もちこす パワー
   let state = 'title';          // title | intro | play | pause | dying | goal | clear | over
   let courseIdx = 0, lives = 3, berryCount = 0, score = 0, courseStartScore = 0;
   let checkpointCol = null;
   let camX = 0, viewW = 400, viewH = 700, scale = 1, offY = 0, padSpace = 0;
   let stateT = 0, simT = 0;
-  const input = { left: false, right: false, jump: false, jumpPressed: false, dash: false };
+  const input = { left: false, right: false, jump: false, jumpPressed: false, dash: false, dashPressed: false, firePressed: false };
 
   const progress = (() => {
     let p = null;
@@ -524,7 +538,7 @@
     C = COURSES[i]();
     C.theme = THEMES[C.theme];
     enemies = []; items = []; berries = []; plats = []; checks = []; pole = null;
-    particles = []; popups = []; bumps = {};
+    particles = []; popups = []; bumps = {}; shots = [];
     for (const e of C.ents) {
       if (ENEMY[e.k]) {
         const d = ENEMY[e.k];
@@ -545,12 +559,13 @@
     const col = checkpointCol !== null ? checkpointCol : C.start;
     P = { x: col * TS + 6, y: GROUND * TS - SMALL.h, w: SMALL.w, h: SMALL.h, vx: 0, vy: 0, big: false, face: 1,
           ground: false, coyote: 0, jumpBuf: 0, inv: 0, star: 0, plat: null, walkT: 0, squash: 0, hidden: false,
-          goalPhase: null, goalT: 0, dieT: 0, prevBottom: 0, growT: 0 };
+          goalPhase: null, goalT: 0, dieT: 0, prevBottom: 0, growT: 0, power: null, boltT: 0, boltCd: 0, boltAir: true };
+    if (carry) { if (carry.big) setSize(true); P.power = carry.power; carry = null; }
     // 地面の高さに合わせる
     for (let ty = 0; ty < ROWS; ty++) if (SOLID.has(tileAt(col, ty))) { P.y = ty * TS - P.h; break; }
     camX = clampCam(P.x - viewW * 0.4);
     courseStartScore = score;
-    updateHud();
+    updateHud(); updatePowerUI();
   }
 
   function tileAt(tx, ty) {
@@ -606,24 +621,28 @@
     const c = tileAt(tx, ty);
     const key = tx + ',' + ty;
     const cx = tx * TS + TS / 2, cy = ty * TS;
-    if (c === '?' || c === 'P' || c === 'S') {
+    if ('?PSFT'.includes(c)) {
       C.grid[ty][tx] = 'u';
       bumps[key] = 0.15;
       if (c === '?') { items.push({ type: 'pop', x: cx - 10, y: cy - 20, w: 20, h: 20, t: 0.45 }); addBerry(); }
-      else items.push({ type: c === 'P' ? 'cake' : 'star', x: tx * TS + 4, y: cy, w: 24, h: 22, vx: 0, vy: 0, emerge: 0.5 });
+      else items.push({ type: { P: 'cake', S: 'star', F: 'fire', T: 'bolt' }[c], x: tx * TS + 4, y: cy, w: 24, h: 22, vx: 0, vy: 0, emerge: 0.5 });
       sfx.bump2();
     } else if (c === 'b') {
-      if (P.big) {
-        C.grid[ty][tx] = '.';
-        score += 50;
-        for (let i = 0; i < 8; i++) particles.push({ x: cx, y: cy + 16, vx: (Math.random() - 0.5) * 260, vy: -200 - Math.random() * 260, life: 1.2, col: '#e9926b', r: 4, sq: true });
-        sfx.brick();
-      } else { bumps[key] = 0.15; sfx.bump(); }
+      if (P.big) breakBrick(tx, ty);
+      else { bumps[key] = 0.15; sfx.bump(); }
     } else { sfx.bump(); return; }
     // 上にいる てきを はじきとばす
     for (const e of enemies) {
       if (e.alive && e.x < tx * TS + TS && e.x + e.w > tx * TS && Math.abs(e.y + e.h - ty * TS) < 6) kill(e, true);
     }
+  }
+
+  function breakBrick(tx, ty) {
+    C.grid[ty][tx] = '.';
+    score += 50;
+    const cx = tx * TS + TS / 2, cy = ty * TS;
+    for (let i = 0; i < 8; i++) particles.push({ x: cx, y: cy + 16, vx: (Math.random() - 0.5) * 260, vy: -200 - Math.random() * 260, life: 1.2, col: '#e9926b', r: 4, sq: true });
+    sfx.brick();
   }
 
   function addBerry(n = 1) {
@@ -648,7 +667,12 @@
 
   function hurt() {
     if (P.inv > 0 || P.star > 0 || state !== 'play') return;
-    if (P.big) {
+    if (P.power) {              // パワーだけ なくなる
+      P.power = null; P.boltT = 0;
+      P.inv = 1.8;
+      sfx.shrink();
+      updatePowerUI();
+    } else if (P.big) {
       setSize(false);
       P.inv = 1.8;
       sfx.shrink();
@@ -657,7 +681,8 @@
 
   function die() {
     state = 'dying';
-    P.vy = -560; P.vx = 0; P.dieT = 2.2; P.inv = 0; P.star = 0;
+    P.vy = -560; P.vx = 0; P.dieT = 2.2; P.inv = 0; P.star = 0; P.power = null; P.boltT = 0;
+    shots = []; updatePowerUI();
     lives--;
     sfx.die();
     updateHud();
@@ -685,7 +710,7 @@
       if (P.dieT <= 0) afterDeath();
     } else if (state === 'goal') updateGoal(h);
 
-    if (state === 'play' || state === 'goal') { updateEnemies(h); updateItems(h); }
+    if (state === 'play' || state === 'goal') { updateEnemies(h); updateItems(h); updateShots(h); }
 
     const target = clampCam(P.x + P.w / 2 - viewW * 0.4);
     if (state !== 'dying') camX += (target - camX) * Math.min(1, h * 8);
@@ -720,7 +745,29 @@
 
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const max = input.dash ? RUN : WALK;
-    if (dir) {
+
+    // ⚡ いなずまダッシュ
+    if (P.boltCd > 0) P.boltCd -= h;
+    if (input.dashPressed && P.power === 'bolt' && P.boltCd <= 0 && (P.ground || P.boltAir)) {
+      if (dir) P.face = dir;
+      P.boltT = 0.32; P.boltCd = 0.6;
+      if (!P.ground) P.boltAir = false;
+      sfx.zap();
+    }
+    input.dashPressed = false;
+    // 🔥 ほのお
+    if (input.firePressed && P.power === 'fire' && shots.length < 2) {
+      shots.push({ x: P.face > 0 ? P.x + P.w - 2 : P.x - 10, y: P.y + P.h * 0.3, w: 12, h: 12, vx: P.face * 300 + P.vx * 0.3, vy: 150, life: 2.5, spin: 0 });
+      sfx.fire();
+    }
+    input.firePressed = false;
+
+    if (P.boltT > 0) {
+      P.boltT -= h;
+      P.vx = P.face * 480;
+      if (Math.random() < 0.8) particles.push({ x: P.x + P.w / 2 - P.face * 10, y: P.y + Math.random() * P.h, vx: -P.face * 60, vy: (Math.random() - 0.5) * 60,
+                                                life: 0.3, col: Math.random() < 0.5 ? '#ffe066' : '#fff6b0', r: 3, star: Math.random() < 0.4 });
+    } else if (dir) {
       if (Math.sign(P.vx) === -dir && P.ground) P.vx += dir * 2600 * h;          // ブレーキ
       else if (P.vx * dir < max) P.vx = dir * Math.min(max, P.vx * dir + (P.ground ? 1000 : 700) * h);
       else P.vx = dir * Math.max(max, P.vx * dir - 700 * h);                   // ダッシュをやめたら ゆっくり減速
@@ -738,12 +785,19 @@
       sfx.jump();
     }
     const gmul = (P.vy < 0 && input.jump) ? 1 : 2.1;
-    P.vy = Math.min(MAX_FALL, P.vy + G * gmul * h);
+    if (P.boltT > 0) P.vy = 0;           // ダッシュ中は まっすぐ とぶ
+    else P.vy = Math.min(MAX_FALL, P.vy + G * gmul * h);
 
     P.prevBottom = P.y + P.h;
     const wasGround = P.ground;
     const r = moveBody(P, P.vx * h, P.vy * h);
-    if (r.hitX) P.vx = 0;
+    if (r.hitX && P.boltT > 0 && P.big) {
+      // いなずまダッシュで レンガを こわす
+      const tx = r.hitX > 0 ? Math.floor((P.x + P.w + 1) / TS) : Math.floor((P.x - 1) / TS);
+      let broke = false;
+      for (let ty = Math.floor(P.y / TS); ty <= Math.floor((P.y + P.h - 0.01) / TS); ty++) if (tileAt(tx, ty) === 'b') { breakBrick(tx, ty); broke = true; }
+      if (!broke) { P.vx = 0; P.boltT = 0; }
+    } else if (r.hitX) { P.vx = 0; P.boltT = 0; }
     if (r.up) {
       P.vy = 40;
       const cx = P.x + P.w / 2;
@@ -761,6 +815,7 @@
     }
     if (P.ground && !wasGround) P.squash = 0.6;
     P.coyote = P.ground ? 0.08 : Math.max(0, P.coyote - h);
+    if (P.ground) P.boltAir = true;
     P.walkT = P.ground && Math.abs(P.vx) > 5 ? P.walkT + h * Math.abs(P.vx) / 140 : 0;
 
     // トゲ
@@ -824,7 +879,7 @@
       }
       // Dino との あたり
       if (state !== 'play' || !overlap(P, e)) continue;
-      if (P.star > 0) { kill(e, true); sfx.stomp(); continue; }
+      if (P.star > 0 || P.boltT > 0) { kill(e, true); sfx.stomp(); continue; }
       if (e.type !== 'hog' && P.vy > 0 && P.prevBottom <= e.y + 10) {
         kill(e, false);
         P.vy = input.jump ? -600 : -400;
@@ -838,7 +893,7 @@
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       if (it.type === 'pop') { it.t -= h; it.y -= 160 * h; if (it.t <= 0) items.splice(i, 1); continue; }
-      if (it.emerge > 0) { it.emerge -= h; it.y -= (TS / 0.5) * h; if (it.emerge <= 0) it.vx = it.type === 'star' ? 110 : 75; continue; }
+      if (it.emerge > 0) { it.emerge -= h; it.y -= (TS / 0.5) * h; if (it.emerge <= 0) it.vx = { star: 110, cake: 75 }[it.type] || 0; continue; }
       it.vy = Math.min(MAX_FALL, it.vy + G * h * (it.type === 'star' ? 0.8 : 1));
       const r = moveBody(it, it.vx * h, it.vy * h);
       if (r.hitX) it.vx = -it.vx;
@@ -850,6 +905,13 @@
           if (!P.big) { setSize(true); P.growT = 0.6; }
           score += 1000; popup(it.x + 12, it.y - 10, '1000', '#ff5c8a');
           sfx.power();
+        } else if (it.type === 'fire' || it.type === 'bolt') {
+          if (!P.big) setSize(true);
+          P.power = it.type;
+          score += 1000; popup(it.x + 12, it.y - 10, '1000', '#ff5c8a');
+          toast(it.type === 'fire' ? T().gotFire : T().gotBolt);
+          sfx.power();
+          updatePowerUI();
         } else {
           P.star = 9; score += 1000;
           sfx.star();
@@ -859,10 +921,28 @@
     }
   }
 
+  function updateShots(h) {
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const f = shots[i];
+      f.life -= h; f.spin += h * 20;
+      f.vy = Math.min(600, f.vy + 1500 * h);
+      const r = moveBody(f, f.vx * h, f.vy * h);
+      if (r.down) f.vy = -320;
+      let gone = r.hitX || f.life <= 0 || f.y > ROWS * TS || f.x < camX - 40 || f.x > camX + viewW + 40;
+      if (!gone) for (const e of enemies) {
+        if (e.alive && e.active && overlap(f, e)) { kill(e, true); score += 100; gone = true; sfx.stomp(); break; }
+      }
+      if (gone) {
+        for (let k = 0; k < 6; k++) particles.push({ x: f.x + 6, y: f.y + 6, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, life: 0.3, col: k % 2 ? '#ffb347' : '#ff5e3a', r: 2.5 });
+        shots.splice(i, 1);
+      }
+    }
+  }
+
   function startGoal() {
     state = 'goal';
     P.goalPhase = 'slide'; P.goalT = 0;
-    P.vx = 0; P.vy = 0; P.star = 0;
+    P.vx = 0; P.vy = 0; P.star = 0; P.boltT = 0;
     P.x = pole.x - P.w + 2;
     if (P.y < pole.top) P.y = pole.top;
     const k = 1 - (P.y + P.h - pole.top) / (pole.bottom - pole.top);
@@ -937,6 +1017,8 @@
     clear: () => seq([523, 659, 784, 1047, 0, 784, 1047, 1319], 0.12, 'triangle', 0.07, 0.18),
     pop: () => beep(800 + Math.random() * 600, 0.08, 'triangle', 0.025),
     start: () => seq([523, 659, 784, 1047], 0.08),
+    fire: () => beep(900, 0.1, 'sawtooth', 0.03, -500),
+    zap: () => { beep(1500, 0.18, 'sawtooth', 0.035, -1200); beep(300, 0.2, 'square', 0.03, 600, 0.03); },
   };
 
   // ---------- 描画 ----------
@@ -1066,7 +1148,7 @@
       ctx.moveTo(sx + 6, sy + 16); ctx.lineTo(sx + 6, sy + TS); ctx.moveTo(sx + 26, sy + 16); ctx.lineTo(sx + 26, sy + TS);
       ctx.stroke();
       ctx.strokeStyle = '#c86f4b'; ctx.strokeRect(sx + 1, sy + 1, TS - 2, TS - 2);
-    } else if (c === '?' || c === 'P' || c === 'S') {
+    } else if ('?PSFT'.includes(c)) {
       ctx.fillStyle = '#d96a83'; roundRect(ctx, sx + 1, sy + 2, TS - 2, TS - 2, 6); ctx.fill();
       ctx.fillStyle = '#ff8fa3'; roundRect(ctx, sx + 1, sy, TS - 2, TS - 4, 6); ctx.fill();
       ctx.fillStyle = '#ffe066';
@@ -1172,9 +1254,34 @@
     ctx.restore();
   }
 
+  function drawFlame(x, y, s, t) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    const w = Math.sin(t * 10) * 1.5;
+    ctx.fillStyle = '#ff5e3a';
+    ctx.beginPath(); ctx.moveTo(0, -14 + w); ctx.bezierCurveTo(9, -4, 11, 4, 0, 11); ctx.bezierCurveTo(-11, 4, -9, -4, 0, -14 + w); ctx.fill();
+    ctx.fillStyle = '#ffb347';
+    ctx.beginPath(); ctx.moveTo(0, -6 - w); ctx.bezierCurveTo(6, 0, 7, 5, 0, 9); ctx.bezierCurveTo(-7, 5, -6, 0, 0, -6 - w); ctx.fill();
+    ctx.restore();
+  }
+  function drawBolt(x, y, s) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#d99a00'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(3, -13); ctx.lineTo(-7, 2); ctx.lineTo(-1, 2); ctx.lineTo(-4, 13); ctx.lineTo(7, -3); ctx.lineTo(1, -3); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
   function drawItem(it, t) {
     const x = it.x + it.w / 2 - camX, y = it.y + it.h / 2 + offY;
     if (it.type === 'pop') { drawBerryShape(x, y, 1.1); return; }
+    if (it.type === 'fire' || it.type === 'bolt') {
+      ctx.save(); ctx.shadowColor = it.type === 'fire' ? '#ff9a5a' : '#ffe066'; ctx.shadowBlur = 12;
+      if (it.type === 'fire') drawFlame(x, y + Math.sin(t * 4) * 1.5, 1, t); else drawBolt(x, y + Math.sin(t * 4) * 1.5, 1.05);
+      ctx.restore();
+      ctx.fillStyle = '#4a2f22';
+      ctx.beginPath(); ctx.arc(x - 3, y + 2, 1.5, 0, Math.PI * 2); ctx.arc(x + 3, y + 2, 1.5, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
     if (it.type === 'cake') {
       ctx.font = '24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('🍰', x, y);
@@ -1247,7 +1354,13 @@
     else if (!P.ground || P.goalPhase) mood = 'happy';
     const bob = P.walkT > 0 ? -Math.abs(Math.sin(P.walkT * 14)) * 2 : 0;
     const wave = !P.ground ? 1 : (P.walkT > 0 ? Math.min(1, Math.abs(P.vx) / 140) : 0);
-    drawChar(ctx, 'pink', 0, -66 * s + bob, s, t * (P.walkT > 0 ? 1.6 : 1), mood, wave);
+    // パワーで ぼうしの 色が かわる
+    const hat = COL.pinkHat, hatD = COL.pinkHatDark;
+    if (P.power === 'fire') { COL.pinkHat = '#ff8a4c'; COL.pinkHatDark = '#e0601a'; }
+    if (P.power === 'bolt') { COL.pinkHat = '#ffd23f'; COL.pinkHatDark = '#e0a812'; }
+    if (P.boltT > 0) { ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 18; ctx.rotate(0.18); }
+    drawChar(ctx, 'pink', 0, -66 * s + bob, s, t * (P.walkT > 0 ? 1.6 : 1), P.boltT > 0 ? 'fever' : mood, P.boltT > 0 ? 1 : wave);
+    COL.pinkHat = hat; COL.pinkHatDark = hatD;
     ctx.restore();
   }
 
@@ -1262,6 +1375,12 @@
     for (const p of plats) drawPlat(p);
     for (const b of berries) if (!b.got && b.x > camX - 20 && b.x < camX + viewW + 20) drawBerryShape(b.x - camX, b.y + offY + Math.sin(t * 3 + b.x) * 2, 1);
     for (const it of items) drawItem(it, t);
+    for (const f of shots) {
+      ctx.save(); ctx.translate(f.x + 6 - camX, f.y + 6 + offY); ctx.rotate(f.spin);
+      ctx.fillStyle = '#ff5e3a'; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd36b'; ctx.beginPath(); ctx.arc(1.5, -1.5, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     for (const e of enemies) if (e.x > camX - 60 && e.x < camX + viewW + 60) drawEnemy(e, t);
     drawDino(t);
     for (const p of particles) {
@@ -1294,6 +1413,20 @@
     $('hudScore').textContent = `${T().score} ${score}`;
   }
 
+  function updatePowerUI() {
+    const pw = P && P.power;
+    $('fireBtn').classList.toggle('hidden', pw !== 'fire');
+    $('dashBtn').classList.toggle('bolt', pw === 'bolt');
+    $('dashBtn').textContent = (pw === 'bolt' ? '⚡' : '') + T().dash;
+    $('hudPower').classList.toggle('hidden', !pw);
+    $('hudPower').textContent = pw === 'fire' ? '🔥' : pw === 'bolt' ? '⚡' : '';
+  }
+  function toast(msg) {
+    const el = $('toast');
+    el.textContent = msg; el.classList.remove('hidden');
+    clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 3200);
+  }
+
   function setScreen(s) {
     state = s; stateT = 0;
     show('title', s === 'title');
@@ -1315,7 +1448,7 @@
   }
 
   function startGame(i) {
-    lives = 3; berryCount = 0; score = 0; checkpointCol = null;
+    lives = 3; berryCount = 0; score = 0; checkpointCol = null; carry = null;
     loadCourse(i);
     showIntro();
     sfx.start();
@@ -1337,6 +1470,7 @@
   }
 
   function courseClear() {
+    carry = { big: P.big, power: P.power };
     progress.cleared[courseIdx] = true;
     saveBest(); saveProgress();
     const last = courseIdx === COURSES.length - 1;
@@ -1374,6 +1508,7 @@
     document.querySelectorAll('#langs button').forEach(b => b.classList.toggle('on', b.dataset.lang === lang));
     buildCourses();
     updateHud();
+    updatePowerUI();
   }
   document.querySelectorAll('#langs button').forEach(b => b.addEventListener('click', () => {
     lang = b.dataset.lang; store.set('fuwamoko-lang', lang); applyLang(); beep(660, 0.08, 'triangle');
@@ -1385,7 +1520,7 @@
   }
   $('pauseBtn').addEventListener('click', () => pause(state === 'play'));
   $('resumeBtn').addEventListener('click', () => pause(false));
-  const toTitle = () => { saveBest(); C = null; buildCourses(); setScreen('title'); };
+  const toTitle = () => { saveBest(); C = null; carry = null; buildCourses(); setScreen('title'); };
   $('pauseTitleBtn').addEventListener('click', toTitle);
   $('clearTitleBtn').addEventListener('click', toTitle);
   $('overTitleBtn').addEventListener('click', toTitle);
@@ -1395,7 +1530,7 @@
 
   // ---------- 入力 ----------
   function clearInput() {
-    input.left = input.right = input.jump = input.jumpPressed = input.dash = false;
+    input.left = input.right = input.jump = input.jumpPressed = input.dash = input.dashPressed = input.firePressed = false;
     $('dpad').classList.remove('l', 'r');
     document.querySelectorAll('.pbtn.down').forEach(b => b.classList.remove('down'));
   }
@@ -1432,7 +1567,8 @@
     el.addEventListener('contextmenu', e => e.preventDefault());
   }
   holdButton('jumpBtn', () => { input.jump = true; input.jumpPressed = true; }, () => { input.jump = false; });
-  holdButton('dashBtn', () => { input.dash = true; }, () => { input.dash = false; });
+  holdButton('dashBtn', () => { input.dash = true; input.dashPressed = true; }, () => { input.dash = false; });
+  holdButton('fireBtn', () => { input.firePressed = true; }, () => {});
   window.addEventListener('touchstart', () => { if (!touchUI) { touchUI = true; resize(); setScreen(state); } }, { passive: true });
 
   const JUMP_KEYS = [' ', 'ArrowUp', 'w', 'W', 'z', 'Z', 'k', 'K'];
@@ -1442,7 +1578,8 @@
     if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
     if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
     if (JUMP_KEYS.includes(k)) { if (!e.repeat && state === 'play') { input.jump = true; input.jumpPressed = true; } else input.jump = true; }
-    if (DASH_KEYS.includes(k)) input.dash = true;
+    if (DASH_KEYS.includes(k)) { input.dash = true; if (!e.repeat) input.dashPressed = true; }
+    if ((k === 'c' || k === 'C' || k === 'f' || k === 'F') && !e.repeat) input.firePressed = true;
     if (k === 'p' || k === 'P' || k === 'Escape') pause(state === 'play');
     if ((k === 'Enter' || k === ' ') && !e.repeat) {
       if (state === 'title') startGame(0);
