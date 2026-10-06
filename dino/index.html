@@ -352,6 +352,7 @@
       fire: 'ほのお', gotFire: '🔥 ほのおボタン（C キー）で ほのおを とばそう！',
       gotBolt: '⚡ ダッシュボタンを おすと いなずまダッシュ！ 空中でも できるよ',
       bossIntro: 'ボスの Himawari が あらわれた！ 上から 3回 ふもう！',
+      bossIntro3: 'ボスの ちびDino が あらわれた！ つかれて すわったら チャンス！ 3回 ふもう！', miniName: 'ちびDino',
       bossIntro2: 'ボスの Onigiri が あらわれた！ ドスンと おりてきた ときが チャンス！ 3回 ふもう！', bossDown: 'まいった〜！', boss: 'ボス',
       tip: '📱 スマホは よこむきが おすすめ', jump: 'ジャンプ', dash: 'ダッシュ',
       courses: ['ぽかぽか そうげん', 'ふわふわ くものうえ', 'よぞらの おかしの おしろ'],
@@ -367,6 +368,7 @@
       fire: 'Fire', gotFire: '🔥 Press Fire (C key) to throw fireballs!',
       gotBolt: '⚡ Tap Dash for a lightning dash — works in the air too!',
       bossIntro: 'Boss Himawari appears! Stomp on Himawari 3 times!',
+      bossIntro3: 'Boss Mini Dino appears! When Mini Dino sits down tired, stomp — 3 times!', miniName: 'Mini Dino',
       bossIntro2: 'Boss Onigiri appears! Stomp when Onigiri lands with a thud — 3 times!', bossDown: 'You got me~!', boss: 'Boss',
       tip: '📱 Landscape works best on phones', jump: 'Jump', dash: 'Dash',
       courses: ['Sunny Meadow', 'Fluffy Cloud Land', 'Candy Castle at Night'],
@@ -382,6 +384,7 @@
       fire: 'Api', gotFire: '🔥 Tekan Api (tombol C) untuk melempar bola api!',
       gotBolt: '⚡ Tekan Dash untuk dash kilat — bisa juga di udara!',
       bossIntro: 'Bos Himawari muncul! Injak dari atas 3 kali!',
+      bossIntro3: 'Bos Dino Kecil muncul! Saat Dino Kecil duduk kelelahan, injak — 3 kali!', miniName: 'Dino Kecil',
       bossIntro2: 'Bos Onigiri muncul! Injak saat Onigiri jatuh ke tanah — 3 kali!', bossDown: 'Aku menyerah~!', boss: 'Bos',
       tip: '📱 Di HP lebih seru dalam posisi miring', jump: 'Lompat', dash: 'Dash',
       courses: ['Padang Rumput Cerah', 'Negeri Awan Empuk', 'Istana Permen Malam Hari'],
@@ -487,7 +490,7 @@
     },
     // 3: よぞらの おかしの おしろ
     () => {
-      const B = makeBuilder(200);
+      const B = makeBuilder(198);
       B.ground(0, 20); B.row(10, 8, '?b?'); B.enemy('hog', 15);
       B.ground(21, 45); B.row(23, GROUND - 1, '^^^'); B.berries(23, 8, 3);
       B.tower(30, 2); B.enemy('hog', 34); B.tower(38, 2); B.enemy('chili', 42);
@@ -499,14 +502,17 @@
       B.row(86, 8, 'bbbSbbb');
       B.row(92, GROUND - 1, '^^^^'); B.row(93, 9, '=='); B.berries(93, 7, 2);
       B.plat(101, GROUND, 3, 'x', 101, 106, 60);
-      B.ground(109, 199);
+      B.ground(109, 197);
       B.enemy('hog', 115); B.enemy('chili', 118); B.enemy('chili', 120); B.enemy('bee', 125, 8);
       B.row(128, 8, 'bTbPb'); B.row(130, 4, '?');
       B.row(136, GROUND - 1, '^^'); B.row(140, GROUND - 1, '^^'); B.berries(136, 8, 2); B.berries(140, 8, 2);
       B.tower(146, 3); B.enemy('hog', 150); B.tower(154, 3); B.enemy('chili', 158); B.enemy('bee', 162, 7);
+      B.check(165);
       B.stairs(170, 8, 1, 1);
-      B.pole(186);
-      return { ...B, theme: 2, house: 191, start: 3 };
+      // ボスべや（181〜197）：ちびDino。とびのれる ブロックが 2つ
+      B.row(185, 9, '==='); B.row(192, 9, '===');
+      B.boss(189, 181, 'mini');
+      return { ...B, theme: 2, house: null, start: 3 };
     },
   ];
 
@@ -567,9 +573,9 @@
         plats.push(p);
       } else if (e.k === 'check') checks.push({ x: e.x * TS, col: e.x, reached: checkpointCol === e.x });
       else if (e.k === 'boss') {
-        const oni = e.kind === 'onigiri';
-        const w = oni ? 48 : 50, hh = oni ? 54 : 58;
-        boss = { kind: e.kind, name: oni ? 'Onigiri' : 'Himawari', x: e.x * TS, y: GROUND * TS - hh, w, h: hh, vx: 0, vy: 0, hp: 3,
+        const oni = e.kind === 'onigiri', mini = e.kind === 'mini';
+        const w = oni ? 48 : mini ? 22 : 50, hh = oni ? 54 : mini ? 30 : 58;
+        boss = { kind: e.kind, name: oni ? 'Onigiri' : mini ? 'mini' : 'Himawari', x: e.x * TS, y: GROUND * TS - hh, w, h: hh, vx: 0, vy: 0, hp: 3,
                  state: 'wait', t: 0, face: -1, inv: 0, arenaL: e.arena * TS, fight: false, puffT: 1 };
         if (oni) { boss.hoverY = GROUND * TS - hh - 5 * TS; boss.y = boss.hoverY - 260; }
       }
@@ -990,18 +996,21 @@
     if (b.state === 'wait') {
       if (state === 'play' && P.x > b.arenaL + 2 * TS) {
         b.fight = true; go('intro');
-        toast(b.kind === 'onigiri' ? T().bossIntro2 : T().bossIntro); sfx.boss();
+        toast(b.kind === 'onigiri' ? T().bossIntro2 : b.kind === 'mini' ? T().bossIntro3 : T().bossIntro); sfx.boss();
       }
       if (b.kind === 'onigiri') return;    // 空の上で まっている
     }
     if (b.kind === 'onigiri') aiOnigiri(b, h, toP, rage, go);
+    else if (b.kind === 'mini') aiMini(b, h, toP, rage, go);
     else aiHimawari(b, h, toP, rage, go);
     updatePuffs(h);
     if (!b.fight || b.state === 'down' || state !== 'play') return;
 
     // Dino との あたり
     if (!overlap(P, b)) return;
-    if (P.vy > 0 && P.prevBottom <= b.y + 16) {
+    // 上から ふんだ（ボスが 下から ぶつかってきても Dino が 上なら ふんだことに する）
+    const above = P.y + P.h <= b.y + 12;    // Dino の 足が ボスの あたまの 上
+    if ((P.vy > 0 && P.prevBottom <= b.y + 16) || (above && (b.vy < 0 || P.vy >= 0))) {
       if (b.inv > 0) { P.vy = -420; return; }
       b.hp--; b.inv = 1.1;
       P.vy = input.jump ? -640 : -520; P.y = b.y - P.h;
@@ -1014,9 +1023,10 @@
         state = 'goal'; P.goalPhase = 'boss'; P.goalT = 0; P.star = 0; P.boltT = 0;
       } else go('hurt');
       updateHud();
+    } else if (above) {                // 上に いるときは いたくない
     } else if (P.boltT > 0) {          // ダッシュは はじかれるだけ
       P.boltT = 0; P.vx = -toP * 250;
-    } else if (!['hurt', 'dizzy', 'land', 'intro'].includes(b.state) && b.inv <= 0) {
+    } else if (!['hurt', 'dizzy', 'land', 'intro', 'tired'].includes(b.state) && b.inv <= 0) {
       hurt();
       if (P.inv > 0) P.vx = -toP * 200;   // すこし はじかれる
     }
@@ -1082,18 +1092,71 @@
     }
   }
 
+  // ちびDino：はしりまわる・ぴょんぴょん・ほのお → つかれて すわる（チャンス）
+  function aiMini(b, h, toP, rage, go) {
+    switch (b.state) {
+      case 'intro':
+        b.vx = 0; b.face = toP;
+        if (b.ground && b.t < 1.1) b.vy = -300;     // うれしくて ぴょんぴょん
+        if (b.t > 1.3) go('run');
+        break;
+      case 'run':
+        b.vx = b.face * (150 + rage * 35);
+        if (b.ground && Math.random() < 0.012) b.vy = -520;
+        if (b.t > (b.next || 1.6)) { b.hops = 0; go(Math.random() < 0.5 ? 'hop' : 'fire'); }
+        break;
+      case 'hop':
+        if (b.ground && b.t > 0.15) {
+          if (b.hops >= 3 + (rage > 1 ? 1 : 0)) { go('tired'); break; }
+          b.hops++; b.face = toP; b.vy = -560; b.vx = b.face * (140 + rage * 30); b.t = 0;
+          sfx.jump();
+        }
+        break;
+      case 'fire': {
+        b.vx = 0; b.face = toP;
+        const shotsN = 2 + rage;
+        const k = Math.floor(b.t / 0.35);
+        if (k >= 1 && k <= shotsN && (b.fired || 0) < k) {
+          b.fired = k;
+          puffs.push({ kind: 'fire', x: b.x + b.w / 2 + b.face * 10 - 5, y: b.y + 8, w: 10, h: 10, vx: b.face * (170 + rage * 30), vy: -120, t: 0 });
+          sfx.fire();
+        }
+        if (b.t > 0.35 * (shotsN + 1) + 0.2) { b.fired = 0; go('tired'); }
+        break;
+      }
+      case 'tired': b.vx = 0; if (b.t > 2.0 - rage * 0.2) { b.face = toP; go('run'); } break;
+      case 'hurt': b.vx = -toP * 260; b.face = -toP; if (b.t > 0.7) { b.face = toP; go('run'); } break;
+      case 'down': b.vx = 0; break;
+    }
+    b.vy = Math.min(MAX_FALL, b.vy + G * h);
+    const r = moveBody(b, b.vx * h, b.vy * h);
+    b.ground = r.down;
+    if (r.down) b.vy = 0;
+    if (b.x < b.arenaL) { b.x = b.arenaL; r.hitX = -1; }
+    if (r.hitX && b.state === 'run') b.face = -r.hitX;
+  }
+
   function updatePuffs(h) {
     for (let i = puffs.length - 1; i >= 0; i--) {
       const f = puffs[i];
-      f.t += h; f.y += f.vy * h; f.x = f.sx + Math.sin(f.t * 3) * 14;
-      let gone = f.y + f.h >= GROUND * TS;
+      f.t += h;
+      let gone;
+      if (f.kind === 'fire') {          // ちびDino の ほのお（はねる）
+        f.vy = Math.min(600, f.vy + 1500 * h);
+        const r = moveBody(f, f.vx * h, f.vy * h);
+        if (r.down) f.vy = -330;
+        gone = r.hitX || f.t > 3 || f.x < boss.arenaL - 20;
+      } else {
+        f.y += f.vy * h; f.x = f.sx + Math.sin(f.t * 3) * 14;
+        gone = f.y + f.h >= GROUND * TS;
+      }
       if (!gone && state === 'play' && overlap(P, f)) {
         gone = true;
         if (P.star <= 0 && P.boltT <= 0) hurt();
       }
       for (const s2 of shots) if (!gone && overlap(s2, f)) gone = true;   // ほのおで けせる
       if (gone) {
-        for (let k = 0; k < 6; k++) particles.push({ x: f.x + 10, y: f.y + 8, vx: (Math.random() - 0.5) * 100, vy: -Math.random() * 80, life: 0.4, col: '#ffffff', r: 3 });
+        for (let k = 0; k < 6; k++) particles.push({ x: f.x + f.w / 2, y: f.y + f.h / 2, vx: (Math.random() - 0.5) * 100, vy: -Math.random() * 80, life: 0.4, col: f.kind === 'fire' ? '#c89cff' : '#ffffff', r: 3 });
         puffs.splice(i, 1);
       }
     }
@@ -1505,7 +1568,9 @@
     const b = boss;
     if (!b) return;
     if (b.inv > 0 && b.state !== 'down' && Math.floor(b.inv * 14) % 2 === 0) return;
+    drawBossShots(t);
     if (b.kind === 'onigiri') { drawOnigiriBoss(b, t); return; }
+    if (b.kind === 'mini') { drawMiniBoss(b, t); return; }
     const s = 0.5;
     let x = b.x + b.w / 2 - camX, y = b.y + b.h + offY;
     if (b.state === 'wind') x += Math.sin(t * 60) * 2;
@@ -1563,13 +1628,60 @@
       ctx.fillStyle = '#ffe066';
       for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1; star(ctx, x + Math.cos(a) * 26, y - 62 + Math.sin(a) * 7, 5); }
     }
-    // わたぐも
+  }
+
+  function drawBossShots(t) {
     for (const f of puffs) {
       const fx = f.x - camX, fy = f.y + offY;
+      if (f.kind === 'fire') {          // むらさきの ほのお
+        ctx.save(); ctx.translate(fx + 5, fy + 5); ctx.rotate(f.t * 18);
+        ctx.fillStyle = '#9b6cff'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e3d1ff'; ctx.beginPath(); ctx.arc(1.5, -1.5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        continue;
+      }
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(fx + 6, fy + 9, 7, 0, Math.PI * 2); ctx.arc(fx + 14, fy + 7, 8, 0, Math.PI * 2); ctx.arc(fx + 10, fy + 12, 7, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#7a6a8a';
       ctx.beginPath(); ctx.arc(fx + 7.5, fy + 9, 1.3, 0, Math.PI * 2); ctx.arc(fx + 12.5, fy + 9, 1.3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawMiniBoss(b, t) {
+    const s = 0.29;
+    const x = b.x + b.w / 2 - camX, y = b.y + b.h + offY;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(b.face, 1);
+    if (b.state === 'tired') ctx.scale(1.08, 0.9);
+    if (b.state === 'run' && b.ground) ctx.rotate(0.12);
+    if (b.state === 'fire') { ctx.shadowColor = '#9b6cff'; ctx.shadowBlur = 12; }
+    let mood = 'normal';
+    if (b.state === 'run' || b.state === 'hop' || b.state === 'intro') mood = 'happy';
+    if (b.state === 'fire') mood = 'fever';
+    if (b.state === 'tired' || b.state === 'hurt') mood = 'ouch';
+    if (b.state === 'down') mood = b.t > 0.8 ? 'happy' : 'ouch';
+    const run = b.state === 'run' && b.ground;
+    const bob = run ? -Math.abs(Math.sin(t * 18)) * 2 : 0;
+    // むらさきの ぼうしで Dino と みわける
+    const hat = COL.pinkHat, hatD = COL.pinkHatDark;
+    COL.pinkHat = '#a77bdc'; COL.pinkHatDark = '#7d55b5';
+    drawChar(ctx, 'pink', 0, -66 * s + bob, s, t * (run ? 2 : 1), mood, run || b.state === 'hop' || (b.state === 'down' && b.t > 0.8) ? 1 : 0);
+    COL.pinkHat = hat; COL.pinkHatDark = hatD;
+    // おうかん
+    const cy = -128 * s + bob - 4;
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#d99a00'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-8, cy + 6); ctx.lineTo(-8, cy - 2); ctx.lineTo(-4, cy + 2); ctx.lineTo(0, cy - 5); ctx.lineTo(4, cy + 2); ctx.lineTo(8, cy - 2); ctx.lineTo(8, cy + 6); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ff5c7a'; ctx.beginPath(); ctx.arc(0, cy + 2, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // つかれた あせ と 星
+    if (b.state === 'tired' || (b.state === 'down' && b.t < 0.8)) {
+      ctx.fillStyle = '#ffe066';
+      for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1; star(ctx, x + Math.cos(a) * 16, y - 42 + Math.sin(a) * 5, 4); }
+      ctx.fillStyle = '#8fd3ff';
+      ctx.beginPath(); ctx.ellipse(x + 12, y - 30 + (t * 20) % 8, 2, 3, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -1580,7 +1692,7 @@
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     roundRect(ctx, cx - 92, y - 16, 184, 32, 16); ctx.fill();
     ctx.fillStyle = '#6b4a3a'; ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${T().boss} ${b.name}`, cx - 80, y + 1);
+    ctx.fillText(`${T().boss} ${b.kind === 'mini' ? T().miniName : b.name}`, cx - 80, y + 1);
     for (let i = 0; i < 3; i++) {
       ctx.fillStyle = i < b.hp ? '#ff5c7a' : 'rgba(107,74,58,0.2)';
       heart(cx + 34 + i * 18, y + 1, 6);
