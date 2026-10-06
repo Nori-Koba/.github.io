@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -177,10 +177,7 @@
   function detectLang() {
     const saved = store.get('fuwamoko-lang');
     if (saved && I18N[saved]) return saved;
-    const nav = (navigator.language || 'en').toLowerCase();
-    if (nav.startsWith('ja')) return 'ja';
-    if (nav.startsWith('id') || nav.startsWith('ms')) return 'id';
-    return 'en';
+    return 'id';   // はじめて開いたときはインドネシア語
   }
   let lang = detectLang();
   const T = () => I18N[lang];
