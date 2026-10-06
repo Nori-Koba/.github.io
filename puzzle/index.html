@@ -361,12 +361,12 @@
       jump: 'ジャンプ', dash: 'ダッシュ', goal: n => `ゴール ${n}/3`,
       controls: 'タッチ：◀ ▶ と ジャンプ ／ 顔を タップして こうたい',
       keys: 'キー：← → ／ スペース ジャンプ ／ X ダッシュ ／ 1 2 3 こうたい ／ R やりなおし',
-      abilities: ['はこを おせる', 'ジャンプ長押しで ふわふわ', 'はやい！ ダッシュできる'],
+      abilities: ['すばやい！ ダッシュできる', 'かるい！ 長押しで ふわふわ', 'ちからもち！ はこを おせる'],
       levels: [
-        ['はこを おそう', 'Dino は はこを おせるよ。はこを だんさの前まで おして、3人で のぼろう！'],
-        ['かたぐるまタワー', 'Dino の上に 2人で のって、さらに その上へ！ 3人タワーで かべを こえて、むこうの レバーを さわろう。'],
+        ['はこを おそう', 'ちからもちの Himawari は はこを おせるよ。はこを だんさの前まで おして、3人で のぼろう！'],
+        ['かたぐるまタワー', 'ちからもちの Himawari の上に 2人で のって、さらに その上へ！ 3人タワーで かべを こえて、むこうの レバーを さわろう。'],
         ['ふわふわ わたり', 'Onigiri で 高いところから ジャンプして、そのまま 長押し！ ふわふわ わたって、レバーで はしを かけよう。'],
-        ['いそげ Himawari', 'スイッチを ふむと すこしだけ とびらが ひらくよ。Himawari の ダッシュで かけぬけて、レバーを さわろう！'],
+        ['いそげ Dino', 'スイッチを ふむと すこしだけ とびらが ひらくよ。すばやい Dino の ダッシュで かけぬけて、レバーを さわろう！'],
         ['みんなで ゴール', 'これまでの ちからを ぜんぶ つかおう！ ゴールの ボタンを だれかが ふんでいると、とびらが ひらくよ。'],
       ],
     },
@@ -378,12 +378,12 @@
       jump: 'Jump', dash: 'Dash', goal: n => `Goal ${n}/3`,
       controls: 'Touch: ◀ ▶ and Jump / tap a face to switch',
       keys: 'Keys: ← → / Space jump / X dash / 1 2 3 switch / R retry',
-      abilities: ['Can push boxes', 'Hold jump to float', 'Fast! Can dash'],
+      abilities: ['Quick! Can dash', 'Light! Hold jump to float', 'Strong! Can push boxes'],
       levels: [
-        ['Push the Box', 'Dino can push boxes. Push the box up to the step, then climb up together!'],
-        ['Buddy Tower', 'Two buddies climb onto Dino, then one climbs even higher! Make a 3-buddy tower to get over the wall and touch the lever.'],
+        ['Push the Box', 'Strong Himawari can push boxes. Push the box up to the step, then climb up together!'],
+        ['Buddy Tower', 'Two buddies climb onto strong Himawari, then one climbs even higher! Make a 3-buddy tower to get over the wall and touch the lever.'],
         ['Float Across', 'Jump from up high with Onigiri and keep holding jump to float across! Then touch the lever to make a bridge.'],
-        ['Hurry, Himawari!', 'The switch opens the door for just a moment. Dash through with Himawari and touch the lever!'],
+        ['Hurry, Dino!', 'The switch opens the door for just a moment. Dash through with quick Dino and touch the lever!'],
         ['All Together', 'Use everything you have learned! The door stays open while someone stands on the button at the goal.'],
       ],
     },
@@ -395,12 +395,12 @@
       jump: 'Lompat', dash: 'Dash', goal: n => `Tujuan ${n}/3`,
       controls: 'Sentuh: ◀ ▶ dan Lompat / ketuk wajah untuk ganti',
       keys: 'Tombol: ← → / Spasi lompat / X dash / 1 2 3 ganti / R ulangi',
-      abilities: ['Bisa mendorong kotak', 'Tahan lompat untuk melayang', 'Cepat! Bisa dash'],
+      abilities: ['Gesit! Bisa dash', 'Ringan! Tahan lompat untuk melayang', 'Kuat! Bisa mendorong kotak'],
       levels: [
-        ['Dorong Kotaknya', 'Dino bisa mendorong kotak. Dorong kotak sampai ke depan tangga, lalu naik bersama!'],
-        ['Menara Teman', 'Dua teman naik ke atas Dino, lalu satu naik lebih tinggi! Buat menara bertiga untuk melewati tembok dan sentuh tuasnya.'],
+        ['Dorong Kotaknya', 'Himawari yang kuat bisa mendorong kotak. Dorong kotak sampai ke depan tangga, lalu naik bersama!'],
+        ['Menara Teman', 'Dua teman naik ke atas Himawari yang kuat, lalu satu naik lebih tinggi! Buat menara bertiga untuk melewati tembok dan sentuh tuasnya.'],
         ['Melayang Menyeberang', 'Lompat dari tempat tinggi dengan Onigiri dan terus tahan tombol lompat untuk melayang! Lalu sentuh tuas untuk membuat jembatan.'],
-        ['Cepat, Himawari!', 'Saklar membuka pintu hanya sebentar. Dash lewat dengan Himawari, lalu sentuh tuasnya!'],
+        ['Cepat, Dino!', 'Saklar membuka pintu hanya sebentar. Dash lewat dengan Dino yang gesit, lalu sentuh tuasnya!'],
         ['Bersama-sama', 'Gunakan semua yang sudah kamu pelajari! Pintu tetap terbuka selama ada yang berdiri di tombol di tujuan.'],
       ],
     },
@@ -501,9 +501,9 @@
   const TIMER_T = 1.3;
   const CW = 26, CHH = 36;       // キャラの当たり判定
   const DEFS = [
-    { id: 'pink', speed: 150, ability: 'push' },
-    { id: 'moko', speed: 140, ability: 'float' },
-    { id: 'lion', speed: 200, ability: 'dash' },
+    { id: 'pink', speed: 200, ability: 'dash' },    // Dino：すばやい
+    { id: 'moko', speed: 140, ability: 'float' },   // Onigiri：かるい
+    { id: 'lion', speed: 150, ability: 'push' },    // Himawari：ちからもち
   ];
 
   let L = null;            // 今のステージ
