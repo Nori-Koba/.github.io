@@ -85,8 +85,8 @@
       <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）</p>
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
-        <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。丸の中心寄りで打つほどナイスショット。<br>
-        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>はトップスピン（キック）：ネットを高く越えてまっすぐ高く跳ね、ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
+        <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球は決めどころ！<br>
+        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを高く越えてまっすぐ高く跳ね、ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
@@ -320,6 +320,7 @@
   const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, mg: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
                  live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
   let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
+  let dust = [];
   let aimX = 0, aimD = 0; // where you are aiming while a shot is charged: -1..1 across, -1 short .. 1 deep
   let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null, history = [], cpuMod = { err: 0, react: 0, noise: 1 };
 
@@ -358,6 +359,7 @@
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
+    player.slide = cpu.slide = player.anim = cpu.anim = 0;
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -468,6 +470,7 @@
 
   // q: toss timing (1 = hit at the top of the toss), power: how long the button was held
   function serveHit(who, q, type, power) {
+    if (faults) type = 'top'; // second serve: always the safe kick serve
     if (type === 'lob') type = 'top';
     if (type === 'drop') type = 'slice';
     const recv = other(who), box = serveBox(recv, deuce()), sh = SHOTS[type];
@@ -493,7 +496,7 @@
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0, serveKmh: kmh });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
-    s.stroke = { kind: 'serve', spin: type }; s.swing = SWING * .7;
+    startAnim(s, 'serve', type, .32);
     (who === 'P' ? cpu : player).hop = HOP;
     sHit(power);
     popupAt(s.x, s.y, 2.6, `${sh.name}サーブ ${kmh}km/h`, sh.color);
@@ -514,19 +517,27 @@
   function press(type) {
     if (state === 'serve' && server() === 'P') {
       if (ball.held) toss();
-      else if (tossing && !charge) { charge = { type, t: 0, full: SERVE_CHARGE, serve: true, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
+      else if (tossing && !charge) { charge = { type: faults ? 'top' : type, key: type, t: 0, full: SERVE_CHARGE, serve: true, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
       return;
     }
-    if ((state === 'rally' || state === 'pause') && !charge) { charge = { type, t: 0, full: FULL_CHARGE, p0: ptr && { ...ptr } }; aimX = openCourt(); aimD = 0; }
+    if ((state === 'rally' || state === 'pause') && !charge) { charge = { type, key: type, t: 0, full: FULL_CHARGE, p0: ptr && { ...ptr } }; aimX = openCourt(); aimD = 0; }
   }
   function release(type) {
-    if (!charge || charge.type !== type) return;
+    if (!charge || charge.key !== type) return;
     charge.serve ? serveRelease() : fireSwing();
   }
+  // stroke animation: kind = fh / bh / volley / serve / smash; `from` is where in the motion to start (0..1)
+  const ANIM = { serve: .75, smash: .6, volley: .38 };
+  function startAnim(o, kind, spin, from = 0) {
+    const dur = ANIM[kind] || .62;
+    o.stroke = { kind, spin, side: kind === 'volley' ? sideKind(o) : kind };
+    o.animDur = dur; o.anim = dur * (1 - from);
+  }
+  const strokeKind = o => (ball.z > 2.3 && ball.bounces === 0 ? 'smash' : ball.bounces === 0 && !ball.serve ? 'volley' : sideKind(o));
   function fireSwing() {
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
-    player.stroke = { kind: ball.z > 2.3 && ball.bounces === 0 ? 'smash' : sideKind(player), spin: charge.type };
+    startAnim(player, strokeKind(player), charge.type);
     player.swing = SWING; player.cool = .42; player.aimX = aimX; player.aimD = aimD; player.closest = null;
     charge = null;
   }
@@ -544,7 +555,10 @@
     if (smash) type = 'flat';
     const sh = styled(type, 'P');
     const r = reachOf(smash ? 'smash' : player.shot);
-    const q = clamp(1 - Math.max(0, d - r * .45) / (r * .55), 0, 1); // sweet spot: the inner half of the circle
+    // three grades by where in the ring you meet the ball: inner = nice, middle = normal, edge = scrambling
+    const rel = d / r, grade = rel <= .45 ? 'nice' : rel <= .8 ? 'normal' : 'edge';
+    const scramble = grade === 'edge' && !smash, mishit = scramble && Math.random() < .45;
+    const q = grade === 'nice' ? 1 : grade === 'normal' ? .7 : mishit ? .05 : .4;
     const goal = aimTarget(type, player.aimX, player.aimD);
     // timing errors plus the risk of hitting hard
     // aiming close to the lines is risky: corners and deep targets widen the error
@@ -569,18 +583,27 @@
       const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
     }
+    if (mishit) { tx += rand(-2.5, 2.5); ty += rand(-2, 1); opts = { speed: rand(14, 24), noClear: true }; }
+    else if (scramble) { // just got there: the ball floats back short and high — a sitter for the opponent
+      type = 'top'; tx = CX + rand(-1.8, 1.8); ty = NET_Y - rand(3.5, 6); opts = { angle: rand(.5, .62) };
+    }
+    if (scramble) startSlide(player);
     opts.curve = 0; opts.who = 'P'; // groundstroke slice goes straight and skids; only the slice serve curves
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'P', bounces: 0, serve: false });
+    // jump the swing animation to the moment of contact if the ball arrived early
+    const ct = .38 * player.animDur;
+    if (player.anim > player.animDur - ct) player.anim = player.animDur - ct;
     ball.shotKmh = kmh;
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
     sHit(smash ? 1 : power);
     const label = smash ? 'スマッシュ!' : sh.name;
     popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
-    if (q > .85 && !smash) popupAt(player.x, player.y, 3.1, 'ナイス!', '#e8ff3a');
-    else if (q < .2) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
+    if (grade === 'nice' && !smash) popupAt(player.x, player.y, 3.1, 'ナイスショット!', '#e8ff3a');
+    else if (mishit) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
+    else if (scramble) popupAt(player.x, player.y, 3.1, 'なんとか返球…', '#9ad');
     if (note) popupAt(player.x, player.y, 3.6, note, '#fff');
-    if (smash) player.stroke.kind = 'smash';
+    if (smash) player.stroke = { kind: 'smash', spin: 'flat', side: 'smash' };
     cpu.hop = HOP;
     readPlayer(smash ? 'smash' : type);
   }
@@ -619,17 +642,18 @@
       + (ball.z > 1.9 ? .06 : 0)                       // high kicking topspin is hard to control
       + Math.max(0, incoming - 26) * .006              // really fast balls rush the swing
       + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0)
-      + (stretched ? .06 : 0);
+      + (stretched ? .2 : d > lv.reach * .8 ? .05 : 0);
     errP = Math.max(.01, errP * (1 + Math.min(0, cpuMod.err)) + Math.max(0, cpuMod.err));
     // attack the open court: the better the CPU, the closer to the lines it aims; sometimes it wrong-foots you
     const openLeft = Math.random() < .2 ? player.x < CX : player.x > CX;
     const edge = .55 + (1 - lv.aim) * rand(0, 1.8);
     let tx = openLeft ? edge : CW - edge;
-    if (stretched) tx = rand(2, CW - 2); // a lunging slice just floats back to the middle
+    if (stretched) tx = CX + rand(-1.8, 1.8); // a lunging get floats back to the middle
     let ty, opts;
     if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
-    else { ty = L - (stretched ? rand(2.5, 5.5) : 1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
+    else if (stretched) { ty = NET_Y + rand(3.5, 6); opts = { angle: rand(.5, .62) }; } // short, high: a chance ball
+    else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
       if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
@@ -640,9 +664,10 @@
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'C', bounces: 0, serve: false });
     rally++; maxRally = Math.max(maxRally, rally);
-    cpu.stroke = { kind: ball.z > 2.3 ? 'smash' : sideKind(cpu), spin: type };
-    cpu.swing = SWING * .6; player.hop = HOP; sHit(power); // CPU swing starts near contact
-    if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
+    startAnim(cpu, ball.z > 2.3 ? 'smash' : sideKind(cpu), type, .3); // the CPU's swing is shown from just before contact
+    cpu.swing = SWING * .6; player.hop = HOP; sHit(power);
+    if (stretched) { startSlide(cpu); popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
+    else if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
   // where should the CPU go to meet the ball in time?
@@ -756,7 +781,8 @@
       if (l > .05 && !(ptr.mouse && g.y < NET_Y)) { const s = Math.min(max, l * 8); tvx = dx / l * s; tvy = dy / l * s; }
     }
     if (player.swing > 0) { tvx *= .25; tvy *= .25; } // planted while swinging
-    accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
+    if (player.slide > 0) accelTo(player, 0, 0, dt, P_ACC, 7); // sliding: no control, low friction
+    else accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
     player.x += player.vx * dt; player.y += player.vy * dt;
     const [x0, x1, y0, y1] = serving
       ? (deuce() ? [CX + .3, CX + 3.6] : [CX - 3.6, CX - .3]).concat([player.y, player.y])
@@ -803,8 +829,12 @@
       if (b.y >= player.y - .2) break;
     }
     const side = b.x >= player.x - .1 ? 1 : -1;
-    return b.x - side * reachOf(charge ? charge.type : 'top') * .5;
+    return b.x - side * reachOf(charge ? charge.type : 'top') * .3; // ball passes in the sweet spot, a little to the side
   }
+
+  // after a scrambling get the player slides on, low and wide, and is slow to recover
+  const SLIDE = .65;
+  function startSlide(o) { o.slide = SLIDE; }
 
   // accelerate toward a target velocity, braking harder than speeding up
   function accelTo(o, tvx, tvy, dt, acc, dec) {
@@ -817,15 +847,21 @@
   // Feet stay planted on the court and step to a new spot when the body leaves them behind.
   function footIdeal(o, i) {
     const { R, Fw } = facing(o);
-    const serving = state === 'serve' && isServer(o) && o.swing <= 0;
+    const serving = state === 'serve' && isServer(o) && !(o.anim > 0);
     let l = serving ? (i < 0 ? [-.08, .3] : [.32, -.22]) : [i * (.19 + o.crouch * .07), 0];
-    const front = o.stroke.kind === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
-    if (o.swing > 0 && i === front && o.stroke.kind !== 'serve') l = [l[0], l[1] + .34];
+    const k = o.stroke.side || o.stroke.kind, front = k === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
+    const animP = o.anim > 0 ? 1 - o.anim / o.animDur : 1;
+    if (o.anim > 0 && animP < .85 && i === front && k !== 'serve' && k !== 'smash') l = [l[0] * 1.3, l[1] + (k === 'volley' ? .45 : .36)];
+    if (o.slide > 0) l = i < 0 ? [-.5, .32] : [.42, -.3]; // splits-style slide
     return [o.x + (R[0] * l[0] + Fw[0] * l[1]) * FIG + o.vx * .1, o.y + (R[1] * l[0] + Fw[1] * l[1]) * FIG + o.vy * .1];
   }
   function stepFeet(o, dt) {
     const sp = Math.hypot(o.vx, o.vy);
     if (!o.feet) o.feet = [-1, 1].map(i => { const w = footIdeal(o, i); return { x: w[0], y: w[1], z: 0, step: 0 }; });
+    if (o.slide > 0) { // both feet skid along the court with the body
+      o.feet.forEach((f, k) => { const w = footIdeal(o, k ? 1 : -1); f.x += (w[0] - f.x) * Math.min(1, dt * 18); f.y += (w[1] - f.y) * Math.min(1, dt * 18); f.z = 0; f.step = 0; });
+      return;
+    }
     o.feet.forEach(f => {
       if (!f.step) return;
       f.step += dt / f.dur;
@@ -852,6 +888,11 @@
   function animateBody(o, dt) {
     const sp = Math.hypot(o.vx, o.vy);
     stepFeet(o, dt);
+    o.anim = Math.max(0, (o.anim || 0) - dt);
+    if (o.slide > 0) {
+      o.slide -= dt;
+      if (Math.random() < dt * 30) dust.push({ x: o.x + rand(-.3, .3), y: o.y + rand(-.3, .3), life: .5, r: rand(.15, .35) });
+    }
     // lean into acceleration, back when braking
     const ax = (o.vx - (o.pvx || 0)) / dt, ay = (o.vy - (o.pvy || 0)) / dt;
     o.pvx = o.vx; o.pvy = o.vy;
@@ -861,7 +902,7 @@
     o.phase += sp * dt * 2.7;
     o.sp += (Math.min(1, sp / 5) - o.sp) * Math.min(1, dt * 10);
     o.hop = Math.max(0, o.hop - dt);
-    const target = state === 'serve' ? (isServer(o) ? .1 : .75) : state === 'rally' ? .65 : .3;
+    const target = o.slide > 0 ? 1.15 : state === 'serve' ? (isServer(o) ? .1 : .75) : state === 'rally' ? .65 : .3;
     o.crouch += (target - o.crouch) * Math.min(1, dt * 5);
   }
 
@@ -876,8 +917,9 @@
     if (target) {
       const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
       const s = Math.min(speed, l * 5), sw = cpu.swing > 0 ? .25 : 1;
-      accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
+      if (!(cpu.slide > 0)) accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
     } else accelTo(cpu, 0, 0, dt, C_ACC, C_DEC);
+    if (cpu.slide > 0) accelTo(cpu, 0, 0, dt, C_ACC, 7); // still sliding after a lunge
     cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt;
     if (cpu.x < -3 || cpu.x > CW + 3) { cpu.x = clamp(cpu.x, -3, CW + 3); cpu.vx = 0; }
     if (cpu.y < -4 || cpu.y > NET_Y - 1.2) { cpu.y = clamp(cpu.y, -4, NET_Y - 1.2); cpu.vy = 0; }
@@ -925,7 +967,7 @@
         const t = dp < reachOf('top') * .9 ? 'top' : dp < reachOf('slice') * .9 ? 'slice' : null;
         if (t) {
           player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = openCourt(); player.aimD = 0; player.closest = null;
-          player.stroke = { kind: sideKind(player), spin: t };
+          startAnim(player, strokeKind(player), t);
         }
       }
       // contact happens where the ball passes closest to you during the swing, not where it enters the ring
@@ -959,6 +1001,8 @@
     popups.forEach(p => { p.z += dt * 1.2; p.life -= dt; });
     popups = popups.filter(p => p.life > 0);
     marks.forEach(m => (m.life -= dt));
+    dust.forEach(d => { d.life -= dt; d.r += dt * .6; });
+    dust = dust.filter(d => d.life > 0);
     marks = marks.filter(m => m.life > 0);
   }
 
@@ -1026,28 +1070,56 @@
   // 'throat' = resting on the racket throat), yaw: how far the shoulders are turned (+ = right shoulder back).
   const K = (t, yaw, hand, dir, off) => ({ t, yaw, hand, dir, off });
   const READY = K(0, 0, [.2, .38, 1], [-.3, .75, .55], 'throat');
+  // Strokes: 0 = take-back, ~.38 = contact, 1 = finish.
   const FH = {
-    top:   [K(0, .95, [.5, -.35, .95], [.25, -.8, .5], [.05, .55, 1.25]), K(.45, 0, [.45, .45, .82], [.85, .45, .25], [-.15, .3, 1.05]),
-            K(1, -.85, [-.3, .15, 1.7], [-.35, -.55, .75], [-.25, .1, 1.3])],
-    flat:  [K(0, .95, [.5, -.35, 1.05], [.25, -.85, .4], [.05, .55, 1.25]), K(.45, 0, [.45, .45, .95], [.9, .4, .05], [-.15, .3, 1.05]),
-            K(1, -.85, [-.3, .2, 1.45], [-.4, -.6, .6], [-.25, .1, 1.2])],
-    slice: [K(0, .9, [.45, -.3, 1.4], [.2, -.6, .75], [.05, .55, 1.3]), K(.45, .1, [.45, .45, 1], [.85, .45, -.15], [-.15, .3, 1.1]),
-            K(1, -.3, [.1, .65, .85], [.6, .75, -.1], [-.3, -.1, 1.1])],
+    // unit turn, racket head drops behind (lag), low-to-high through contact, windshield-wiper wrap over the shoulder
+    top: [K(0, 1.25, [.55, -.45, 1.15], [.1, -.75, .65], [.15, .6, 1.3]),
+          K(.24, 1, [.62, -.3, .82], [.25, -.6, -.75], [.05, .5, 1.2]),
+          K(.38, .1, [.48, .5, .85], [.9, .42, .1], [-.2, .35, 1.05]),
+          K(.55, -.45, [.15, .8, 1.25], [.2, .9, .35], [-.3, .2, 1.1]),
+          K(1, -1.2, [-.35, 0, 1.6], [-.3, -.6, -.75], [-.3, .05, 1.25])],
+    flat: [K(0, 1.2, [.55, -.45, 1.1], [.15, -.8, .5], [.15, .6, 1.3]),
+           K(.24, .95, [.62, -.3, .95], [.3, -.8, -.3], [.05, .5, 1.2]),
+           K(.38, .1, [.48, .5, .95], [.92, .4, .02], [-.2, .35, 1.05]),
+           K(.55, -.45, [.15, .85, 1.05], [.3, .95, .05], [-.3, .2, 1.1]),
+           K(1, -1.1, [-.4, .1, 1.35], [-.4, -.8, -.2], [-.3, .05, 1.2])],
+    // slice: high take-back, open face, long forward finish, off arm opens for balance
+    slice: [K(0, 1.1, [.45, -.3, 1.5], [.15, -.5, .85], [.1, .6, 1.35]),
+            K(.38, .1, [.45, .5, 1], [.85, .45, -.15], [-.25, .2, 1.1]),
+            K(.6, -.1, [.25, .85, .85], [.6, .75, -.2], [-.4, -.2, 1.1]),
+            K(1, -.2, [.15, .75, .95], [.5, .8, .1], [-.45, -.35, 1.15])],
   };
-  FH.lob = [FH.top[0], K(.45, 0, [.45, .4, .75], [.8, .4, .45], [-.15, .3, 1.05]), K(1, -.7, [-.15, .25, 1.95], [-.2, -.3, .9], [-.25, .1, 1.3])];
-  FH.drop = [FH.slice[0], K(.45, .1, [.4, .4, 1.05], [.8, .5, -.25], [-.15, .3, 1.1]), K(1, -.1, [.25, .55, .95], [.6, .7, -.3], [-.3, -.1, 1.1])];
+  FH.lob = [FH.top[0], FH.top[1], K(.38, .05, [.45, .45, .72], [.75, .4, .55], [-.2, .35, 1.05]),
+            K(1, -.9, [-.2, .2, 2], [-.2, -.3, .9], [-.3, .1, 1.3])];
+  FH.drop = [FH.slice[0], K(.38, .1, [.42, .45, 1.05], [.8, .5, -.25], [-.2, .25, 1.1]),
+             K(1, -.05, [.3, .6, .95], [.6, .7, -.35], [-.35, -.15, 1.1])];
   const mirror = k => K(k.t, -k.yaw, [-k.hand[0], k.hand[1], k.hand[2]], [-k.dir[0], k.dir[1], k.dir[2]],
     typeof k.off === 'string' ? k.off : [-k.off[0], k.off[1], k.off[2]]);
-  // two-handed backhand for drives, one-handed for slice / drop
+  // two-handed backhand for drives (both hands on the grip, finish over the right shoulder);
+  // one-handed slice / drop with the left arm opening back behind
   const BH = {};
   for (const sp in FH) BH[sp] = FH[sp].map(k => { const m = mirror(k); if (sp !== 'slice' && sp !== 'drop') m.off = 'grip'; return m; });
-  BH.slice[2] = K(1, .3, [-.1, .65, .9], [-.6, .75, -.1], [.35, -.35, 1.15]);
+  BH.slice = BH.slice.map((k, i) => ({ ...k, off: [[.05, .55, 1.25], [-.35, -.25, 1.1], [-.5, -.42, 1.15], [-.55, -.5, 1.2]][i] }));
+  BH.drop = BH.drop.map((k, i) => ({ ...k, off: [[.05, .55, 1.25], [-.35, -.25, 1.1], [-.5, -.42, 1.15]][i] }));
+  // volley: no backswing, a short firm punch out in front
+  const VOLLEY_FH = [K(0, .5, [.45, .3, 1.25], [.3, .4, .85], [.1, .55, 1.25]),
+                     K(.38, .15, [.45, .75, 1.15], [.55, .75, .35], [-.1, .45, 1.15]),
+                     K(1, .1, [.42, .8, 1.1], [.5, .8, .3], [-.1, .4, 1.1])];
+  const VOLLEY_BH = VOLLEY_FH.map(mirror);
   const SERVE_STANCE = K(0, .95, [.3, -.05, .8], [.15, .35, -.9], [.1, .4, 1.05]);
   const TROPHY = K(0, .95, [.4, -.25, 1.6], [.15, -.35, .9], [.05, .3, 2.05]);
   const RACKET_DROP = K(0, .9, [.3, -.2, 1.7], [0, -.25, -1], [.05, .3, 2]);
-  const OVERHEAD = [RACKET_DROP, K(.4, .1, [.15, .35, 2.3], [.05, .3, 1], [-.15, .25, 1.3]),
-                    K(1, -.8, [-.3, .3, .85], [-.25, -.35, -.9], [-.25, .05, 1.05])];
-  const keysFor = st => st.kind === 'serve' || st.kind === 'smash' ? OVERHEAD : (st.kind === 'bh' ? BH : FH)[st.spin] || FH.top;
+  // serve: racket drop behind the back, drive up to full stretch, pronate and finish across the left hip
+  const OVERHEAD = [RACKET_DROP,
+                    K(.3, .35, [.25, .1, 2.15], [.1, .2, 1], [-.1, .25, 1.6]),
+                    K(.4, .1, [.15, .38, 2.35], [.05, .35, 1], [-.15, .3, 1.35]),
+                    K(.6, -.4, [.05, .62, 1.5], [.1, .8, -.6], [-.25, .15, 1.05]),
+                    K(1, -.9, [-.35, .35, .8], [-.3, -.2, -.95], [-.3, 0, 1])];
+  // smash: side-on, left hand pointing up at the ball, then the same overhead swing
+  const SMASH = [K(0, 1, [.35, -.2, 1.75], [0, -.3, -1], [.1, .55, 2.2]), ...OVERHEAD.slice(1)];
+  const keysFor = st => st.kind === 'serve' ? OVERHEAD : st.kind === 'smash' ? SMASH
+    : st.kind === 'volley' ? (st.side === 'bh' ? VOLLEY_BH : VOLLEY_FH)
+    : (st.kind === 'bh' ? BH : FH)[st.spin] || FH.top;
 
   const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
   const smooth = t => t * t * (3 - 2 * t);
@@ -1066,7 +1138,7 @@
   const isServer = o => (server() === 'P') === (o === player);
 
   function poseOf(o, ch) {
-    if (o.swing > 0) return sample(keysFor(o.stroke), 1 - o.swing / SWING);
+    if (o.anim > 0) return sample(keysFor(o.stroke), 1 - o.anim / o.animDur);
     if (state === 'serve' && isServer(o)) {
       if (ball.held) return SERVE_STANCE;
       const up = blendKey(SERVE_STANCE, TROPHY, (ball.z - 1.1) / (TOSS_PEAK - 1.1) * 1.4);
@@ -1078,6 +1150,7 @@
     if (ball.live && ball.last !== mine) prep = clamp((5.5 - d2(ball, o)) / 3.5, 0, 1);
     if (ch) prep = Math.max(prep, .4 + .6 * Math.min(1, ch.t / ch.full));
     if (prep > 0 && ball.z > 2.3 && ball.bounces === 0) st.kind = 'smash';
+    else if (prep > 0 && o === player && ball.bounces === 0 && player.y < NET_Y + 5) { st.side = st.kind; st.kind = 'volley'; }
     let pose = prep > 0 ? blendKey(READY, keysFor(st)[0], prep) : READY;
     if (o.sp > .25 && prep < .3) { // pump the arms while running
       const sw = Math.sin(o.phase) * .28 * o.sp;
@@ -1103,7 +1176,11 @@
   function figure(o, kit, ch) {
     const { R, Fw } = facing(o);
     const pose = poseOf(o, ch);
-    const hop = o.hop > 0 ? Math.sin(Math.PI * (1 - o.hop / HOP)) * .09 : 0;
+    let hop = o.hop > 0 ? Math.sin(Math.PI * (1 - o.hop / HOP)) * .09 : 0;
+    if (o.anim > 0 && (o.stroke.kind === 'serve' || o.stroke.kind === 'smash')) {
+      const p = 1 - o.anim / o.animDur; // spring up into the ball, land after contact
+      hop += Math.sin(Math.PI * clamp((p - .15) / .5, 0, 1)) * (o.stroke.kind === 'smash' ? .3 : .22);
+    }
     const bob = (o.feet ? Math.max(...o.feet.map(f => f.z)) : 0) / FIG * .35 - o.sp * .03;
     const hipZ = .93 - o.crouch * .17 + hop + bob;
     const lean = o.crouch * .1 + o.sp * .07;
@@ -1276,6 +1353,11 @@
     ctx.clearRect(0, 0, W, H);
     drawCourt();
 
+    dust.forEach(d => {
+      const p = P(d.x, d.y);
+      ctx.fillStyle = `rgba(210,220,240,${d.life * .5})`;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y - d.r * p.s * .3, d.r * p.s, d.r * p.s * .45, 0, 0, 7); ctx.fill();
+    });
     marks.forEach(m => {
       const p = P(m.x, m.y);
       ctx.globalAlpha = Math.min(1, m.life);
@@ -1357,7 +1439,7 @@
       const text = mine
         ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '球種を長押し → 一番高いところで離せ!')
         : 'CPU のサーブ…';
-      const t2 = faults ? 'セカンドサーブ' : '';
+      const t2 = faults ? 'セカンドサーブ（スピンサーブ）' : '';
       ctx.font = 'bold 18px system-ui, sans-serif';
       const w = ctx.measureText(text).width + 32, y = coarse ? H * .42 : H - 40;
       ctx.fillStyle = 'rgba(15,20,40,.75)';
