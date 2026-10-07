@@ -67,6 +67,7 @@
     <div class="r"><span class="srv" id="srvC">●</span><span class="n">CPU <span class="lv">スライス</span> <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
   </div>
   <div id="topR">
+    <button id="quit" title="メニューへ" class="hidden">☰</button>
     <button id="mute" title="サウンド">🔊</button>
     <a href="../index.html" title="ホームへ">🏠</a>
   </div>
@@ -98,7 +99,7 @@
         ・低く弾んだ球はスライスで返すと安全（フラットやトップは持ち上げにくい）<br>
         ・高く跳ねた球はトップスピンで。腰の高さの打ちごろの球はフラットで強打！<br>
         ・同じ球種ばかりだと CPU に<b>読まれる</b>。3 種類続けて打ち分けると CPU が<b>揺さぶられて</b>崩れる<br>
-        <b>コツ</b>：ボールの真横で打つとナイスショット。動きながら打つとその方向へ。ノーバウンドの高い球はスマッシュ！
+        <b>コツ</b>：ショットのボタンを長押しすると、ボールの打ちやすい所（ボレー・スマッシュの位置やバウンド後の頂点）へ自動で走る。ノーバウンドの高い球はスマッシュ！ 練習モードで球出し練習もできる。
       </div>
       <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
       <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
@@ -106,6 +107,14 @@
         <button class="alt" data-level="easy">やさしい</button>
         <button data-level="normal">ふつう</button>
         <button class="dark" data-level="hard">つよい</button>
+      </div>
+      <p style="margin-top:12px"><b>練習モード</b>（CPU が球出し）</p>
+      <div class="btns">
+        <button class="alt" data-drill="stroke">ストローク</button>
+        <button class="alt" data-drill="volley">ボレー</button>
+        <button class="alt" data-drill="smash">スマッシュ</button>
+        <button class="alt" data-drill="drop">ドロップ拾い</button>
+        <button class="alt" data-drill="random">ランダム</button>
       </div>
       <p style="margin-top:12px"><a href="index.html">🎉 Bumpy Party! であそぶ</a></p>
     </div>
@@ -303,6 +312,7 @@
   // ---------- state ----------
   const rand = (a, b) => a + Math.random() * (b - a);
   const lerp = (a, b, t) => a + (b - a) * t;
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const other = w => (w === 'P' ? 'C' : 'P');
@@ -314,6 +324,7 @@
   };
 
   let lvKey = 'normal', lv = LEVELS.normal, state = 'menu';
+  let practice = null, pstats = null; // practice drill (null = match) and its tally
   const body = () => ({ phase: 0, sp: 0, hop: 0, crouch: 0, stroke: { kind: 'fh', spin: 'top' } });
   const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0, shot: 'top', power: 0, ...body() };
   const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0, ...body() };
@@ -338,6 +349,8 @@
     (recv === 'C' ? ball.y >= -T && ball.y <= NET_Y : ball.y >= NET_Y && ball.y <= L + T);
 
   function startMatch(key) {
+    practice = null; $('quit').classList.remove('hidden');
+    $('board').innerHTML = BOARD_HTML;
     lvKey = key; lv = LEVELS[key];
     pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; maxSpeed = 0; popups = []; marks = [];
     ptr = null; // the click on the menu button is not a move order
@@ -565,6 +578,7 @@
     let rel = d / r;
     if (chance && (smash || drive)) rel *= .6; // a sitter is easy to time: put it away
     const grade = rel <= .45 ? 'nice' : rel <= .8 ? 'normal' : 'edge';
+    player.lastGrade = grade;
     const scramble = grade === 'edge' && !smash, mishit = scramble && Math.random() < .45;
     const q = grade === 'nice' ? 1 : grade === 'normal' ? .7 : mishit ? .05 : .4;
     const goal = aimTarget(type, player.aimX, player.aimD);
@@ -617,7 +631,7 @@
     if (note) popupAt(player.x, player.y, 3.6, note, '#fff');
     if (smash) player.stroke = { kind: 'smash', spin: 'flat', side: 'smash' };
     cpu.hop = HOP;
-    readPlayer(smash ? 'smash' : type);
+    if (!practice) readPlayer(smash ? 'smash' : type);
   }
 
   // The CPU learns your habits: the same shot over and over gets read,
@@ -736,7 +750,70 @@
   }
 
   // ---------- rules ----------
+  // ---------- practice: the CPU feeds balls, nothing is scored ----------
+  const DRILLS = {
+    stroke: { name: 'ストローク', spot: () => [CX, L + .6], feeder: [CX, -.5] },
+    volley: { name: 'ボレー', spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, -.5] },
+    smash:  { name: 'スマッシュ', spot: () => [CX + rand(-.4, .4), NET_Y + 3.5], feeder: [CX, 1] },
+    drop:   { name: 'ドロップ拾い', spot: () => [CX, L + 1], feeder: [CX, 1.5] },
+  };
+  let drill = 'stroke';
+  function startPractice(key) {
+    lvKey = 'normal'; lv = LEVELS.normal; practice = key;
+    pstats = { n: 0, ok: 0, nice: 0, streak: 0, best: 0 };
+    pts = [0, 0]; games = [0, 0]; faults = 0; popups = []; marks = [];
+    $('menu').classList.add('hidden'); $('result').classList.add('hidden');
+    $('board').classList.remove('hidden'); $('quit').classList.remove('hidden');
+    feedNext();
+  }
+  function practiceBoard() {
+    const d = practice === 'random' ? 'ランダム' : DRILLS[practice].name;
+    $('board').innerHTML = `<div class="r"><span class="n">練習：${d}</span></div>` +
+      `<div class="r"><span class="n" style="font-size:13px">成功 ${pstats.ok} / ${pstats.n} ・ ナイス ${pstats.nice} ・ 連続 ${pstats.streak}（最高 ${pstats.best}）</span></div>`;
+  }
+  function feedNext() {
+    drill = practice === 'random' ? pick(Object.keys(DRILLS)) : practice;
+    const D = DRILLS[drill], [px, py] = D.spot();
+    Object.assign(player, { x: px, y: py, vx: 0, vy: 0, feet: null, slide: 0, anim: 0, swing: 0, closest: null });
+    Object.assign(cpu, { x: D.feeder[0], y: D.feeder[1], vx: 0, vy: 0, feet: null, slide: 0, plan: null });
+    Object.assign(ball, { x: cpu.x - .3, y: cpu.y + .3, z: 1, held: false, rolling: false, live: true, serve: false,
+                          last: 'C', bounces: 0, chance: false, trail: [] });
+    tossing = false; charge = null; rally = 0; msg = null;
+    let kmh;
+    if (drill === 'stroke') {
+      const t = pick(['top', 'top', 'slice', 'flat']);
+      kmh = shoot(rand(.8, CW - .8), L - rand(2, 5.5), t, { speed: rand(24, 32), who: 'C', curve: 0 });
+    } else if (drill === 'volley') { // a firm ball that passes you at about waist height
+      kmh = shoot(player.x + rand(-1.6, 1.6), L + rand(.5, 2), 'flat', { speed: rand(19, 24), who: 'C' });
+    } else if (drill === 'smash') { // a lob that comes down around you
+      kmh = shoot(player.x + rand(-1.2, 1.2), player.y + rand(-.5, 1.5), 'lob', { angle: rand(.85, 1), who: 'C' });
+    } else {
+      kmh = shoot(rand(1.5, CW - 1.5), NET_Y + rand(1.5, 3), 'drop', { angle: rand(.32, .38), who: 'C' });
+    }
+    ball.shotKmh = kmh;
+    startAnim(cpu, sideKind(cpu), drill === 'drop' ? 'drop' : 'top', .3);
+    state = 'rally'; practiceBoard();
+  }
+  function practiceDone(ok, label) {
+    ball.live = false;
+    pstats.n++;
+    if (ok) { pstats.ok++; pstats.streak++; pstats.best = Math.max(pstats.best, pstats.streak); sWin(); }
+    else { pstats.streak = 0; sLose(); }
+    if (ok && player.lastGrade === 'nice') pstats.nice++;
+    popupAt(player.x, player.y, 3, label, ok ? '#e8ff3a' : '#ff8080');
+    practiceBoard();
+    state = 'pause'; msg = null; pauseT = 1; pauseCb = feedNext;
+  }
+
   function onBounce() {
+    if (practice) {
+      if (!ball.live) return;
+      ball.bounces++;
+      if (ball.last === 'P') practiceDone(ball.bounces === 1 && inCourt('C'), ball.bounces === 1 && inCourt('C') ? 'イン!' : 'アウト');
+      else if ((drill === 'volley' || drill === 'smash') && ball.bounces === 1) practiceDone(false, 'ノーバウンドで打とう');
+      else if (ball.bounces >= 2) practiceDone(false, '取れなかった…');
+      return;
+    }
     if (!ball.live) return;
     ball.bounces++;
     const recv = other(ball.last);
@@ -750,7 +827,10 @@
       pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
     }
   }
-  function onNet() { ball.serve ? fault('ネット') : pointTo(other(ball.last), 'ネット!'); }
+  function onNet() {
+    if (practice) return practiceDone(false, 'ネット');
+    ball.serve ? fault('ネット') : pointTo(other(ball.last), 'ネット!');
+  }
 
   function fault(label) {
     ball.live = false;
@@ -812,8 +892,11 @@
     if (charge) {
       // while a shot is charged the controls aim instead of moving you
       aimFromInput(mx, my);
-      const gx = charge.serve ? null : assistX();
-      if (gx !== null) { const dx = gx - player.x; tvx = clamp(dx * 6, -PSPEED * .6, PSPEED * .6); }
+      const g = charge.serve ? null : assistTarget();
+      if (g) {
+        const dx = g.x - player.x, dy = g.y - player.y, l = Math.hypot(dx, dy), sp = Math.min(PSPEED * .75, l * 6);
+        if (l > .05) { tvx = dx / l * sp; tvy = dy / l * sp; }
+      }
     } else if (mx || my) {
       const l = Math.hypot(mx, my); tvx = mx / l * max; tvy = my / l * max;
     } else if (ptr) {
@@ -861,16 +944,24 @@
   }
 
   // where to stand (x) to meet the incoming ball on the forehand or backhand side
-  function assistX() {
+  // Where to go to meet the incoming ball (while a shot is charged, the player is walked there):
+  // volley it where you stand if it passes you at a playable height, get under a high ball that comes
+  // down in front of you, otherwise go to where it peaks after the bounce (all the way in for a drop shot).
+  function assistTarget() {
     if (!ball.live || ball.last !== 'C') return null;
     const b = { ...ball, trail: null }, step = 1 / 60;
-    let bounces = ball.bounces;
-    for (let i = 0; i < 240; i++) {
+    let bounces = ball.bounces, air = null, post = null, cross = null;
+    for (let i = 0; i < 300; i++) {
+      const py = b.y;
       if (physStep(b, step) && ++bounces >= 2) break;
-      if (b.y >= player.y - .2) break;
+      if (bounces === 0 && py < player.y - .2 && b.y >= player.y - .2 && b.z > .4 && b.z < 2.8) { cross = { x: b.x, y: player.y }; break; }
+      if (bounces === 0 && !air && b.y > NET_Y + 1 && b.vz < 0 && b.z < 2.8 && b.z > 1) air = { x: b.x, y: b.y };
+      if (bounces === 1 && !post && b.vz <= 0) { post = { x: b.x, y: b.y }; break; }
     }
-    const side = b.x >= player.x - .1 ? 1 : -1;
-    return b.x - side * reachOf(charge ? charge.type : 'top') * .3; // ball passes in the sweet spot, a little to the side
+    const g = cross || (air && player.y < NET_Y + 7 ? air : null) || post || { x: b.x, y: player.y };
+    const side = g.x >= player.x - .1 ? 1 : -1;
+    // stand so the ball passes in the sweet spot, a little to the side
+    return { x: g.x - side * reachOf(charge ? charge.type : 'top') * .3, y: clamp(g.y + .3, NET_Y + .8, L + 3) };
   }
 
   // after a scrambling get the player slides on, low and wide, and is slow to recover
@@ -950,6 +1041,7 @@
   }
 
   function moveCpu(dt) {
+    if (practice) { accelTo(cpu, 0, 0, dt, C_ACC, C_DEC); cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt; animateBody(cpu, dt); return; }
     let target = null, speed = lv.speed * (ball.live && ball.last === 'P' ? footSpeed() : 1);
     if (state === 'rally' && ball.live && ball.last === 'P') {
       if (cpu.react > 0) cpu.react -= dt;
@@ -1024,7 +1116,7 @@
       const dc = d2(ball, cpu);
       // the CPU also meets the ball where it passes closest (it can stretch past its reach with a
       // defensive slice), and lets a ball that just bounced rise to a hittable height first
-      const cIn = state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < (ball.bounces === 0 ? 3.1 : 2.6);
+      const cIn = !practice && state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < (ball.bounces === 0 ? 3.1 : 2.6);
       const rising = ball.z < .35 && ball.vz > 0;
       if (cIn && (cpu.closest == null || dc < cpu.closest || rising)) cpu.closest = Math.min(cpu.closest ?? dc, dc);
       else if (cpu.closest != null) {
@@ -1517,9 +1609,16 @@
     requestAnimationFrame(loop);
   }
 
+  const BOARD_HTML = $('board').innerHTML;
   document.querySelectorAll('[data-level]').forEach(b => (b.onclick = () => startMatch(b.dataset.level)));
+  document.querySelectorAll('[data-drill]').forEach(b => (b.onclick = () => startPractice(b.dataset.drill)));
+  $('quit').onclick = () => {
+    practice = null; state = 'menu'; msg = null; ball.live = false;
+    $('result').classList.add('hidden'); $('board').classList.add('hidden'); $('quit').classList.add('hidden'); $('menu').classList.remove('hidden');
+  };
   $('again').onclick = () => startMatch(lvKey);
-  $('toMenu').onclick = () => { $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); $('board').classList.add('hidden'); state = 'menu'; };
+  $('toMenu').onclick = () => {
+    $('quit').classList.add('hidden'); $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); $('board').classList.add('hidden'); state = 'menu'; };
   requestAnimationFrame(loop);
 })();
 </script>
