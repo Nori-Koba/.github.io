@@ -86,7 +86,7 @@
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
         <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。丸の中心寄りで打つほどナイスショット。<br>
-        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>はトップスピン（キック）：ネットを高く越えて大きく跳ね、ほぼ必ず入る。
+        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>はトップスピン（キック）：ネットを高く越えてまっすぐ高く跳ね、ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
@@ -133,7 +133,12 @@
   // how far from your body each stroke can reach (m): topspin needs the ball close, slice can stretch
   const REACHES = { top: 1.05, flat: 1.2, smash: 1.3, lob: 1.4, drop: 1.5, slice: 1.8 };
   const reachOf = type => REACHES[type] || 1.2;
-  const BALL_TS = .85; // the ball runs slower than the people, for longer rallies
+  const BALL_TS = .85; // in rallies the ball runs slower than the people, for longer rallies
+  const SERVE_TS = 1;  // serves fly at full speed: returners only get a step or two
+  // returning a serve: the faster it comes, the later you react and the fewer steps you get
+  const serveHurry = () => clamp((ball.serveKmh - 110) / 80, 0, 1);
+  const SERVE_RETURN = { react: () => .05 + .2 * serveHurry(), speed: () => 1 - .45 * serveHurry() };
+  const ballTS = () => (ball.serve ? SERVE_TS : BALL_TS);
   const FIG = .8;      // people are drawn at 80% size
   const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
@@ -458,7 +463,7 @@
     // bad timing and big power both widen the error; topspin (kick) is the safest serve
     // flat = fastest first serve, slice = fast curving first serve, kick = safe second serve
     const SERVE = {
-      flat:  { speed: [30, 58], timing: 1.3, risk: 1.6, over: null },
+      flat:  { speed: [30, 58], timing: 1.3, risk: 1.3, over: null },
       slice: { speed: [30, 52], timing: 1.1, risk: 1.1, over: { mg: .003, margin: .22, bz: .5, bh: .85 } },  // sidespin, not backspin
       top:   { speed: [22, 32], timing: .45, risk: .25, over: { mg: .026, margin: 1.1, bz: .55, bh: .85 } },  // high over the net, big kick
     }[type];
@@ -470,9 +475,9 @@
     // a right-hander's slice serve curves to the server's left
     const kmh = shoot(tx, ty, type, { speed, noClear: q < .25 && type !== 'top', curve: type === 'slice' ? 3.6 + power * 2.6 : 1, side: leftOf(who), who, over: SERVE.over });
     if (type === 'top') { // kick serve: jumps up high and off to the server's right
-      ball.bz = .52 + power * .06; ball.bh = .85; ball.kick = (who === 'P' ? 1 : -1) * (3 + 3 * power);
+      ball.bz = .52 + power * .06; ball.bh = .85; ball.kick = 0; // kicks straight up
     } else if (type === 'flat') { ball.bz = .45; ball.bh = .75; } // flat serve skids through low
-    Object.assign(ball, { live: true, serve: true, last: who, bounces: 0 });
+    Object.assign(ball, { live: true, serve: true, last: who, bounces: 0, serveKmh: kmh });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
     s.stroke = { kind: 'serve', spin: type }; s.swing = SWING * .7;
@@ -483,7 +488,7 @@
       maxSpeed = Math.max(maxSpeed, kmh);
       const t = q > .85 ? (power >= 1 ? 'ジャスト! MAX!' : 'ジャスト!') : q < .35 ? 'タイミングずれ…' : '';
       popupAt(player.x, player.y, 3.2, t, q > .85 ? '#e8ff3a' : '#fff');
-      cpu.plan = null; cpu.react = lv.react;
+      cpu.plan = null; cpu.react = lv.react + SERVE_RETURN.react();
     }
   }
 
@@ -627,8 +632,9 @@
       t += step;
       if (bounces === 1 && b.z < 2.3) {
         last = { x: b.x, y: b.y };
-        const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / lv.speed + lv.speed / (2 * C_ACC);
-        if (need <= t / BALL_TS) break; // t is ball time, need is people time
+        const spd = lv.speed * (ball.serve ? SERVE_RETURN.speed() : 1);
+        const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / spd + spd / (2 * C_ACC);
+        if (need <= t / ballTS()) break; // t is ball time, need is people time
       }
     }
     const p = last || { x: ball.x, y: ball.y };
@@ -838,7 +844,7 @@
   }
 
   function moveCpu(dt) {
-    let target = null, speed = lv.speed;
+    let target = null, speed = lv.speed * (ball.serve && ball.live ? SERVE_RETURN.speed() : 1);
     if (state === 'rally' && ball.live && ball.last === 'P') {
       if (cpu.react > 0) cpu.react -= dt;
       else target = cpu.plan = cpu.plan || planIntercept();
@@ -882,7 +888,7 @@
   function step(dt) {
     movePlayer(dt);
     moveCpu(dt);
-    moveBall(dt * BALL_TS);
+    moveBall(dt * ballTS());
     player.swing = Math.max(0, player.swing - dt); player.cool -= dt;
     cpu.swing = Math.max(0, cpu.swing - dt);
     if (charge) charge.t += dt;
