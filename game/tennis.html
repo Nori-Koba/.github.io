@@ -133,11 +133,15 @@
   // how far from your body each stroke can reach (m): topspin needs the ball close, slice can stretch
   const REACHES = { top: 1.05, flat: 1.2, smash: 1.3, lob: 1.4, drop: 1.5, slice: 1.8 };
   const reachOf = type => REACHES[type] || 1.2;
-  const BALL_TS = .85; // in rallies the ball runs slower than the people, for longer rallies
+  const BALL_TS = 1;   // rallies run at real ball speed too
   const SERVE_TS = 1;  // serves fly at full speed: returners only get a step or two
   // returning a serve: the faster it comes, the later you react and the fewer steps you get
   const serveHurry = () => clamp((ball.serveKmh - 110) / 80, 0, 1);
   const SERVE_RETURN = { react: () => .05 + .2 * serveHurry(), speed: () => 1 - .45 * serveHurry() };
+  // in rallies too, a hard-hit ball leaves the CPU less time to read it and get going
+  const rallyHurry = () => clamp((ball.shotKmh - 95) / 55, 0, 1);
+  const STRETCH = 1.35; // how far past its normal reach the CPU can lunge for a slice
+  const footSpeed = () => ball.serve ? SERVE_RETURN.speed() : 1 - .05 * rallyHurry();
   const ballTS = () => (ball.serve ? SERVE_TS : BALL_TS);
   const FIG = .8;      // people are drawn at 80% size
   const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
@@ -147,7 +151,7 @@
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', mg: .016, bz: .68, bh: .88, margin: .6,  speed: [27, 38], err: .8 },
+    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .7, bh: .88, margin: .35, speed: [27, 38], err: .8 },
     slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
     flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .6, bh: .7,  margin: .12, speed: [26, 44], err: 1.3 },
     lob:   { name: 'ロブ',         color: '#c77dff', mg: .006, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
@@ -155,7 +159,7 @@
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { mg: .026, bz: .62, bh: .9, margin: .9, speed: [29, 41] } },
+    P: { name: 'パワースピン型', top: { mg: .018, bz: .66, bh: .9, margin: .45, speed: [30, 42] } },
     C: { name: 'スライス型',
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
          flat:  { speed: [28, 46] },
@@ -256,6 +260,11 @@
     const k = e.key.toLowerCase();
     if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
     if (MOVE_KEYS.includes(k)) ptr = null; // keyboard takes over from the mouse until it moves again
+    if (charge && !keys[k]) { // a quick tap while charging picks the aim right away
+      const dx = { arrowleft: -1, a: -1, arrowright: 1, d: 1 }[k], dy = { arrowup: 1, w: 1, arrowdown: -1, s: -1 }[k];
+      if (dx) aimX = dx * AIM_X;
+      if (dy) aimD = dy;
+    }
     keys[k] = true;
     if (k.startsWith('arrow') || k === ' ') e.preventDefault();
   });
@@ -450,7 +459,7 @@
     if (type === 'drop') return { x: CX + ax * (CX - 1), y: NET_Y - 2.2 };
     if (type === 'lob') return { x: CX + ax * (CX - 1), y: lerp(2.2, .9, Math.max(0, ad)) };
     const short = Math.max(0, -ad);
-    return { x: CX + ax * (CX - .7 + short * .4), y: ad >= 0 ? lerp(2.8, 1, ad) : lerp(2.8, 6.8, short) };
+    return { x: CX + ax * (CX - .7 + short * .4), y: ad >= 0 ? lerp(3, 1.5, ad) : lerp(3, 6.8, short) };
   }
 
   // q: toss timing (1 = hit at the top of the toss), power: how long the button was held
@@ -534,7 +543,8 @@
     const q = clamp(1 - Math.max(0, d - r * .45) / (r * .55), 0, 1); // sweet spot: the inner half of the circle
     const goal = aimTarget(type, player.aimX, player.aimD);
     // timing errors plus the risk of hitting hard
-    let err = (1 - q) * 1.6 + power * power * sh.err * .9, speedMul = 1, note = '';
+    // aiming close to the lines is risky: corners and deep targets widen the error
+    let err = (1 - q) * 1.6 + power * power * sh.err * .9 + .3 * Math.abs(player.aimX) + .25 * Math.max(0, player.aimD), speedMul = 1, note = '';
     // the height you meet the ball at decides which shot is safe
     if (!smash && ball.bounces === 1) {
       if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += type === 'top' ? .3 : .6; speedMul = .85; note = type === 'top' ? '' : '低い球はスライスで!'; }
@@ -558,6 +568,7 @@
     opts.curve = 0; opts.who = 'P'; // groundstroke slice goes straight and skids; only the slice serve curves
     const kmh = shoot(tx, ty, type, opts);
     Object.assign(ball, { last: 'P', bounces: 0, serve: false });
+    ball.shotKmh = kmh;
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
     sHit(smash ? 1 : power);
     const label = smash ? 'スマッシュ!' : sh.name;
@@ -585,29 +596,33 @@
     } else if (prev && prev !== type) {
       cpuMod = { err: .04, react: .2, noise: 1.2 };
     }
-    cpu.plan = null; cpu.react = lv.react * (1 + cpuMod.react);
+    cpu.plan = null; cpu.react = lv.react * (1 + cpuMod.react) + .04 * rallyHurry();
   }
 
   function cpuHit(d) {
     const incoming = Math.hypot(ball.vx, ball.vy);
+    const stretched = d > lv.reach;
     let type = pickWeighted(lv.mix);
     if (player.y < NET_Y + 5 && Math.random() < lv.tactic) type = 'lob';           // passing lob over a net rusher
     else if (player.y > L + 1.2 && Math.random() < lv.tactic * .3) type = 'drop';   // drop shot vs. a deep player
     if (ball.z > 2.4) type = 'flat';
-    const sh = styled(type, 'C'), power = rand(...lv.power);
+    if (stretched) type = 'slice';
+    const sh = styled(type, 'C'), power = stretched ? rand(.1, .35) : rand(...lv.power);
     let errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0)
       + power * power * sh.err * .08
       + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
       + (ball.z > 1.9 ? .06 : 0)                       // high kicking topspin is hard to control
       + Math.max(0, incoming - 18) * .008              // fast flat balls rush the swing
-      + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0);
+      + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0)
+      + (stretched ? .06 : 0);
     errP = Math.max(.01, errP * (1 + Math.min(0, cpuMod.err)) + Math.max(0, cpuMod.err));
     let tx = player.x > CX ? rand(.5, CX - .3) : rand(CX + .3, CW - .5);
     if (Math.random() < .3) tx = rand(.6, CW - .6);
+    if (stretched) tx = rand(2, CW - 2); // a lunging slice just floats back to the middle
     let ty, opts;
     if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
-    else { ty = L - rand(1, 5); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
+    else { ty = L - (stretched ? rand(2.5, 5.5) : rand(1, 5)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
       if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
@@ -632,7 +647,7 @@
       t += step;
       if (bounces === 1 && b.z < 2.3) {
         last = { x: b.x, y: b.y };
-        const spd = lv.speed * (ball.serve ? SERVE_RETURN.speed() : 1);
+        const spd = lv.speed * footSpeed();
         const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / spd + spd / (2 * C_ACC);
         if (need <= t / ballTS()) break; // t is ball time, need is people time
       }
@@ -844,12 +859,12 @@
   }
 
   function moveCpu(dt) {
-    let target = null, speed = lv.speed * (ball.serve && ball.live ? SERVE_RETURN.speed() : 1);
+    let target = null, speed = lv.speed * (ball.live && ball.last === 'P' ? footSpeed() : 1);
     if (state === 'rally' && ball.live && ball.last === 'P') {
       if (cpu.react > 0) cpu.react -= dt;
       else target = cpu.plan = cpu.plan || planIntercept();
     } else if (state === 'rally' || state === 'pause') {
-      target = { x: CX + (player.x - CX) * .25, y: -1 }; speed *= .7;
+      target = { x: CX + (player.x - CX) * .25, y: -1 }; // recover to the middle right after hitting
     }
     if (target) {
       const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
@@ -914,7 +929,8 @@
         player.closest = null;
       }
       const dc = d2(ball, cpu);
-      if (state === 'rally' && canHit('C') && dc < lv.reach && ball.z < 2.6) cpuHit(dc);
+      // the CPU can stretch past its normal reach, but only with a defensive slice
+      if (state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < 2.6) cpuHit(dc);
     }
   }
 
