@@ -411,15 +411,18 @@
   // ---------- コース ----------
   const TS = 32, ROWS = 14, GROUND = 12;
   // タイル: # 地面  = かたいブロック  b レンガ  ? いちご箱  P ケーキ箱  S スター箱  F ほのお箱  T いなずま箱  u からっぽ  - くも（下から通れる）  ^ トゲ
-  const SOLID = new Set(['#', '=', 'b', '?', 'P', 'S', 'F', 'T', 'W', 'M', 'O', 'u', 'J', '>']);
+  const SOLID = new Set(['#', '=', 'b', '?', 'P', 'S', 'F', 'T', 'W', 'M', 'O', 'u', 'J', 'K', '>']);
   const BOXES = '?PSFTWMO';   // プレゼント箱
 
-  function makeBuilder(len) {
-    const grid = Array.from({ length: ROWS }, () => Array(len).fill('.'));
+  // top：画面の上に たす 空の 行の かず（1-4 だけ。y は マイナスで 空の上）
+  function makeBuilder(len, top = 0) {
+    const grid0 = Array.from({ length: ROWS + top }, () => Array(len).fill('.'));
+    const grid = new Proxy(grid0, { get: (g, k) => (typeof k === 'string' && /^-?\d+$/.test(k)) ? g[+k + top] : g[k] });
     const ents = [];
     const B = {
-      grid, ents, len,
+      grid: grid0, top, ents, len,
       ground(a, b, top = GROUND) { for (let x = a; x <= b; x++) for (let y = top; y < ROWS; y++) grid[y][x] = '#'; },
+      fill(a, b, y0, y1, c = '#') { for (let x = a; x <= b; x++) for (let y = y0; y <= y1; y++) grid[y][x] = c; },
       set(x, y, c) { grid[y][x] = c; },
       row(x, y, s) { for (let i = 0; i < s.length; i++) if (s[i] !== ' ') grid[y][x + i] = s[i]; },
       tower(x, h, w = 2) { for (let i = 0; i < w; i++) for (let y = GROUND - h; y < GROUND; y++) grid[y][x + i] = '='; },
@@ -440,7 +443,7 @@
       item(type, x, y) { ents.push({ k: 'placed', type, x, y }); },
       // バネや ふみつけの とびかた（はかったもの）に そって いちごを ならべる
       arc(x0, h0, pts) { for (const [dx, hh] of pts) ents.push({ k: 'berryAt', px: (x0 + dx) * TS, py: (GROUND - h0 - hh - 0.45) * TS }); },
-      hole(a, b) { for (let x = a; x <= b; x++) for (let y = 0; y < ROWS; y++) grid[y][x] = '.'; },
+      hole(a, b) { for (let x = a; x <= b; x++) for (let y = -top; y < ROWS; y++) grid[y][x] = '.'; },
       pole(x) { ents.push({ k: 'pole', x }); },
       boss(x, arena, kind = 'himawari') { ents.push({ k: 'boss', x, arena, kind }); },
     };
@@ -532,10 +535,11 @@
     },
     // 4: びゅんびゅん ハイウェイ（→ を おすだけで クリア）
     () => {
-      const B = makeBuilder(300);
+      const S = 69;                                    // ⑤ から うしろは 空の セクションの ぶん うしろへ
+      const B = makeBuilder(300 + S, 16);              // 上に 16行 ぶんの 空
       const SPRING = [[1, 3.5], [2, 6], [3, 7.5], [4, 8.2], [5, 7.5], [6, 5]];        // バネの とびかた
       const STOMP = [[1, 2.4], [2, 3.9], [3, 3.8], [4, 2.2]];                        // ふみつけの とびかた
-      B.ground(0, 299);
+      B.ground(0, 299 + S);
       B.berries(6, GROUND - 1, 7);
       // ① バネで 穴を こえて、とうがらしを 4ひき れんぞく ふみつけ
       B.spring(15); B.hole(17, 20); B.arc(15.1, 0, SPRING);
@@ -553,35 +557,48 @@
       // ④ マグネットで 空の いちごを あつめる
       B.item('magnet', 80, GROUND - 1);
       for (let x = 83; x <= 97; x += 2) { B.berries(x, 6, 1); B.berries(x + 1, 7, 1); }
-      // ⑤ スターで てきの むれを つきぬける
-      B.star(101, GROUND - 1);
+      // ⑤ だんだんの がけを バネで のぼる → 金の スーパーバネで 空の 道へ → 空から いっきに おちる
+      B.spring(100); B.arc(100.1, 0, SPRING.slice(0, 5));
+      B.ground(103, 111, GROUND - 4);  B.set(109, GROUND - 4, 'J'); B.arc(109.1, 4, SPRING.slice(0, 5));
+      B.ground(112, 120, GROUND - 8);  B.set(118, GROUND - 8, 'J'); B.arc(118.1, 8, SPRING.slice(0, 5));
+      B.ground(121, 128, GROUND - 12); B.set(127, GROUND - 12, 'K');
+      B.enemy('hog', 104, GROUND - 5); B.enemy('hog', 113, GROUND - 9); B.enemy('bee', 124, -4);
+      B.row(130, -8, '-'.repeat(31));                  // 空の 道（くも）
+      B.set(137, -8, 'J'); B.enemy('chili', 144, -9); B.enemy('chili', 149, -9); B.arc(137.1, 20, SPRING);
+      for (const x of [144.6, 149.5]) B.arc(x, 20.7, STOMP);
+      for (const x of [140, 143]) B.enemy('bee', x, -13);
+      for (const x of [152, 156]) B.enemy('bee', x, -16);
+      B.berries(155, -9, 5);
+      B.arc(161.4, 0, [[0.7, 19.4], [1.7, 16.9], [2.7, 13.9], [3.7, 10.9], [4.7, 7.9], [5.7, 4.9]]);   // まっさかさまに おちる みち
+      // ⑥ スターで てきの むれを つきぬける
+      B.star(101 + S, GROUND - 1);
       const crowd = ['chili', 'hog', 'snail', 'squirrel', 'jelly'];
-      for (let x = 105, k = 0; x <= 146; x += 3, k++) B.enemy(crowd[k % crowd.length], x);
-      for (let x = 106; x <= 146; x += 3) B.berries(x, GROUND - 1, 2);
-      B.check(150);
-      // ⑥ バネで たかい とうを とびこえる
-      B.spring(156); B.tower(158, 4, 4); B.enemy('hog', 159, GROUND - 5); B.arc(156.1, 0, SPRING);
-      // ⑦ スピード床から 大ジャンプ！
-      for (let x = 166; x <= 169; x++) B.set(x, GROUND, '>');
-      B.spring(171); B.hole(173, 180);
-      B.arc(171.1, 0, [[2, 3.8], [3, 5.3], [4, 6.4], [5, 7.3], [6, 7.9], [7, 8.2], [8, 7.6], [9, 5.2]]);
-      // ⑧ バネの れんぞく
-      B.spring(186); B.hole(188, 192); B.spring(193); B.hole(195, 199); B.spring(201); B.hole(203, 207);
-      B.arc(186.1, 0, SPRING); B.arc(193.7, 0, SPRING); B.arc(201.3, 0, SPRING);
-      // ⑨ ボス：Himawari と Onigiri
-      B.berries(210, GROUND - 1, 3);
-      B.spring(214); B.arc(214.1, 0, SPRING.slice(0, 5));
-      B.duo(220);
-      B.spring(232); B.arc(232.1, 0, SPRING);
-      B.berries(240, GROUND - 1, 3);
-      B.spring(247); B.arc(247.1, 0, SPRING.slice(0, 5));
-      B.spring(263); B.arc(263.1, 0, SPRING.slice(0, 5));
-      // ⑩ さいごは 塔の上の バネで はたの てっぺんへ
-      B.berries(276, GROUND - 1, 2);
-      B.spring(279); B.arc(279.1, 0, SPRING.slice(0, 5));
-      B.tower(284, 3, 5); B.set(287, GROUND - 3, 'J'); B.arc(287.1, 3, SPRING.slice(0, 3));
-      B.pole(291);
-      return { ...B, theme: 3, house: 295, start: 3, auto: true, duoZones: { hit2: 244, leap: 258, hit3: 270 } };
+      for (let x = 105, k = 0; x <= 146; x += 3, k++) B.enemy(crowd[k % crowd.length], x + S);
+      for (let x = 106; x <= 146; x += 3) B.berries(x + S, GROUND - 1, 2);
+      B.check(150 + S);
+      // ⑦ バネで たかい とうを とびこえる
+      B.spring(156 + S); B.tower(158 + S, 4, 4); B.enemy('hog', 159 + S, GROUND - 5); B.arc(156.1 + S, 0, SPRING);
+      // ⑧ スピード床から 大ジャンプ！
+      for (let x = 166; x <= 169; x++) B.set(x + S, GROUND, '>');
+      B.spring(171 + S); B.hole(173 + S, 180 + S);
+      B.arc(171.1 + S, 0, [[2, 3.8], [3, 5.3], [4, 6.4], [5, 7.3], [6, 7.9], [7, 8.2], [8, 7.6], [9, 5.2]]);
+      // ⑨ バネの れんぞく
+      B.spring(186 + S); B.hole(188 + S, 192 + S); B.spring(193 + S); B.hole(195 + S, 199 + S); B.spring(201 + S); B.hole(203 + S, 207 + S);
+      B.arc(186.1 + S, 0, SPRING); B.arc(193.7 + S, 0, SPRING); B.arc(201.3 + S, 0, SPRING);
+      // ⑩ ボス：Himawari と Onigiri
+      B.berries(210 + S, GROUND - 1, 3);
+      B.spring(214 + S); B.arc(214.1 + S, 0, SPRING.slice(0, 5));
+      B.duo(220 + S);
+      B.spring(232 + S); B.arc(232.1 + S, 0, SPRING);
+      B.berries(240 + S, GROUND - 1, 3);
+      B.spring(247 + S); B.arc(247.1 + S, 0, SPRING.slice(0, 5));
+      B.spring(263 + S); B.arc(263.1 + S, 0, SPRING.slice(0, 5));
+      // ⑪ さいごは 塔の上の バネで はたの てっぺんへ
+      B.berries(276 + S, GROUND - 1, 2);
+      B.spring(279 + S); B.arc(279.1 + S, 0, SPRING.slice(0, 5));
+      B.tower(284 + S, 3, 5); B.set(287 + S, GROUND - 3, 'J'); B.arc(287.1 + S, 3, SPRING.slice(0, 3));
+      B.pole(291 + S);
+      return { ...B, theme: 3, house: 295 + S, start: 3, auto: true, duoZones: { hit2: 244 + S, leap: 258 + S, hit3: 270 + S } };
     },
   ];
 
@@ -612,7 +629,7 @@
   let state = 'title';          // title | intro | play | pause | dying | goal | clear | over
   let courseIdx = 0, lives = 3, berryCount = 0, score = 0, courseStartScore = 0;
   let checkpointCol = null;
-  let camX = 0, viewW = 400, viewH = 700, scale = 1, offY = 0, padSpace = 0;
+  let camX = 0, camSY = 0, viewW = 400, viewH = 700, scale = 1, offY = 0, padSpace = 0;
   let stateT = 0, simT = 0;
   const input = { left: false, right: false, jump: false, jumpPressed: false, dash: false, dashPressed: false, firePressed: false };
 
@@ -669,16 +686,17 @@
     if (carry) { if (carry.big) setSize(true); P.power = carry.power; carry = null; }
     // 地面の高さに合わせる
     for (let ty = 0; ty < ROWS; ty++) if (SOLID.has(tileAt(col, ty))) { P.y = ty * TS - P.h; break; }
-    camX = clampCam(P.x - viewW * 0.4);
+    camX = clampCam(P.x - viewW * 0.4); camSY = 0;
     courseStartScore = score;
     updateHud(); updatePowerUI();
   }
 
   function tileAt(tx, ty) {
     if (tx < 0 || tx >= C.len) return '#';
-    if (ty < 0 || ty >= ROWS) return '.';
-    return C.grid[ty][tx];
+    if (ty < -C.top || ty >= ROWS) return '.';
+    return C.grid[ty + C.top][tx];
   }
+  function setTile(tx, ty, c) { C.grid[ty + C.top][tx] = c; }
   const clampCam = x => {
     const lo = boss && boss.fight ? Math.min(boss.arenaL, C.len * TS - viewW) : 0;   // ボス戦は へやの中だけ
     return Math.max(lo, Math.min(C.len * TS - viewW, x));
@@ -731,7 +749,7 @@
     const key = tx + ',' + ty;
     const cx = tx * TS + TS / 2, cy = ty * TS;
     if (BOXES.includes(c)) {
-      C.grid[ty][tx] = 'u';
+      setTile(tx, ty, 'u');
       bumps[key] = 0.15;
       if (c === '?') { items.push({ type: 'pop', x: cx - 10, y: cy - 20, w: 20, h: 20, t: 0.45 }); addBerry(); }
       else items.push({ type: { P: 'cake', S: 'star', F: 'fire', T: 'bolt', W: 'wing', M: 'magnet', O: 'bubble' }[c], x: tx * TS + 4, y: cy, w: 24, h: 22, vx: 0, vy: 0, emerge: 0.5 });
@@ -747,7 +765,7 @@
   }
 
   function breakBrick(tx, ty) {
-    C.grid[ty][tx] = '.';
+    setTile(tx, ty, '.');
     score += 50;
     const cx = tx * TS + TS / 2, cy = ty * TS;
     for (let i = 0; i < 8; i++) particles.push({ x: cx, y: cy + 16, vx: (Math.random() - 0.5) * 260, vy: -200 - Math.random() * 260, life: 1.2, col: '#e9926b', r: 4, sq: true });
@@ -830,6 +848,11 @@
 
     const target = clampCam(P.x + P.w / 2 - viewW * 0.4);
     if (state !== 'dying') camX += (target - camX) * Math.min(1, h * 8);
+    // 空の上に いったら 画面も 上へ
+    if (C.top > 0 && state !== 'dying') {
+      const want = Math.max(0, viewH * 0.32 - (P.y + offY));
+      camSY += (want - camSY) * Math.min(1, h * 5);
+    }
 
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -950,10 +973,11 @@
     // バネに のったら びよーん
     if (P.ground) {
       const tx = Math.floor((P.x + P.w / 2) / TS), ty = Math.floor((P.y + P.h + 1) / TS);
-      if (tileAt(tx, ty) === 'J') {
-        P.vy = -950; P.springRise = true; P.ground = false; P.coyote = 0; P.plat = null;
+      const sp = tileAt(tx, ty);
+      if (sp === 'J' || sp === 'K') {
+        P.vy = sp === 'K' ? -1150 : -950; P.springRise = true; P.ground = false; P.coyote = 0; P.plat = null;
         bumps[tx + ',' + ty] = 0.15;
-        sfx.spring();
+        sfx.spring(); if (sp === 'K') sfx.boost();
       }
     }
     P.walkT = P.ground && Math.abs(P.vx) > 5 ? P.walkT + h * Math.abs(P.vx) / 140 : 0;
@@ -1696,7 +1720,7 @@
   function drawTile(c, tx, ty, sx, sy, t) {
     const th = C.theme;
     if (c === '#') {
-      const topOpen = !['#', 'J', '>'].includes(tileAt(tx, ty - 1));
+      const topOpen = !['#', 'J', 'K', '>'].includes(tileAt(tx, ty - 1));
       if (th.cloudGround) {
         ctx.fillStyle = th.dirt; ctx.fillRect(sx, sy, TS, TS);
         ctx.fillStyle = th.dirtDot; ctx.beginPath(); ctx.arc(sx + 10 + (tx % 2) * 12, sy + 18, 5, 0, Math.PI * 2); ctx.fill();
@@ -1759,14 +1783,15 @@
         if (ax < sx - 2 || ax > sx + TS - 6) continue;
         ctx.beginPath(); ctx.moveTo(ax, sy + 1); ctx.lineTo(ax + 5, sy + 4.5); ctx.lineTo(ax, sy + 8); ctx.lineTo(ax + 2, sy + 4.5); ctx.closePath(); ctx.fill();
       }
-    } else if (c === 'J') {          // バネ
+    } else if (c === 'J' || c === 'K') {          // バネ（K は 金の スーパーバネ）
       ctx.fillStyle = C.theme.dirt; ctx.fillRect(sx, sy + 10, TS, TS - 10);
       const k = bumps[tx + ',' + ty] ? 6 : 0;
       ctx.strokeStyle = '#8f97b3'; ctx.lineWidth = 2.5;
       for (let i = 0; i < 3; i++) {          // くるくる コイル
         ctx.beginPath(); ctx.ellipse(sx + 16, sy + 20 - i * (4 + k / 3), 10, 3, 0, 0, Math.PI * 2); ctx.stroke();
       }
-      ctx.fillStyle = '#ff5c7a'; roundRect(ctx, sx + 2, sy - 2 - k, TS - 4, 9, 4); ctx.fill();
+      ctx.fillStyle = c === 'K' ? '#ffc21f' : '#ff5c7a'; roundRect(ctx, sx + 2, sy - 2 - k, TS - 4, 9, 4); ctx.fill();
+      if (c === 'K') { ctx.fillStyle = 'rgba(255,255,255,' + (0.5 + 0.5 * Math.sin(t * 8)) + ')'; star(ctx, sx + 16, sy - 12 - k, 5); }
       ctx.fillStyle = '#ffd0da'; roundRect(ctx, sx + 6, sy - 1 - k, TS - 12, 3, 2); ctx.fill();
     } else if (c === '^') {
       ctx.fillStyle = '#c9cfe0'; ctx.strokeStyle = '#8f97b3'; ctx.lineWidth = 1.5;
@@ -1789,8 +1814,9 @@
         ctx.fillStyle = g2; ctx.fillRect(tx * TS - camX, top, TS + 1, viewH - top);
       }
     }
-    for (let ty = 0; ty < ROWS; ty++) for (let tx = x0; tx <= x1; tx++) {
-      const c = C.grid[ty][tx];
+    const ty0 = Math.max(-C.top, Math.floor(-offY / TS) - 1);
+    for (let ty = ty0; ty < ROWS; ty++) for (let tx = x0; tx <= x1; tx++) {
+      const c = tileAt(tx, ty);
       if (c === '.') continue;
       let sy = ty * TS + offY;
       const bt = bumps[tx + ',' + ty];
@@ -2183,6 +2209,8 @@
   function render(t) {
     ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
     if (!C) { drawBackground(THEMES[0], t); return; }
+    const baseOffY = offY;
+    offY = baseOffY + camSY;          // たての スクロール
     drawBackground(C.theme, t);
     drawHouse();
     for (const k of checks) drawCheck(k);
@@ -2223,6 +2251,7 @@
       ctx.strokeText(p.text, p.x - camX, p.y + offY); ctx.fillText(p.text, p.x - camX, p.y + offY);
     }
     ctx.globalAlpha = 1;
+    offY = baseOffY;
     drawBossBar();
   }
 
