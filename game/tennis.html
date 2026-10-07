@@ -85,7 +85,7 @@
       <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）</p>
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
-        <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球は決めどころ！<br>
+        <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球（光る輪）は決めどころ！ 高ければ<b>スマッシュ</b>、腰〜肩の高さならコート後方から<b>ドライブボレー</b>（トップスピン / フラット）でノーバウンドで叩ける。<br>
         <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを高く越えてまっすぐ高く跳ね、ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
@@ -493,7 +493,7 @@
     if (type === 'top') { // kick serve: jumps up high and off to the server's right
       ball.bz = .52 + power * .06; ball.bh = .85; ball.kick = 0; // kicks straight up
     } else if (type === 'flat') { ball.bz = .45; ball.bh = .75; } // flat serve skids through low
-    Object.assign(ball, { live: true, serve: true, last: who, bounces: 0, serveKmh: kmh });
+    Object.assign(ball, { live: true, serve: true, last: who, bounces: 0, serveKmh: kmh, chance: false });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
     startAnim(s, 'serve', type, .32);
@@ -533,7 +533,10 @@
     o.stroke = { kind, spin, side: kind === 'volley' ? sideKind(o) : kind };
     o.animDur = dur; o.anim = dur * (1 - from);
   }
-  const strokeKind = o => (ball.z > 2.3 && ball.bounces === 0 ? 'smash' : ball.bounces === 0 && !ball.serve ? 'volley' : sideKind(o));
+  const strokeKind = o => (ball.z > 2.3 && ball.bounces === 0 ? 'smash'
+    : ball.bounces === 0 && !ball.serve && !(o === player && isDriveVolley()) ? 'volley' : sideKind(o));
+  // a floater taken out of the air from mid-court with a full swing
+  const isDriveVolley = () => ball.bounces === 0 && !ball.serve && ball.z > 1 && ball.z <= 2.3 && player.y > NET_Y + 2.5;
   function fireSwing() {
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
@@ -551,12 +554,16 @@
   function playerHit(d) {
     let type = player.shot;
     const power = player.power;
-    const smash = ball.z > 2.1 && ball.bounces === 0 && (type === 'top' || type === 'flat');
+    const smash = ball.z > 2.1 && ball.bounces === 0 && type !== 'lob' && type !== 'drop';
+    const drive = !smash && isDriveVolley() && (type === 'top' || type === 'flat');
+    const chance = ball.chance; // the CPU's floater
     if (smash) type = 'flat';
     const sh = styled(type, 'P');
     const r = reachOf(smash ? 'smash' : player.shot);
     // three grades by where in the ring you meet the ball: inner = nice, middle = normal, edge = scrambling
-    const rel = d / r, grade = rel <= .45 ? 'nice' : rel <= .8 ? 'normal' : 'edge';
+    let rel = d / r;
+    if (chance && (smash || drive)) rel *= .6; // a sitter is easy to time: put it away
+    const grade = rel <= .45 ? 'nice' : rel <= .8 ? 'normal' : 'edge';
     const scramble = grade === 'edge' && !smash, mishit = scramble && Math.random() < .45;
     const q = grade === 'nice' ? 1 : grade === 'normal' ? .7 : mishit ? .05 : .4;
     const goal = aimTarget(type, player.aimX, player.aimD);
@@ -579,13 +586,14 @@
       ty = goal.y + rand(-.7, .7) + rand(-err * .6, err * .6);
       opts = { angle: .32 + rand(0, .06), noClear: q < .35 };
     } else {
-      ty = (smash ? rand(2, 7) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
-      const speed = smash ? 32 + power * 6 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
+      ty = (smash ? goal.y + rand(-1, 2.5) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
+      if (drive) speedMul *= 1.12;
+      const speed = smash ? 37 + power * 9 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
     }
     if (mishit) { tx += rand(-2.5, 2.5); ty += rand(-2, 1); opts = { speed: rand(14, 24), noClear: true }; }
     else if (scramble) { // just got there: the ball floats back short and high — a sitter for the opponent
-      type = 'top'; tx = CX + rand(-1.8, 1.8); ty = NET_Y - rand(3.5, 6); opts = { angle: rand(.5, .62) };
+      type = 'top'; tx = CX + rand(-1.8, 1.8); ty = NET_Y - rand(5.5, 8); opts = { angle: rand(.68, .8) };
     }
     if (scramble) startSlide(player);
     opts.curve = 0; opts.who = 'P'; // groundstroke slice goes straight and skids; only the slice serve curves
@@ -599,6 +607,9 @@
     sHit(smash ? 1 : power);
     const label = smash ? 'スマッシュ!' : sh.name;
     popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
+    ball.chance = false;
+    if (chance && (smash || drive)) popupAt(player.x, player.y, 3.6, smash ? '叩き込んだ!' : 'ドライブボレー!', '#ff5d73');
+    else if (drive) popupAt(player.x, player.y, 3.6, 'ドライブボレー!', '#ff9f43');
     if (grade === 'nice' && !smash) popupAt(player.x, player.y, 3.1, 'ナイスショット!', '#e8ff3a');
     else if (mishit) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
     else if (scramble) popupAt(player.x, player.y, 3.1, 'なんとか返球…', '#9ad');
@@ -652,7 +663,7 @@
     let ty, opts;
     if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
-    else if (stretched) { ty = NET_Y + rand(3.5, 6); opts = { angle: rand(.5, .62) }; } // short, high: a chance ball
+    else if (stretched) { ty = NET_Y + rand(5.5, 8); opts = { angle: rand(.68, .8) }; } // a high floater dropping around the service line
     else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
@@ -662,11 +673,11 @@
     }
     opts.curve = 0; opts.who = 'C';
     const kmh = shoot(tx, ty, type, opts);
-    Object.assign(ball, { last: 'C', bounces: 0, serve: false });
+    Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
     rally++; maxRally = Math.max(maxRally, rally);
     startAnim(cpu, ball.z > 2.3 ? 'smash' : sideKind(cpu), type, .3); // the CPU's swing is shown from just before contact
     cpu.swing = SWING * .6; player.hop = HOP; sHit(power);
-    if (stretched) { startSlide(cpu); popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
+    if (stretched) { startSlide(cpu); ball.chance = true; popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
     else if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
@@ -778,10 +789,10 @@
     } else if (ptr) {
       // the cursor on your side of the net moves you; on the far side it is only for aiming
       const g = unproject(ptr.x, ptr.y), dx = g.x - player.x, dy = serving ? 0 : g.y - player.y, l = Math.hypot(dx, dy);
-      if (l > .05 && !(ptr.mouse && g.y < NET_Y)) { const s = Math.min(max, l * 8); tvx = dx / l * s; tvy = dy / l * s; }
+      if (l > .12 && !(ptr.mouse && g.y < NET_Y)) { const s = Math.max(2.5, Math.min(max, l * 10)); tvx = dx / l * s; tvy = dy / l * s; }
     }
     if (player.swing > 0) { tvx *= .25; tvy *= .25; } // planted while swinging
-    if (player.slide > 0) accelTo(player, 0, 0, dt, P_ACC, 7); // sliding: no control, low friction
+    if (player.slide > 0) accelTo(player, 0, 0, dt, P_ACC, 16); // sliding: no control; skids 1-2 m
     else accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
     player.x += player.vx * dt; player.y += player.vy * dt;
     const [x0, x1, y0, y1] = serving
@@ -833,7 +844,7 @@
   }
 
   // after a scrambling get the player slides on, low and wide, and is slow to recover
-  const SLIDE = .65;
+  const SLIDE = .45;
   function startSlide(o) { o.slide = SLIDE; }
 
   // accelerate toward a target velocity, braking harder than speeding up
@@ -858,8 +869,10 @@
   function stepFeet(o, dt) {
     const sp = Math.hypot(o.vx, o.vy);
     if (!o.feet) o.feet = [-1, 1].map(i => { const w = footIdeal(o, i); return { x: w[0], y: w[1], z: 0, step: 0 }; });
-    if (o.slide > 0) { // both feet skid along the court with the body
-      o.feet.forEach((f, k) => { const w = footIdeal(o, k ? 1 : -1); f.x += (w[0] - f.x) * Math.min(1, dt * 18); f.y += (w[1] - f.y) * Math.min(1, dt * 18); f.z = 0; f.step = 0; });
+    if (o.slide > 0) { // the leading foot skids out ahead, the trailing foot stays planted
+      const { R } = facing(o), lead = o.vx * R[0] + o.vy * R[1] >= 0 ? 1 : 0;
+      const f = o.feet[lead], w = footIdeal(o, lead ? 1 : -1);
+      f.x += (w[0] - f.x) * Math.min(1, dt * 14); f.y += (w[1] - f.y) * Math.min(1, dt * 14); f.z = 0; f.step = 0;
       return;
     }
     o.feet.forEach(f => {
@@ -919,7 +932,7 @@
       const s = Math.min(speed, l * 5), sw = cpu.swing > 0 ? .25 : 1;
       if (!(cpu.slide > 0)) accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
     } else accelTo(cpu, 0, 0, dt, C_ACC, C_DEC);
-    if (cpu.slide > 0) accelTo(cpu, 0, 0, dt, C_ACC, 7); // still sliding after a lunge
+    if (cpu.slide > 0) accelTo(cpu, 0, 0, dt, C_ACC, 16); // still sliding after a lunge
     cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt;
     if (cpu.x < -3 || cpu.x > CW + 3) { cpu.x = clamp(cpu.x, -3, CW + 3); cpu.vx = 0; }
     if (cpu.y < -4 || cpu.y > NET_Y - 1.2) { cpu.y = clamp(cpu.y, -4, NET_Y - 1.2); cpu.vy = 0; }
@@ -1365,6 +1378,12 @@
       ctx.beginPath(); ctx.ellipse(p.x, p.y, .25 * p.s, .1 * p.s, 0, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     });
+    if (ball.chance && ball.live && ball.last === 'C') { // highlight the sitter (and its shadow) so you go for it
+      const q = P(ball.x, ball.y, ball.z), g = P(ball.x, ball.y), pulse = 1 + Math.sin(performance.now() / 70) * .25;
+      ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(8, .32 * q.s) * pulse, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(g.x, g.y, .5 * g.s * pulse, .2 * g.s * pulse, 0, 0, 7); ctx.stroke();
+    }
     if (state === 'rally' && ball.live && ball.last === 'C' && ball.bounces === 0) {
       const b = predictBounce();
       if (b) {
