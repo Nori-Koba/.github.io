@@ -136,10 +136,10 @@
   const BALL_TS = 1;   // rallies run at real ball speed too
   const SERVE_TS = 1;  // serves fly at full speed: returners only get a step or two
   // returning a serve: the faster it comes, the later you react and the fewer steps you get
-  const serveHurry = () => clamp((ball.serveKmh - 110) / 80, 0, 1);
+  const serveHurry = () => clamp(((ball.serveKmh || 0) - 110) / 80, 0, 1);
   const SERVE_RETURN = { react: () => .05 + .2 * serveHurry(), speed: () => 1 - .45 * serveHurry() };
   // in rallies too, a hard-hit ball leaves the CPU less time to read it and get going
-  const rallyHurry = () => clamp((ball.shotKmh - 95) / 55, 0, 1);
+  const rallyHurry = () => clamp(((ball.shotKmh || 0) - 95) / 55, 0, 1);
   const STRETCH = 1.35; // how far past its normal reach the CPU can lunge for a slice
   const footSpeed = () => ball.serve ? SERVE_RETURN.speed() : 1 - .05 * rallyHurry();
   const ballTS = () => (ball.serve ? SERVE_TS : BALL_TS);
@@ -548,6 +548,7 @@
   function canHit(w) {
     if (!ball.live || ball.last === w) return false;
     if (ball.bounces === 1) return true;
+    if (w === 'C') return ball.bounces === 0 && ball.chance && ball.y < NET_Y; // the CPU volleys / smashes sitters
     return w === 'P' && ball.bounces === 0 && !ball.serve && ball.y > NET_Y; // volley
   }
 
@@ -607,7 +608,7 @@
     sHit(smash ? 1 : power);
     const label = smash ? 'スマッシュ!' : sh.name;
     popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
-    ball.chance = false;
+    ball.chance = scramble && !mishit; // your floater is now a sitter for the CPU
     if (chance && (smash || drive)) popupAt(player.x, player.y, 3.6, smash ? '叩き込んだ!' : 'ドライブボレー!', '#ff5d73');
     else if (drive) popupAt(player.x, player.y, 3.6, 'ドライブボレー!', '#ff9f43');
     if (grade === 'nice' && !smash) popupAt(player.x, player.y, 3.1, 'ナイスショット!', '#e8ff3a');
@@ -638,7 +639,24 @@
     cpu.closest = null;
   }
 
+  // the CPU puts a sitter away out of the air: a smash if it is high, a firm volley otherwise
+  function cpuPutAway() {
+    const air = ball.bounces === 0, smash = ball.z > 2.1, openLeft = player.x > CX;
+    const tx = openLeft ? rand(.5, 1.4) : CW - rand(.5, 1.4), ty = L - rand(1.5, 5);
+    let opts = { speed: smash ? rand(40, 46) : air ? rand(30, 36) : rand(36, 42), noClear: false, curve: 0, who: 'C' };
+    let gx = tx, gy = ty;
+    if (Math.random() < lv.err * .6 + .02) { gx = openLeft ? -rand(.2, 1.2) : CW + rand(.2, 1.2); } // even sitters get missed now and then
+    // groundstroke and volley put-aways are ripped with heavy topspin so they dive in; smashes go flat
+    const kmh = smash ? shoot(gx, gy, 'flat', opts) : shoot(gx, gy, 'top', { ...opts, over: { mg: .024, margin: .15 } });
+    Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
+    rally++; maxRally = Math.max(maxRally, rally);
+    startAnim(cpu, smash ? 'smash' : air ? 'volley' : sideKind(cpu), 'flat', .3);
+    cpu.swing = SWING * .6; cpu.defend = false; player.hop = HOP; sHit(1);
+    popupAt(cpu.x, cpu.y, 2.8, `${smash ? 'スマッシュ' : air ? 'ボレー' : '強打'}! ${kmh}km/h`, '#ff5d73');
+  }
+
   function cpuHit(d) {
+    if (ball.bounces === 0 || ball.chance) return cpuPutAway(); // a sitter, in the air or after the bounce
     const incoming = Math.hypot(ball.vx, ball.vy);
     const stretched = d > lv.reach;
     let type = pickWeighted(lv.mix);
@@ -677,12 +695,24 @@
     rally++; maxRally = Math.max(maxRally, rally);
     startAnim(cpu, ball.z > 2.3 ? 'smash' : sideKind(cpu), type, .3); // the CPU's swing is shown from just before contact
     cpu.swing = SWING * .6; player.hop = HOP; sHit(power);
+    cpu.defend = stretched;
     if (stretched) { startSlide(cpu); ball.chance = true; popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
     else if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
   // where should the CPU go to meet the ball in time?
   function planIntercept() {
+    if (ball.chance && ball.bounces === 0) { // a floater: move in and meet it in the air, as close to the net as it can get
+      const b = { ...ball, trail: null }, step = 1 / 120, spd = lv.speed;
+      for (let t = 0, i = 0; i < 700; i++) {
+        if (physStep(b, step)) break;
+        t += step;
+        if (b.y < NET_Y - 1.3 && b.y > -3 && b.z > 1 && b.z < 3) {
+          const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .6) / spd + spd / (2 * C_ACC);
+          if (need <= t / ballTS()) return { x: b.x, y: b.y, air: true };
+        }
+      }
+    }
     const b = { ...ball, trail: null }, step = 1 / 120;
     let bounces = ball.bounces, t = 0, last = null;
     for (let i = 0; i < 700; i++) {
@@ -925,7 +955,8 @@
       if (cpu.react > 0) cpu.react -= dt;
       else target = cpu.plan = cpu.plan || planIntercept();
     } else if (state === 'rally' || state === 'pause') {
-      target = { x: CX + (player.x - CX) * .25, y: -1 }; // recover to the middle right after hitting
+      // recover to the middle right after hitting; after floating up a sitter, back off deep to defend the smash
+      target = { x: CX + (player.x - CX) * .25, y: cpu.defend ? -3.2 : -1 };
     }
     if (target) {
       const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
@@ -993,7 +1024,7 @@
       const dc = d2(ball, cpu);
       // the CPU also meets the ball where it passes closest (it can stretch past its reach with a
       // defensive slice), and lets a ball that just bounced rise to a hittable height first
-      const cIn = state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < 2.6;
+      const cIn = state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < (ball.bounces === 0 ? 3.1 : 2.6);
       const rising = ball.z < .35 && ball.vz > 0;
       if (cIn && (cpu.closest == null || dc < cpu.closest || rising)) cpu.closest = Math.min(cpu.closest ?? dc, dc);
       else if (cpu.closest != null) {
