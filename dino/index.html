@@ -2344,7 +2344,7 @@
     box.innerHTML = '';
     COURSES.forEach((_, i) => {
       const b = document.createElement('button');
-      const ok = i === 0 || progress.cleared[i - 1] || progress.cleared[i];
+      const ok = true;   // クリアしなくても ぜんぶの コースを あそべる
       b.className = 'course' + (progress.cleared[i] ? ' done' : '');
       b.disabled = !ok;
       b.innerHTML = `${ok ? '' : '🔒 '}1-${i + 1}${progress.cleared[i] ? ' ✔' : ''}<small></small>`;
