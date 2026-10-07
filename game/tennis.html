@@ -163,16 +163,16 @@
     C: { name: 'スライス型',
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
          flat:  { speed: [28, 46] },
-         top:   { speed: [28, 40] } },
+         top:   { speed: [30, 44] } },
   };
   const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
   const LEVELS = {
-    easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1,    err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
-              mix: { top: 5, slice: 3, flat: 1 }, tactic: .2 },
-    normal: { name: 'ふつう',   speed: 4.8, react: .25, reach: 1.1,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
-              mix: { top: 5, slice: 3.5, flat: 1.5 }, tactic: .4 },
-    hard:   { name: 'つよい',   speed: 5.8, react: .15, reach: 1.25, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
-              mix: { top: 5, slice: 3.5, flat: 2 }, tactic: .6 },
+    easy:   { name: 'やさしい', speed: 4,   react: .32, reach: 1,    err: .15, power: [.3, .65], noise: .8,  serve: [.45, .9],
+              mix: { top: 6, slice: 3, flat: 1 }, tactic: .2, aim: .15 },
+    normal: { name: 'ふつう',   speed: 5.1, react: .22, reach: 1.1,  err: .06, power: [.45, .8], noise: .5,  serve: [.55, 1],
+              mix: { top: 8, slice: 2.5, flat: 1.5 }, tactic: .4, aim: .4 },
+    hard:   { name: 'つよい',   speed: 6.1, react: .13, reach: 1.25, err: .03, power: [.65, 1],  noise: .25, serve: [.7, 1],
+              mix: { top: 8, slice: 2, flat: 2 }, tactic: .6, aim: .7 },
   };
 
   const $ = id => document.getElementById(id);
@@ -601,6 +601,7 @@
       cpuMod = { err: .04, react: .2, noise: 1.2 };
     }
     cpu.plan = null; cpu.react = lv.react * (1 + cpuMod.react) + .04 * rallyHurry();
+    cpu.closest = null;
   }
 
   function cpuHit(d) {
@@ -612,21 +613,23 @@
     if (ball.z > 2.4) type = 'flat';
     if (stretched) type = 'slice';
     const sh = styled(type, 'C'), power = stretched ? rand(.1, .35) : rand(...lv.power);
-    let errP = lv.err + (d / lv.reach) * .06 + Math.min(rally, 20) * .003 + (incoming > 20 ? .05 : 0)
+    let errP = lv.err + (d / lv.reach) * .04 + Math.min(rally, 20) * .002
       + power * power * sh.err * .08
       + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
       + (ball.z > 1.9 ? .06 : 0)                       // high kicking topspin is hard to control
-      + Math.max(0, incoming - 18) * .008              // fast flat balls rush the swing
+      + Math.max(0, incoming - 26) * .006              // really fast balls rush the swing
       + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0)
       + (stretched ? .06 : 0);
     errP = Math.max(.01, errP * (1 + Math.min(0, cpuMod.err)) + Math.max(0, cpuMod.err));
-    let tx = player.x > CX ? rand(.5, CX - .3) : rand(CX + .3, CW - .5);
-    if (Math.random() < .3) tx = rand(.6, CW - .6);
+    // attack the open court: the better the CPU, the closer to the lines it aims; sometimes it wrong-foots you
+    const openLeft = Math.random() < .2 ? player.x < CX : player.x > CX;
+    const edge = .55 + (1 - lv.aim) * rand(0, 1.8);
+    let tx = openLeft ? edge : CW - edge;
     if (stretched) tx = rand(2, CW - 2); // a lunging slice just floats back to the middle
     let ty, opts;
     if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
-    else { ty = L - (stretched ? rand(2.5, 5.5) : rand(1, 5)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
+    else { ty = L - (stretched ? rand(2.5, 5.5) : 1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
       if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
@@ -933,8 +936,15 @@
         player.closest = null;
       }
       const dc = d2(ball, cpu);
-      // the CPU can stretch past its normal reach, but only with a defensive slice
-      if (state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < 2.6) cpuHit(dc);
+      // the CPU also meets the ball where it passes closest (it can stretch past its reach with a
+      // defensive slice), and lets a ball that just bounced rise to a hittable height first
+      const cIn = state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < 2.6;
+      const rising = ball.z < .35 && ball.vz > 0;
+      if (cIn && (cpu.closest == null || dc < cpu.closest || rising)) cpu.closest = Math.min(cpu.closest ?? dc, dc);
+      else if (cpu.closest != null) {
+        if (state === 'rally' && canHit('C')) cpuHit(cpu.closest);
+        cpu.closest = null;
+      }
     }
   }
 
