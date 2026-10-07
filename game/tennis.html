@@ -143,7 +143,7 @@
   const STRETCH = 1.35; // how far past its normal reach the CPU can lunge for a slice
   const footSpeed = () => ball.serve ? SERVE_RETURN.speed() : 1 - .05 * rallyHurry();
   const ballTS = () => (ball.serve ? SERVE_TS : BALL_TS);
-  const FIG = .8;      // people are drawn at 80% size
+  const FIG = .72;     // people are drawn at 72% size
   const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
 
@@ -151,15 +151,15 @@
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .7, bh: .88, margin: .35, speed: [27, 38], err: .8 },
+    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .7, bh: .88, margin: .35, speed: [29, 41], err: .8 },
     slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
-    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .6, bh: .7,  margin: .12, speed: [26, 44], err: 1.3 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .6, bh: .7,  margin: .12, speed: [28, 48], err: 1.3 },
     lob:   { name: 'ロブ',         color: '#c77dff', mg: .006, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
     drop:  { name: 'ドロップ',     color: '#80ed99', mg: -.005, bz: .35, bh: .35, margin: .25, speed: [0, 0],  err: .9 },
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { mg: .018, bz: .66, bh: .9, margin: .45, speed: [30, 42] } },
+    P: { name: 'パワースピン型', top: { mg: .018, bz: .66, bh: .9, margin: .45, speed: [32, 45] } },
     C: { name: 'スライス型',
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
          flat:  { speed: [28, 46] },
@@ -167,11 +167,11 @@
   };
   const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
   const LEVELS = {
-    easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1.2,  err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
+    easy:   { name: 'やさしい', speed: 3.8, react: .35, reach: 1,    err: .20, power: [.2, .55], noise: .8,  serve: [.45, .9],
               mix: { top: 5, slice: 3, flat: 1 }, tactic: .2 },
-    normal: { name: 'ふつう',   speed: 4.8, react: .25, reach: 1.3,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
+    normal: { name: 'ふつう',   speed: 4.8, react: .25, reach: 1.1,  err: .11, power: [.35, .8], noise: .5,  serve: [.55, 1],
               mix: { top: 5, slice: 3.5, flat: 1.5 }, tactic: .4 },
-    hard:   { name: 'つよい',   speed: 5.8, react: .15, reach: 1.45, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
+    hard:   { name: 'つよい',   speed: 5.8, react: .15, reach: 1.25, err: .05, power: [.5, 1],   noise: .25, serve: [.7, 1],
               mix: { top: 5, slice: 3.5, flat: 2 }, tactic: .6 },
   };
 
@@ -450,6 +450,9 @@
     return Math.round(S * 3.6);
   }
 
+  // default aim: the side of the court the CPU is not covering
+  const openCourt = () => (cpu.x > CX ? -1 : 1) * AIM_X * .8;
+
   // the spot a charged shot is aimed at (without the random error), for the aim marker and the shot itself
   function aimTarget(type, ax, ad) {
     if (state === 'serve') {
@@ -459,7 +462,8 @@
     if (type === 'drop') return { x: CX + ax * (CX - 1), y: NET_Y - 2.2 };
     if (type === 'lob') return { x: CX + ax * (CX - 1), y: lerp(2.2, .9, Math.max(0, ad)) };
     const short = Math.max(0, -ad);
-    return { x: CX + ax * (CX - .7 + short * .4), y: ad >= 0 ? lerp(3, 1.5, ad) : lerp(3, 6.8, short) };
+    // corners sit ~0.45 m inside the sideline; the short angle cuts right out to the line
+    return { x: CX + ax * (CX - .45 + short * .3), y: ad >= 0 ? lerp(3, 1.5, ad) : lerp(3, 7.2, short) };
   }
 
   // q: toss timing (1 = hit at the top of the toss), power: how long the button was held
@@ -513,7 +517,7 @@
       else if (tossing && !charge) { charge = { type, t: 0, full: SERVE_CHARGE, serve: true, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
       return;
     }
-    if ((state === 'rally' || state === 'pause') && !charge) { charge = { type, t: 0, full: FULL_CHARGE, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
+    if ((state === 'rally' || state === 'pause') && !charge) { charge = { type, t: 0, full: FULL_CHARGE, p0: ptr && { ...ptr } }; aimX = openCourt(); aimD = 0; }
   }
   function release(type) {
     if (!charge || charge.type !== type) return;
@@ -917,7 +921,7 @@
         // auto swing: topspin when the ball is close, a defensive slice when you have to stretch
         const t = dp < reachOf('top') * .9 ? 'top' : dp < reachOf('slice') * .9 ? 'slice' : null;
         if (t) {
-          player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = rand(-.5, .5); player.aimD = 0; player.closest = null;
+          player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = openCourt(); player.aimD = 0; player.closest = null;
           player.stroke = { kind: sideKind(player), spin: t };
         }
       }
