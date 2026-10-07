@@ -514,7 +514,7 @@
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
     player.stroke = { kind: ball.z > 2.3 && ball.bounces === 0 ? 'smash' : sideKind(player), spin: charge.type };
-    player.swing = SWING; player.cool = .42; player.aimX = aimX; player.aimD = aimD;
+    player.swing = SWING; player.cool = .42; player.aimX = aimX; player.aimD = aimD; player.closest = null;
     charge = null;
   }
 
@@ -902,11 +902,17 @@
         // auto swing: topspin when the ball is close, a defensive slice when you have to stretch
         const t = dp < reachOf('top') * .9 ? 'top' : dp < reachOf('slice') * .9 ? 'slice' : null;
         if (t) {
-          player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = rand(-.5, .5); player.aimD = 0;
+          player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = rand(-.5, .5); player.aimD = 0; player.closest = null;
           player.stroke = { kind: sideKind(player), spin: t };
         }
       }
-      if (player.swing > 0 && reachable && dp < reachOf(player.shot)) playerHit(dp);
+      // contact happens where the ball passes closest to you during the swing, not where it enters the ring
+      const inRing = reachable && dp < reachOf(player.shot);
+      if (player.swing > 0 && inRing && (player.closest == null || dp < player.closest)) player.closest = dp;
+      else if (player.closest != null && (!inRing || dp > player.closest || player.swing <= 0)) {
+        if (reachable) playerHit(player.closest);
+        player.closest = null;
+      }
       const dc = d2(ball, cpu);
       if (state === 'rally' && canHit('C') && dc < lv.reach && ball.z < 2.6) cpuHit(dc);
     }
