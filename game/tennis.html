@@ -56,6 +56,12 @@
   .card a { color: var(--sub); font-size: 13px; }
   .pc { display: inline; } .coarse .pc { display: none; }
   .sp { display: none; } .coarse .sp { display: inline; }
+  .card button.pick { background: #eef0f6; color: var(--ink); box-shadow: 0 3px 0 #c9cde0; font-size: 14px; padding: 8px 14px;
+    display: inline-flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.2; }
+  .card button.pick small { font-size: 11px; font-weight: normal; color: var(--sub); }
+  .card button.pick.on { background: var(--ink); color: #fff; box-shadow: 0 3px 0 #000; }
+  .card button.pick.on small { color: #cfd3e6; }
+  .card button.pick .sw { width: 34px; height: 12px; border-radius: 4px; display: block; margin-bottom: 3px; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -82,7 +88,19 @@
   <div class="overlay" id="menu">
     <div class="card">
       <h2>🎾 Bumpy Tennis</h2>
-      <p>CPU と 1 対 1 のテニス勝負！<b>3 ゲーム先取</b>で勝ち。</p>
+      <p>CPU と 1 対 1 のテニス勝負！</p>
+      <p style="margin:8px 0 4px"><b>会場</b></p>
+      <div class="btns venues" style="margin-top:0">
+        <button data-venue="mel" class="pick"><span class="sw" style="background:#2f6fc4"></span>メルボルン<small>ハード</small></button>
+        <button data-venue="par" class="pick"><span class="sw" style="background:#c8643a"></span>パリ<small>クレー</small></button>
+        <button data-venue="lon" class="pick"><span class="sw" style="background:#4f9a3e"></span>ロンドン<small>芝</small></button>
+        <button data-venue="ny" class="pick"><span class="sw" style="background:#3d63b8;box-shadow:0 0 0 3px #3f7f56 inset"></span>ニューヨーク<small>ハード・夜</small></button>
+      </div>
+      <p style="margin:8px 0 4px"><b>試合形式</b></p>
+      <div class="btns formats" style="margin-top:0">
+        <button data-format="set" class="pick">1 セット<small>6 ゲーム先取・6-6 でタイブレーク</small></button>
+        <button data-format="short" class="pick">ショート<small>3 ゲーム先取</small></button>
+      </div>
       <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）</p>
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
@@ -138,7 +156,7 @@
 (() => {
   // ---------- court (meters) ----------
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
-  const G = 9.8, TS = 0.85, CAM_BACK = 16, GAMES_TO_WIN = 3;
+  const G = 9.8, TS = 0.85, CAM_BACK = 16;
   const PSPEED = 8.5, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
   // how far from your body each stroke can reach (m): topspin needs the ball close, slice can stretch
   const REACHES = { top: 1.05, flat: 1.2, smash: 1.3, lob: 1.4, drop: 1.5, slice: 1.8 };
@@ -184,6 +202,19 @@
     hard:   { name: 'つよい',   speed: 6.1, react: .13, reach: 1.25, err: .03, power: [.65, 1],  noise: .25, serve: [.7, 1],
               mix: { top: 8, slice: 2, flat: 2 }, tactic: .6, aim: .7 },
   };
+
+  // Venues modelled on the four majors' surfaces. bz / bh scale how high / how fast the ball comes off the court.
+  const VENUES = {
+    mel: { name: 'メルボルン', surf: 'ハード', banner: 'BUMPY OPEN · MELBOURNE', court: '#2f6fc4', outer: '#4f9ee2', wall: '#17407a',
+           sky: ['#0f2a55', '#3a6fb0'], line: '#ffffff', bz: 1, bh: 1, dust: '215,225,245', slide: 16 },
+    par: { name: 'パリ', surf: 'クレー', banner: 'BUMPY OPEN · PARIS', court: '#c8643a', outer: '#bf5d35', wall: '#1d5a3a',
+           sky: ['#4a7fb8', '#a9cbe8'], line: '#f6f0e4', bz: 1.12, bh: .86, dust: '205,115,65', slide: 9, clay: true },
+    lon: { name: 'ロンドン', surf: '芝', banner: 'BUMPY OPEN · LONDON', court: '#4f9a3e', outer: '#4a9339', wall: '#12422a',
+           sky: ['#5d84b8', '#cfe0f0'], line: '#ffffff', bz: .8, bh: 1.08, dust: '140,180,100', slide: 14, grass: true },
+    ny:  { name: 'ニューヨーク', surf: 'ハード', banner: 'BUMPY OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
+           sky: ['#04060d', '#151d33'], line: '#ffffff', bz: .97, bh: 1.04, dust: '215,225,245', slide: 16, night: true },
+  };
+  let venue = VENUES.mel, format = 'set';
 
   const $ = id => document.getElementById(id);
   const canvas = $('c'), ctx = canvas.getContext('2d');
@@ -336,7 +367,22 @@
   let aimX = 0, aimD = 0; // where you are aiming while a shot is charged: -1..1 across, -1 short .. 1 deep
   let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null, history = [], cpuMod = { err: 0, react: 0, noise: 1 };
 
-  const server = () => ((games[0] + games[1]) % 2 === 0 ? 'P' : 'C');
+  // tiebreak: the player due to serve serves the first point, then each serves two in a row
+  let tb = false, tbStart = 'P', tbScore = null;
+  const server = () => {
+    if (tb) { const n = pts[0] + pts[1]; return n === 0 ? tbStart : Math.floor((n - 1) / 2) % 2 === 0 ? other(tbStart) : tbStart; }
+    return (games[0] + games[1]) % 2 === 0 ? 'P' : 'C';
+  };
+  const setWon = i => format === 'short' ? games[i] >= 3 : (games[i] >= 6 && games[i] - games[1 - i] >= 2) || games[i] === 7;
+  const winsGameNext = i => tb ? pts[i] + 1 >= 7 && pts[i] + 1 - pts[1 - i] >= 2 : pts[i] + 1 >= 4 && pts[i] + 1 - pts[1 - i] >= 2;
+  const winsSetNext = i => { if (!winsGameNext(i)) return false; if (tb) return true; games[i]++; const w = setWon(i); games[i]--; return w; };
+  // the label for the next point (match point / break point), or ''
+  function bigPoint() {
+    for (const i of [0, 1]) if (winsSetNext(i)) return i === 0 ? 'マッチポイント（あなた）' : 'マッチポイント（CPU）';
+    const recv = other(server()), ri = recv === 'P' ? 0 : 1;
+    if (!tb && winsGameNext(ri)) return recv === 'P' ? 'ブレークポイント!' : 'ブレークポイント（CPU）';
+    return '';
+  }
   const deuce = () => (pts[0] + pts[1]) % 2 === 0;
   function serveBox(recv, dc) {
     const left = { x0: 0, x1: CX }, right = { x0: CX, x1: CW };
@@ -351,6 +397,7 @@
 
   function startMatch(key) {
     practice = null; $('quit').classList.remove('hidden');
+    tb = false; tbScore = null;
     $('board').innerHTML = BOARD_HTML;
     lvKey = key; lv = LEVELS[key];
     pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; maxSpeed = 0; popups = []; marks = [];
@@ -399,7 +446,8 @@
     b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
     if (b.z <= 0 && b.vz < 0) {
       const impact = -b.vz;
-      b.z = 0; b.vz = impact * b.bz; b.vx *= b.bh; b.vy *= b.bh;
+      const bh = Math.min(.98, b.bh * venue.bh); // the surface: clay grips and sits up, grass skids through low
+      b.z = 0; b.vz = impact * b.bz * venue.bz; b.vx *= bh; b.vy *= bh;
       if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
       // spin mostly wears off after the first bounce; court friction on later bounces
       b.mg *= .4; b.ax = 0; b.bz = .68; b.bh = .7;
@@ -825,7 +873,7 @@
     const recv = other(ball.last);
     if (ball.bounces === 1) {
       const ok = ball.serve ? inBox(serveBox(recv, deuce())) : inCourt(recv);
-      marks.push({ x: ball.x, y: ball.y, life: 1.2, ok });
+      marks.push({ x: ball.x, y: ball.y, life: venue.clay ? 5 : 1.2, ok }); // clay keeps the ball mark
       if (ok && ball.serve && ball.type === 'top') popupAt(ball.x, ball.y, 1.4, 'キック!', SHOTS.top.color);
       if (!ok) ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
     } else {
@@ -853,10 +901,18 @@
     w === 'P' ? sWin() : sLose();
     if (navigator.vibrate && w === 'C') navigator.vibrate(60);
     let title = w === 'P' ? 'あなたのポイント!' : 'CPU のポイント';
-    if (pts[i] >= 4 && pts[i] - pts[1 - i] >= 2) {
+    const gameWon = tb ? pts[i] >= 7 && pts[i] - pts[1 - i] >= 2 : pts[i] >= 4 && pts[i] - pts[1 - i] >= 2;
+    if (gameWon) {
+      if (tb) tbScore = [...pts];
       games[i]++; pts = [0, 0];
-      title = w === 'P' ? '🎾 あなたがゲームを取った!' : 'CPU がゲームを取った';
-      if (games[i] >= GAMES_TO_WIN) { updateBoard(); pause(title, label, 1.8, () => endMatch(w)); return; }
+      title = tb ? (w === 'P' ? '🎾 タイブレークを取った!' : 'CPU がタイブレークを取った')
+                 : w === 'P' ? '🎾 あなたがゲームを取った!' : 'CPU がゲームを取った';
+      tb = false;
+      if (setWon(i)) { updateBoard(); pause(title, label, 1.8, () => endMatch(w)); return; }
+      if (format === 'set' && games[0] === 6 && games[1] === 6) { // 6-6: tiebreak
+        tbStart = server(); tb = true;
+        updateBoard(); pause('6-6 タイブレーク!', '7 ポイント先取（2 点差）', 2, setupServe); return;
+      }
     }
     updateBoard();
     pause(title, label, 1.6, setupServe);
@@ -865,13 +921,14 @@
   function endMatch(w) {
     state = 'over'; msg = null;
     $('resTitle').textContent = w === 'P' ? '🏆 勝利!' : '😢 まけちゃった…';
-    $('resScore').textContent = `${games[0]} - ${games[1]}`;
+    $('resScore').textContent = `${games[0]} - ${games[1]}` + (tbScore ? ` (${Math.min(...tbScore)})` : '');
     $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
       (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
     $('result').classList.remove('hidden');
   }
 
   function scoreText(a, b) {
+    if (tb) return String(a);
     if (a >= 3 && b >= 3) return a === b ? '40' : a > b ? 'Ad' : '40';
     return ['0', '15', '30', '40'][Math.min(a, 3)];
   }
@@ -880,6 +937,7 @@
     $('pP').textContent = scoreText(pts[0], pts[1]); $('pC').textContent = scoreText(pts[1], pts[0]);
     $('srvP').style.visibility = server() === 'P' ? 'visible' : 'hidden';
     $('srvC').style.visibility = server() === 'C' ? 'visible' : 'hidden';
+    $('lvName').textContent = (tb ? 'タイブレーク ・ ' : '') + venue.name + ' ・ ' + lv.name;
   }
 
   function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1.1 }); }
@@ -911,7 +969,7 @@
       if (l > .12 && !(ptr.mouse && g.y < NET_Y)) { const s = Math.max(2.5, Math.min(max, l * 10)); tvx = dx / l * s; tvy = dy / l * s; }
     }
     if (player.swing > 0) { tvx *= .25; tvy *= .25; } // planted while swinging
-    if (player.slide > 0) accelTo(player, 0, 0, dt, P_ACC, 16); // sliding: no control; skids 1-2 m
+    if (player.slide > 0) accelTo(player, 0, 0, dt, P_ACC, venue.slide); // sliding: no control; skids 1-2 m (further on clay)
     else accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
     player.x += player.vx * dt; player.y += player.vy * dt;
     const [x0, x1, y0, y1] = serving
@@ -1079,7 +1137,7 @@
       const s = Math.min(speed, l * 5), sw = cpu.swing > 0 ? .25 : 1;
       if (!(cpu.slide > 0)) accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
     } else accelTo(cpu, 0, 0, dt, C_ACC, C_DEC);
-    if (cpu.slide > 0) accelTo(cpu, 0, 0, dt, C_ACC, 16); // still sliding after a lunge
+    if (cpu.slide > 0) accelTo(cpu, 0, 0, dt, C_ACC, venue.slide); // still sliding after a lunge
     cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt;
     if (cpu.x < -3 || cpu.x > CW + 3) { cpu.x = clamp(cpu.x, -3, CW + 3); cpu.vx = 0; }
     if (cpu.y < -4 || cpu.y > NET_Y - 1.2) { cpu.y = clamp(cpu.y, -4, NET_Y - 1.2); cpu.vy = 0; }
@@ -1183,28 +1241,53 @@
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   }
 
+  const stripes = (x0, x1, y0, y1, step, c1, c2) => {
+    for (let y = y0, k = 0; y < y1; y += step, k++) poly([[x0, y], [x1, y], [x1, Math.min(y1, y + step)], [x0, Math.min(y1, y + step)]], k % 2 ? c1 : c2);
+  };
   function drawCourt() {
-    const wallTop = P(0, -8, 2.2).y, wallBot = P(0, -8, 0).y;
+    const V = venue, wallTop = P(0, -8, 2.2).y, wallBot = P(0, -8, 0).y;
     const sky = ctx.createLinearGradient(0, 0, 0, wallTop);
-    sky.addColorStop(0, '#1b2440'); sky.addColorStop(1, '#2d3b63');
+    sky.addColorStop(0, V.sky[0]); sky.addColorStop(1, V.sky[1]);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, wallTop);
+    if (V.night) { // floodlights over a night session
+      [.12, .38, .62, .88].forEach(u => {
+        const g = ctx.createRadialGradient(u * W, 6, 0, u * W, 6, 60);
+        g.addColorStop(0, 'rgba(255,255,235,.95)'); g.addColorStop(1, 'rgba(255,255,235,0)');
+        ctx.fillStyle = g; ctx.fillRect(u * W - 60, 0, 120, 70);
+      });
+    }
     const t = performance.now() / 1000;
     crowd.forEach((c, i) => {
       const y = c.v * (wallTop - 6) + 3 + (rally > 4 ? Math.sin(t * 9 + i) * 1.5 : 0);
       ctx.fillStyle = c.c; ctx.beginPath(); ctx.arc(c.u * W, y, 2 + c.v * 2.5, 0, Math.PI * 2); ctx.fill();
     });
-    ctx.fillStyle = '#1d5a3e'; ctx.fillRect(0, wallTop, W, wallBot - wallTop);
+    ctx.fillStyle = V.wall; ctx.fillRect(0, wallTop, W, wallBot - wallTop);
     const mid = P(CX, -8, 1.1);
-    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `bold ${Math.max(10, mid.s * .9)}px system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.font = `bold ${Math.max(10, mid.s * .75)}px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('BUMPY OPEN 🎾', mid.x, mid.y);
-    ctx.fillStyle = '#2f7d62'; ctx.fillRect(0, wallBot, W, H - wallBot);
-    poly([[-ALLEY, 0], [CW + ALLEY, 0], [CW + ALLEY, L], [-ALLEY, L]], '#3567b5');
-    [-ALLEY, 0, CW, CW + ALLEY].forEach(x => line(x, 0, x, L));
-    [0, L].forEach(y => line(-ALLEY, y, CW + ALLEY, y, .08));
-    [NET_Y - SVC, NET_Y + SVC].forEach(y => line(0, y, CW, y));
-    line(CX, NET_Y - SVC, CX, NET_Y + SVC);
-    line(CX, 0, CX, .25); line(CX, L, CX, L - .25);
+    ctx.fillText(V.banner, mid.x, mid.y);
+    // the playing surface
+    ctx.fillStyle = V.outer; ctx.fillRect(0, wallBot, W, H - wallBot);
+    if (V.grass) { // mowing stripes and worn patches behind the baselines
+      stripes(-12, CW + 12, -8, L + 12, 1.6, '#4f9a3e', '#469036');
+      [0, L].forEach(y => {
+        const p = P(CX, y + (y ? 1 : -1)), r = 2.6;
+        ctx.fillStyle = 'rgba(176,160,98,.55)';
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, r * p.s, r * .45 * p.s, 0, 0, 7); ctx.fill();
+      });
+    } else {
+      poly([[-ALLEY, 0], [CW + ALLEY, 0], [CW + ALLEY, L], [-ALLEY, L]], V.court);
+      if (V.clay) { // brushed clay
+        ctx.strokeStyle = 'rgba(120,45,15,.12)'; ctx.lineWidth = 1;
+        for (let y = -6; y < L + 6; y += .7) { const a = P(-4, y), b2 = P(CW + 4, y + .3); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke(); }
+      }
+    }
+    const lc = V.line;
+    [-ALLEY, 0, CW, CW + ALLEY].forEach(x => line(x, 0, x, L, .06, lc));
+    [0, L].forEach(y => line(-ALLEY, y, CW + ALLEY, y, .08, lc));
+    [NET_Y - SVC, NET_Y + SVC].forEach(y => line(0, y, CW, y, .06, lc));
+    line(CX, NET_Y - SVC, CX, NET_Y + SVC, .06, lc);
+    line(CX, 0, CX, .25, .06, lc); line(CX, L, CX, L - .25, .06, lc);
   }
 
   function drawNet() {
@@ -1515,7 +1598,7 @@
 
     dust.forEach(d => {
       const p = P(d.x, d.y);
-      ctx.fillStyle = `rgba(210,220,240,${d.life * .5})`;
+      ctx.fillStyle = `rgba(${venue.dust},${d.life * (venue.clay ? .8 : .5)})`;
       ctx.beginPath(); ctx.ellipse(p.x, p.y - d.r * p.s * .3, d.r * p.s, d.r * p.s * .45, 0, 0, 7); ctx.fill();
     });
     marks.forEach(m => {
@@ -1624,7 +1707,7 @@
       const text = mine
         ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '球種を長押し → 一番高いところで離せ!')
         : 'CPU のサーブ…';
-      const t2 = faults ? 'セカンドサーブ（スピンサーブ）' : '';
+      const t2 = [bigPoint(), faults ? 'セカンドサーブ（スピンサーブ）' : ''].filter(Boolean).join(' ・ ');
       ctx.font = 'bold 18px system-ui, sans-serif';
       const w = ctx.measureText(text).width + 32, y = coarse ? H * .42 : H - 40;
       ctx.fillStyle = 'rgba(15,20,40,.75)';
@@ -1653,6 +1736,10 @@
   }
 
   const BOARD_HTML = $('board').innerHTML;
+  const pickOne = (sel, attr, val) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('on', b.dataset[attr] === val));
+  document.querySelectorAll('[data-venue]').forEach(b => (b.onclick = () => { venue = VENUES[b.dataset.venue]; pickOne('[data-venue]', 'venue', b.dataset.venue); }));
+  document.querySelectorAll('[data-format]').forEach(b => (b.onclick = () => { format = b.dataset.format; pickOne('[data-format]', 'format', format); }));
+  pickOne('[data-venue]', 'venue', 'mel'); pickOne('[data-format]', 'format', 'set');
   document.querySelectorAll('[data-level]').forEach(b => (b.onclick = () => startMatch(b.dataset.level)));
   document.querySelectorAll('[data-drill]').forEach(b => (b.onclick = () => startPractice(b.dataset.drill)));
   $('quit').onclick = () => {
