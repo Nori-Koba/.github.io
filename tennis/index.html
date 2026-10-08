@@ -1250,11 +1250,13 @@
       h += '</ul></details>';
     }
     h += '<div class="btns">' + (tour.out || champ >= 0 ? '<button data-t="new">新しいトーナメント</button>' : '<button data-t="play">▶ 試合開始</button>') +
-      '<button class="alt" data-t="menu">メニュー</button></div></div>';
+      '<button class="alt" data-t="menu">メニュー</button></div>' +
+      '<div class="btns"><button class="dark" data-t="pdf">📄 勝ち上がりを PDF で保存</button></div></div>';
     card.innerHTML = h;
     card.querySelectorAll('[data-t]').forEach(b => (b.onclick = () => {
       const t = b.dataset.t;
       if (t === 'play') playTourMatch();
+      else if (t === 'pdf') saveTourPDF(b);
       else if (t === 'new') { tour = newTour(); saveTour(); showTour(); }
       else { $('tour').classList.add('hidden'); $('menu').classList.remove('hidden'); refreshTourButtons(); }
     }));
@@ -1277,6 +1279,117 @@
     if (w !== 'P') { tour.out = true; while (tour.res.length < 7) simRound(tour.res.length); }
     saveTour();
     return r;
+  }
+  // ---------- the draw as a PDF: a cover page, the four quarters, and the final eight ----------
+  let jspdfP = null;
+  const loadJsPDF = () => jspdfP || (jspdfP = new Promise((ok, ng) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => ok(window.jspdf.jsPDF); s.onerror = () => { jspdfP = null; ng(new Error('jspdf')); };
+    document.head.appendChild(s);
+  }));
+  const PW = 1240, PH = 1754, PFONT = 'system-ui, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif';
+  const entAt = r => r === 0 ? tour.draw : r <= tour.res.length ? tour.res[r - 1].map(m => m.w) : null;
+  const plain = (id, cc = true) => { const p = tour.players[id]; return (p.seed ? `[${p.seed}] ` : '') + (id === 0 ? 'あなた' : cc ? `${p.n}  ${p.cc}` : p.n); };
+  function finish(id) {
+    if (champion() === id) return '優勝';
+    const r = tour.res.findIndex(rr => rr.some(m => m.l === id));
+    if (r < 0) return '勝ち残り';
+    return r === 6 ? '準優勝' : r === 5 ? 'ベスト4' : r === 4 ? 'ベスト8' : `${ROUNDS[r]}敗退`;
+  }
+  function pdfPage() {
+    const c = document.createElement('canvas'); c.width = PW; c.height = PH;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, PW, PH); g.fillStyle = '#1d2240'; g.textBaseline = 'middle';
+    return [c, g];
+  }
+  function fitText(g, text, x, y, maxW, size, weight = '') {
+    let s = size; do { g.font = `${weight} ${s}px ${PFONT}`; s -= 1; } while (g.measureText(text).width > maxW && s > 9);
+    g.fillText(text, x, y);
+  }
+  function pageHead(g, title) {
+    const v = VENUES[tour.venue];
+    g.fillStyle = '#1d2240'; g.fillRect(0, 0, PW, 110);
+    g.fillStyle = '#fff'; g.font = `bold 44px ${PFONT}`; g.fillText('BUMPY OPEN', 50, 55);
+    g.font = `24px ${PFONT}`; g.fillText(`${v.name}（${v.surf}）・ 128 ドロー`, 400, 55);
+    g.textAlign = 'right'; g.font = `bold 30px ${PFONT}`; g.fillText(title, PW - 50, 55); g.textAlign = 'left';
+    g.fillStyle = '#1d2240';
+  }
+  // a bracket: `count` players from draw position `off` at round r0, followed round by round to the right
+  function bracketPage(title, r0, off, count, lastLabel) {
+    const [c, g] = pdfPage(); pageHead(g, title);
+    const top = 170, bottom = PH - 60, left = 40, cols = Math.log2(count) + 1, colW = (PW - left * 2) / cols;
+    for (let k = 0; k < cols; k++) {
+      g.fillStyle = '#5a6080'; g.font = `bold 22px ${PFONT}`;
+      g.fillText(k === cols - 1 ? lastLabel : ROUNDS[r0 + k], left + k * colW + 6, 140);
+      const n = count >> k, ent = entAt(r0 + k), rowH = (bottom - top) / n;
+      for (let i = 0; i < n; i++) {
+        const y = top + (i + .5) * rowH, x = left + k * colW, id = ent ? ent[(off >> k) + i] : null;
+        // connector to the next round
+        if (k < cols - 1 && i % 2 === 0) {
+          const y2 = top + (i + 1.5) * rowH, xr = x + colW - 8;
+          g.strokeStyle = '#b8bdd0'; g.lineWidth = 2; g.beginPath();
+          g.moveTo(x + 4, y + 14); g.lineTo(xr, y + 14); g.lineTo(xr, y2 + 14); g.lineTo(x + 4, y2 + 14);
+          g.moveTo(xr, (y + y2) / 2 + 14); g.lineTo(xr + 12, (y + y2) / 2 + 14); g.stroke();
+        }
+        if (id === null || id === undefined) { g.fillStyle = '#c0c4d4'; g.font = `18px ${PFONT}`; g.fillText('—', x + 8, y); continue; }
+        const won = k < cols - 1 && entAt(r0 + k + 1) && entAt(r0 + k + 1).includes(id);
+        if (id === 0) { g.fillStyle = '#ffe9a8'; g.fillRect(x + 2, y - 15, colW - 14, 28); }
+        g.fillStyle = won || k === cols - 1 ? '#1d2240' : '#8a8fa6';
+        fitText(g, plain(id, cols < 6), x + 8, y, colW - 24, 19, won || k === cols - 1 ? 'bold' : '');
+        if (k > 0) { // the score of the match they just won
+          const m = tour.res[r0 + k - 1][((off >> k) + i)];
+          g.fillStyle = '#e0475c'; g.font = `16px ${PFONT}`; g.fillText(m.s, x + 8, y + 24);
+        }
+      }
+    }
+    return c;
+  }
+  function coverPage() {
+    const [c, g] = pdfPage(); pageHead(g, '大会記録');
+    const champ = champion(), r = tour.res.length;
+    let y = 190;
+    g.font = `bold 40px ${PFONT}`;
+    const status = champ === 0 ? '🏆 あなたが優勝!' : tour.out ? `あなた：${finish(0)}` : `${ROUNDS[r]} へ進出中`;
+    g.fillText(status, 50, y); y += 60;
+    if (champ >= 0) { g.font = `28px ${PFONT}`; g.fillText(`優勝：${plain(champ)}　決勝 ${tour.res[6][0].s}（相手 ${plain(tour.res[6][0].l)}）`, 50, y); y += 50; }
+    g.font = `bold 30px ${PFONT}`; g.fillText('あなたの勝ち上がり', 50, y += 30); y += 50;
+    tour.res.forEach((rr, i) => rr.forEach(m => {
+      if (m.w !== 0 && m.l !== 0) return;
+      const win = m.w === 0, s = win ? m.s : m.s.replace(/^(\d+)-(\d+)/, '$2-$1');
+      g.font = `24px ${PFONT}`; g.fillStyle = win ? '#1d2240' : '#e0475c';
+      g.fillText(ROUNDS[i], 70, y); g.fillText(win ? '○' : '●', 260, y); fitText(g, plain(win ? m.l : m.w), 310, y, 600, 24); g.fillText(s, 960, y);
+      g.fillStyle = '#1d2240'; y += 42;
+    }));
+    if (!tour.res.length) { g.font = `24px ${PFONT}`; g.fillText('まだ試合がありません', 70, y); y += 42; }
+    y += 30; g.font = `bold 30px ${PFONT}`; g.fillText('シード選手の成績', 50, y); y += 50;
+    const seeds = tour.players.map((p, i) => i).filter(i => tour.players[i].seed);
+    seeds.forEach((id, k) => {
+      const x = k < 16 ? 70 : 650, yy = y + (k % 16) * 40, f = finish(id);
+      g.fillStyle = f === '優勝' ? '#e0475c' : '#1d2240'; fitText(g, plain(id), x, yy, 380, 20);
+      g.fillStyle = f === '勝ち残り' ? '#3a8f3a' : '#5a6080'; g.font = `bold 20px ${PFONT}`; g.fillText(f, x + 400, yy);
+    });
+    g.fillStyle = '#8a8fa6'; g.font = `18px ${PFONT}`;
+    g.fillText('2〜5 ページ：ドロー（1/4 ずつ）　6 ページ：準々決勝から決勝', 50, PH - 50);
+    return c;
+  }
+  async function saveTourPDF(btn) {
+    const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
+    try {
+      const jsPDF = await loadJsPDF();
+      const pages = [coverPage(),
+        ...[0, 1, 2, 3].map(q => bracketPage(`ドロー ${q + 1}/4`, 0, q * 32, 32, '準決勝へ')),
+        bracketPage('準々決勝〜決勝', 4, 0, 8, '優勝')];
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      pages.forEach((p, i) => { if (i) doc.addPage(); doc.addImage(p.toDataURL('image/jpeg', .9), 'JPEG', 0, 0, 210, 297); });
+      const blob = doc.output('blob'), filename = `bumpy-open-${tour.venue}.pdf`;
+      const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+      if (dl) await dl.save({ filename, data: blob });
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+      btn.textContent = label;
+    } catch (e) {
+      btn.textContent = e && e.code === 'declined' ? label : 'PDF を作れませんでした';
+    }
+    btn.disabled = false;
   }
   function refreshTourButtons() {
     const t = loadTour();
