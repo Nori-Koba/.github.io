@@ -79,6 +79,9 @@
   .tour .path span { background: #eef0f6; border-radius: 6px; padding: 2px 5px; }
   .tour .path span.done { background: #8bd17c; color: #fff; } .tour .path span.now { background: var(--accent); color: #fff; }
   .tour .path span.lost { background: #999; color: #fff; }
+  .tour .memo { text-align: left; font-size: 13px; background: #fff; border-radius: 10px; padding: 8px 10px; margin-top: 6px; line-height: 1.5; }
+  .tour .memo .g { color: #1d7a3a; } .tour .memo .b { color: #b0283c; }
+  .tour .kit { display: inline-block; width: 26px; height: 16px; border-radius: 4px; border: 3px solid #ddd; margin: 0 2px; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -194,9 +197,10 @@
   // in rallies too, a hard-hit ball leaves the CPU less time to read it and get going
   const rallyHurry = () => clamp(((ball.shotKmh || 0) - 95) / 55, 0, 1);
   const STRETCH = 1.35; // how far past its normal reach the CPU can lunge for a slice
-  const footSpeed = () => ball.serve ? SERVE_RETURN.speed() : 1 - .05 * rallyHurry();
+  const footSpeed = () => ball.serve ? (lv.q && lv.q.ret ? 1 - .2 * serveHurry() : SERVE_RETURN.speed()) : 1 - .05 * rallyHurry();
   const ballTS = () => (ball.serve ? SERVE_TS : BALL_TS);
   const FIG = .72;     // people are drawn at 72% size
+  const BASE_FIG = FIG;
   const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
   const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
 
@@ -239,7 +243,12 @@
     ny:  { name: 'ニューヨーク', surf: 'ハード', banner: 'BUMPY OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
            sky: ['#04060d', '#151d33'], line: '#ffffff', bz: .97, bh: 1.04, dust: '215,225,245', slide: 16, night: true },
   };
+  for (const k in VENUES) VENUES[k].key = k;
   let venue = VENUES.mel, format = 'set';
+  // the match setting: how full the stands are (the tournament's early rounds are on outside courts)
+  let stage = { fill: 1 };
+  // tournament player quirks (lv.q); plain menu levels have none
+  const Q = k => !!(lv.q && lv.q[k]);
 
   const $ = id => document.getElementById(id);
   const canvas = $('c'), ctx = canvas.getContext('2d');
@@ -346,6 +355,7 @@
   // crowd: applause built from hundreds of short claps, a filtered roar for a cheer, a falling "ooh"
   function crowdClap(intensity, dur = 2.2) {
     if (muted) return;
+    intensity *= .25 + .75 * stage.fill;
     try {
       ac();
       if (!clapBuf) {
@@ -367,6 +377,7 @@
   }
   function crowdVoice(kind, intensity) {
     if (muted) return;
+    intensity *= .25 + .75 * stage.fill;
     try {
       ac();
       const t = audio.currentTime, src = audio.createBufferSource(), f = audio.createBiquadFilter(), lp = audio.createBiquadFilter(), g = audio.createGain();
@@ -384,6 +395,7 @@
   // a soft stadium murmur that hushes during the rally
   function setMurmur(level) {
     if (muted) level = 0;
+    level *= .2 + .8 * stage.fill;
     try {
       ac();
       if (!murmur) {
@@ -512,8 +524,11 @@
     $('board').innerHTML = BOARD_HTML;
     lvKey = key; lv = LEVELS[key];
     tourOpp = opp; NAME.C = opp ? opp.sur : 'C P U';
+    if (!opp) stage = { fill: 1 };
+    cpu.size = opp && opp.look ? opp.look.size : 1; cpu.build = opp && opp.look ? opp.look.build : 1;
+    cpuKit = opp && opp.look ? { ...KIT_C, ...opp.look } : KIT_C;
     if (opp) {
-      lv = { ...levelFor(opp), name: ROUNDS[tour.res.length] };
+      lv = { ...levelFor(opp), name: `${ROUNDS[tour.res.length]} ・ ${STAGES[tour.res.length].court}` };
       $('cName').textContent = (opp.seed ? `[${opp.seed}] ` : '') + opp.n;
       $('cStyle').textContent = TSTYLE[opp.st];
     }
@@ -538,7 +553,7 @@
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
-    player.slide = cpu.slide = player.anim = cpu.anim = 0; quietForPoint();
+    player.slide = cpu.slide = player.anim = cpu.anim = 0; cpu.rush = false; quietForPoint();
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -654,7 +669,7 @@
     if (type === 'lob') type = 'top';
     if (type === 'drop') type = 'slice';
     const recv = other(who), box = serveBox(recv, deuce()), sh = SHOTS[type];
-    const aim = who === 'P' ? aimX : rand(-1, 1);
+    const aim = who === 'P' ? aimX : lv.srv && !faults ? (Math.random() < .5 ? -1 : 1) * rand(lv.srv.aim, 1) : rand(-1, 1);
     const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45;
     // bad timing and big power both widen the error; topspin (kick) is the safest serve
     // flat = fastest first serve, slice = fast curving first serve, kick = safe second serve
@@ -663,11 +678,12 @@
       slice: { speed: [30, 52], timing: 1.1, risk: 1.1, over: { mg: .003, margin: .22, bz: .5, bh: .85 } },  // sidespin, not backspin
       top:   { speed: [24, 35], timing: .45, risk: .25, over: { mg: .026, margin: 1.1, bz: .48, bh: .97 } },  // high over the net, big kick
     }[type];
-    const err = (1 - q) * 1.6 * SERVE.timing + power * power * SERVE.risk;
+    const srv = who === 'C' && lv.srv ? lv.srv : { spd: 1, risk: 1 };
+    const err = ((1 - q) * 1.6 * SERVE.timing + power * power * SERVE.risk) * srv.risk;
     const tx = bx + aim * hw + rand(-err, err);
     const deep = rand(.6, 2);
     const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
-    const speed = lerp(SERVE.speed[0], SERVE.speed[1], power) * (.75 + .25 * q);
+    const speed = lerp(SERVE.speed[0], SERVE.speed[1], power) * (.75 + .25 * q) * srv.spd;
     // a right-hander's slice serve curves to the server's left
     const kmh = shoot(tx, ty, type, { speed, noClear: q < .25 && type !== 'top', curve: type === 'slice' ? 3.6 + power * 2.6 : 1, side: leftOf(who), who, over: SERVE.over });
     if (type === 'top') { // kick serve: jumps up high and off to the server's right
@@ -684,7 +700,7 @@
       maxSpeed = Math.max(maxSpeed, kmh);
       const t = q > .85 ? (power >= 1 ? 'ジャスト! MAX!' : 'ジャスト!') : q < .35 ? 'タイミングずれ…' : '';
       popupAt(player.x, player.y, 3.2, t, q > .85 ? '#e8ff3a' : '#fff');
-      cpu.plan = null; cpu.react = lv.react + SERVE_RETURN.react();
+      cpu.plan = null; cpu.react = lv.react + SERVE_RETURN.react() * (Q('ret') ? .4 : 1);
     }
   }
 
@@ -728,7 +744,7 @@
   function canHit(w) {
     if (!ball.live || ball.last === w) return false;
     if (ball.bounces === 1) return true;
-    if (w === 'C') return ball.bounces === 0 && ball.chance && ball.y < NET_Y; // the CPU volleys / smashes sitters
+    if (w === 'C') return ball.bounces === 0 && (ball.chance || cpu.rush) && ball.y < NET_Y; // the CPU volleys sitters, or anything once it has rushed the net
     return w === 'P' && ball.bounces === 0 && !ball.serve && ball.y > NET_Y; // volley
   }
 
@@ -822,11 +838,15 @@
 
   // the CPU puts a sitter away out of the air: a smash if it is high, a firm volley otherwise
   function cpuPutAway() {
-    const air = ball.bounces === 0, smash = ball.z > 2.1, openLeft = player.x > CX;
+    const air = ball.bounces === 0, smash = ball.z > 2.1, openLeft = player.x > CX, sitter = ball.chance;
     const tx = openLeft ? rand(.5, 1.4) : CW - rand(.5, 1.4), ty = L - rand(1.5, 5);
-    let opts = { speed: smash ? rand(40, 46) : air ? rand(30, 36) : rand(36, 42), noClear: false, curve: 0, who: 'C' };
+    let opts = { speed: smash ? rand(40, 46) : air ? (sitter ? rand(30, 36) : rand(24, 31)) : rand(36, 42), noClear: false, curve: 0, who: 'C' };
     let gx = tx, gy = ty;
-    if (Math.random() < lv.err * .6 + .02) { gx = openLeft ? -rand(.2, 1.2) : CW + rand(.2, 1.2); } // even sitters get missed now and then
+    // a net rusher's volley off a real shot is harder than a sitter: low or fast balls get missed
+    const missP = sitter || smash ? lv.err * .6 + .02
+      : .06 + (ball.z < .7 ? .16 : 0) + Math.max(0, Math.hypot(ball.vx, ball.vy) - 27) * .012;
+    if (!sitter && !smash) { gx = CX + (gx - CX) * rand(.4, 1); gy = L - rand(2.5, 7); }
+    if (Math.random() < missP) { gx = openLeft ? -rand(.2, 1.2) : CW + rand(.2, 1.2); } // even sitters get missed now and then
     // groundstroke and volley put-aways are ripped with heavy topspin so they dive in; smashes go flat
     const kmh = smash ? shoot(gx, gy, 'flat', opts) : shoot(gx, gy, 'top', { ...opts, over: { mg: .024, margin: .15 } });
     Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
@@ -843,6 +863,7 @@
     let type = pickWeighted(lv.mix);
     if (player.y < NET_Y + 5 && Math.random() < lv.tactic) type = 'lob';           // passing lob over a net rusher
     else if (player.y > L + 1.2 && Math.random() < lv.tactic * .3) type = 'drop';   // drop shot vs. a deep player
+    else if (Q('drop') && player.y > NET_Y + 4 && Math.random() < .16) type = 'drop';  // loves the drop shot
     if (ball.z > 2.4) type = 'flat';
     if (stretched) type = 'slice';
     const sh = styled(type, 'C'), power = stretched ? rand(.1, .35) : rand(...lv.power);
@@ -850,10 +871,13 @@
       + power * power * sh.err * .08
       + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
       + (ball.z > 1.9 ? .06 : 0)                       // high kicking topspin is hard to control
-      + Math.max(0, incoming - 26) * .006              // really fast balls rush the swing
+      + Math.max(0, incoming - 26) * .006 * (Q('counter') ? .3 : Q('ret') && ball.serve ? .4 : 1) // really fast balls rush the swing
+      + (Q('bh') && sideKind(cpu) === 'bh' ? .07 : 0)   // shaky backhand
+      + (Q('low') && ball.z < .6 ? .08 : 0) + (Q('high') && ball.z > 1.5 ? .08 : 0)
       + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0)
       + (stretched ? .2 : d > lv.reach * .8 ? .05 : 0);
     errP = Math.max(.01, errP * (1 + Math.min(0, cpuMod.err)) + Math.max(0, cpuMod.err));
+    if (bigPoint()) errP = Q('clutch') ? errP * .5 : Q('nerve') ? errP + .08 : errP;
     // attack the open court: the better the CPU, the closer to the lines it aims; sometimes it wrong-foots you
     const openLeft = Math.random() < .2 ? player.x < CX : player.x > CX;
     const edge = .55 + (1 - lv.aim) * rand(0, 1.8);
@@ -877,18 +901,20 @@
     startAnim(cpu, ball.z > 2.3 ? 'smash' : sideKind(cpu), type, .3); // the CPU's swing is shown from just before contact
     cpu.swing = SWING * .6; player.hop = HOP; sHit(power);
     cpu.defend = stretched;
+    // a net rusher follows an attacking ball in
+    cpu.rush = Q('net') && !stretched && type !== 'lob' && type !== 'drop' && (power > .5 || player.x < 1 || player.x > CW - 1) && Math.random() < .6;
     if (stretched) { startSlide(cpu); ball.chance = true; popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
     else if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
   // where should the CPU go to meet the ball in time?
   function planIntercept() {
-    if (ball.chance && ball.bounces === 0) { // a floater: move in and meet it in the air, as close to the net as it can get
-      const b = { ...ball, trail: null }, step = 1 / 120, spd = lv.speed;
+    if ((ball.chance || cpu.rush) && ball.bounces === 0) { // a floater (or at the net): meet it in the air, as close to the net as it can get
+      const b = { ...ball, trail: null }, step = 1 / 120, spd = lv.speed, zLo = ball.chance ? 1 : .35;
       for (let t = 0, i = 0; i < 700; i++) {
         if (physStep(b, step)) break;
         t += step;
-        if (b.y < NET_Y - 1.3 && b.y > -3 && b.z > 1 && b.z < 3) {
+        if (b.y < NET_Y - 1.3 && b.y > -3 && b.z > zLo && b.z < 3) {
           const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .6) / spd + spd / (2 * C_ACC);
           if (need <= t / ballTS()) return { x: b.x, y: b.y, air: true };
         }
@@ -927,7 +953,7 @@
   };
   let drill = 'stroke';
   function startPractice(key) {
-    lvKey = 'normal'; lv = LEVELS.normal; practice = key;
+    lvKey = 'normal'; lv = LEVELS.normal; practice = key; stage = { fill: 1 }; cpu.size = cpu.build = 1; cpuKit = KIT_C;
     pstats = { n: 0, ok: 0, nice: 0, streak: 0, best: 0 };
     pts = [0, 0]; games = [0, 0]; faults = 0; popups = []; marks = [];
     $('menu').classList.add('hidden'); $('result').classList.add('hidden');
@@ -1124,6 +1150,48 @@
     KOR: ['Baek', 'Seong', 'Hwang'],
   };
   const INITIALS = 'ABCDEFGHJKLMNOPRSTVW';
+  // quirks: what the scouting memo says about each player
+  const TRAITS = {
+    net:     { good: true,  name: 'ネットダッシュ',     memo: '攻めたあとはネットに詰めてくる。ロブか足元へのパスで抜こう' },
+    drop:    { good: true,  name: 'ドロップの名手',     memo: '後ろに下がるとドロップが来る。ベースラインから離れすぎない' },
+    ret:     { good: true,  name: 'リターンの名手',     memo: '速いサーブにも反応が早い。エースは取りにくい' },
+    clutch:  { good: true,  name: '勝負強い',           memo: 'ブレークポイントやマッチポイントでミスが減る' },
+    counter: { good: true,  name: 'カウンター上手',     memo: '速い球ほど上手く返してくる。緩急をつけよう' },
+    speed:   { good: true,  name: '俊足',               memo: 'コートカバーが広い。オープンコートでも追いつかれる' },
+    bh:      { good: false, name: 'バックハンドが苦手', memo: 'バック側に集めるとミスが増える' },
+    low:     { good: false, name: '低い球が苦手',       memo: '低く滑るスライスでミスを誘える' },
+    high:    { good: false, name: '高い球が苦手',       memo: '高く弾むトップスピンで押し込める' },
+    nerve:   { good: false, name: 'プレッシャーに弱い', memo: '大事なポイントでミスやダブルフォールトが増える' },
+    slow:    { good: false, name: 'フットワークが重い', memo: '左右に振ると追いつけないことが多い' },
+  };
+  const GOOD = Object.keys(TRAITS).filter(k => TRAITS[k].good), BAD = Object.keys(TRAITS).filter(k => !TRAITS[k].good);
+  const pickOf = a => a[Math.floor(Math.random() * a.length)];
+  function makeTraits(p) {
+    const t = [], nGood = p.seed && p.seed <= 8 ? 2 : 1;
+    while (t.length < nGood) { const k = pickOf(GOOD); if (!t.includes(k)) t.push(k); }
+    const badP = !p.seed ? .8 : p.seed <= 4 ? .3 : .6;
+    if (Math.random() < badP) { let k; do k = pickOf(BAD); while (k === 'slow' && t.includes('speed')); t.push(k); }
+    return t;
+  }
+  const SHIRTS = ['#4a6fd1', '#2bb673', '#ffd166', '#ef476f', '#118ab2', '#f78c6b', '#7b2cbf', '#073b4c', '#f4f4f4', '#222831', '#e63946', '#06d6a0', '#ff9f1c', '#3d5a80'];
+  const SKINS = ['#f3d2b5', '#e8b98f', '#d9a074', '#c68a5a', '#9a6340', '#6b4428'], HAIRS = ['#1b1b1b', '#3a2a22', '#6b4423', '#c9a25a', '#8a8a8a', '#b5532a'];
+  function makeLook(p) {
+    const r = (a, b) => a + Math.random() * (b - a);
+    const size = p.st === 'big' ? r(1.07, 1.15) : p.st === 'base' ? r(.95, 1.05) : r(.96, 1.06);
+    const shirt = pickOf(SHIRTS);
+    let trim; do trim = pickOf(['#ffffff', '#ffd166', '#1b1b1b', '#ef476f', '#06d6a0', '#4cc9f0']); while (trim === shirt);
+    return { size: +size.toFixed(3), build: +(p.st === 'big' ? r(1.02, 1.14) : r(.9, 1.1)).toFixed(3), shirt, trim,
+             shorts: pickOf(['#1f2b55', '#f4f4f4', '#222222', shirt]), skin: pickOf(SKINS), hair: pickOf(HAIRS),
+             shoe: pickOf(['#ffffff', '#ffd166', '#1b1b1b', trim]), racket: pickOf(['#2b2f4a', '#d7263d', '#118ab2', '#f4f4f4', '#ff9f1c', '#2bb673']),
+             head: pickOf(['band', 'band', 'cap', 'none']) };
+  }
+  const heightCm = p => Math.round(184 * (p.look ? p.look.size : 1));
+  // the court and crowd for each round of the tournament
+  const STAGES = [
+    { court: 'コート 14', fill: .25 }, { court: 'コート 7', fill: .35 }, { court: 'ショーコート 2', fill: .55 }, { court: 'ショーコート 1', fill: .7 },
+    { court: 'センターコート', fill: .9 }, { court: 'センターコート', fill: 1 }, { court: 'センターコート（ナイター）', fill: 1, night: true },
+  ];
+  const ROUNDS_EN = ['First round', 'Second round', 'Third round', 'Fourth round', 'Quarterfinal', 'Semifinal', 'Final'];
   const TKEY = 'bumpyTennisTour1';
   let tour = null, tourOpp = null; // tourOpp: the CPU you are playing right now in the tournament
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -1137,6 +1205,10 @@
       if ((t.v || 1) < 3) { // a tournament saved before the level-ups: bring its players up to the new strength
         t.players.forEach((p, i) => { if (i && (p.seed || !t.v)) p.r = +(p.seed ? seedRating(p.seed) : .62 + (p.r - .45) / .15 * .16).toFixed(3); });
         t.v = 3;
+      }
+      if (t.v < 4) { // older saves: give everyone quirks and a look
+        t.players.forEach((p, i) => { if (i) { p.traits = makeTraits(p); p.look = makeLook(p); } });
+        t.v = 4;
       }
       return t;
     } catch (e) { return null; }
@@ -1154,7 +1226,9 @@
       // seeds get steadily weaker from #2 to #32; the other 96 are all about "normal" strength
       const r = seedRating(seed);
       const st = ['big', 'base', 'slice', 'all'][Math.floor(Math.random() * 4)];
-      players.push({ n: full, sur: nm.sur, cc: nm.cc, seed, r: +r.toFixed(3), st });
+      const pl = { n: full, sur: nm.sur, cc: nm.cc, seed, r: +r.toFixed(3), st };
+      pl.traits = makeTraits(pl); pl.look = makeLook(pl);
+      players.push(pl);
     }
     // seeded draw: 1 top, 2 bottom, 3-4 meet them in the semis, 5-8 in the quarters, and so on
     const draw = new Array(128).fill(-1), place = (seeds, slots) => { shuffle(slots); seeds.forEach((s, i) => (draw[slots[i]] = s - 1)); };
@@ -1165,8 +1239,8 @@
     place([...Array(16)].map((_, i) => 17 + i), [7, 8, 23, 24, 39, 40, 55, 56, 71, 72, 87, 88, 103, 104, 119, 120]);
     const rest = shuffle([...Array(96)].map((_, i) => 32 + i));
     for (let i = 0; i < 128; i++) if (draw[i] < 0) draw[i] = rest.pop();
-    const vkey = Object.keys(VENUES).find(k => VENUES[k] === venue) || 'mel';
-    return { v: 3, venue: vkey, players, draw, res: [], out: false };
+    const vkey = venue.key || 'mel';
+    return { v: 4, venue: vkey, players, draw, res: [], out: false };
   }
   const entrants = r => r === 0 ? tour.draw : tour.res[r - 1].map(m => m.w);
   const userMatch = r => Math.floor(entrants(r).indexOf(0) / 2);
@@ -1213,7 +1287,13 @@
                  serve: [Math.min(.85, f2('serve', 0)), Math.min(1, f2('serve', 1))],
                  mix: { top: lerp(A.mix.top, B.mix.top, t), slice: lerp(A.mix.slice, B.mix.slice, t), flat: lerp(A.mix.flat, B.mix.flat, t) },
                  tactic: clamp(f('tactic'), 0, .75), aim: clamp(f('aim'), 0, .8) };
-    if (p.st === 'big') { lv.serve = [Math.min(.95, lv.serve[0] + .12), 1]; lv.mix.flat *= 2; }
+    if (p.st === 'big') { // a huge first serve: faster, closer to the lines, and still landing more often
+      lv.serve = [Math.min(.97, lv.serve[0] + .15), 1]; lv.mix.flat *= 2;
+      lv.srv = { spd: 1.08, risk: .85, aim: .7, mix: { flat: 7, slice: 3, top: .3 } };
+    }
+    lv.q = {}; (p.traits || []).forEach(k => (lv.q[k] = true));
+    if (lv.q.speed) lv.speed *= 1.08;
+    if (lv.q.slow) lv.speed *= .92;
     if (p.st === 'base') { lv.mix.top *= 1.4; lv.err *= .8; lv.speed *= 1.03; }
     if (p.st === 'slice') { lv.mix.slice *= 2.2; lv.reach *= 1.05; }
     if (p.st === 'all') { lv.tactic = Math.min(.8, lv.tactic + .1); lv.aim = Math.min(.85, lv.aim + .1); }
@@ -1240,7 +1320,10 @@
     } else {
       const e = entrants(r), m = userMatch(r), opp = e[2 * m] === 0 ? e[2 * m + 1] : e[2 * m], p = tour.players[opp];
       h += `<h3>${ROUNDS[r]} ・ 次の相手</h3><div class="opp"><div class="nm">${p.seed ? `<span class="sd">第${p.seed}シード</span> ` : ''}${p.n} <small>${p.cc}</small></div>
-        ${TSTYLE[p.st]} ・ 強さ <span class="st">${stars(p.r)}</span></div>`;
+        ${TSTYLE[p.st]} ・ 身長 ${heightCm(p)}cm ・ 強さ <span class="st">${stars(p.r)}</span>
+        ${p.look ? `<div style="margin:6px 0"><span class="kit" style="background:${p.look.shirt};border-color:${p.look.trim}"></span><span class="kit" style="background:${p.look.shorts}"></span></div>` : ''}
+        <div class="memo"><b>📋 スカウティングメモ</b>${(p.traits || []).map(k => `<div class="${TRAITS[k].good ? 'g' : 'b'}">${TRAITS[k].good ? '◎' : '△'} <b>${TRAITS[k].name}</b>：${TRAITS[k].memo}</div>`).join('')}</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:4px">会場：${STAGES[r].court}</div></div>`;
     }
     // your road so far
     const mine = [];
@@ -1278,10 +1361,18 @@
   function playTourMatch() {
     const r = tour.res.length, e = entrants(r), m = userMatch(r);
     const id = e[2 * m] === 0 ? e[2 * m + 1] : e[2 * m];
-    venue = VENUES[tour.venue]; format = 'set';
+    const st = STAGES[r];
+    venue = st.night && !VENUES[tour.venue].night
+      ? { ...VENUES[tour.venue], night: true, sky: ['#04060d', '#151d33'] } : VENUES[tour.venue];
+    format = 'set'; stage = st;
     pickOne('[data-venue]', 'venue', tour.venue); pickOne('[data-format]', 'format', 'set');
     $('tour').classList.add('hidden');
     startMatch('normal', { id, ...tour.players[id] });
+    // walk-on: the round and court, the umpire introduces the players, the crowd greets them
+    const opp = tour.players[id];
+    pause(`${ROUNDS[r]} ・ ${st.court}`, `あなた vs ${opp.seed ? `[${opp.seed}] ` : ''}${opp.n}`, r >= 4 ? 3.2 : 2.2, () => { state = 'serve'; msg = null; });
+    umpire(`${r === 6 ? 'Ladies and gentlemen, the final. ' : ROUNDS_EN[r] + '. '}${NAME.P}, versus, ${NAME.C}.`, 300);
+    crowdClap(r >= 4 ? 1 : .5, r >= 4 ? 3.5 : 2); if (r >= 5) crowdVoice('cheer', .8);
   }
   // called when a tournament match ends
   function tourResult(w) {
@@ -1419,7 +1510,7 @@
     $('pP').textContent = scoreText(pts[0], pts[1]); $('pC').textContent = scoreText(pts[1], pts[0]);
     $('srvP').style.visibility = server() === 'P' ? 'visible' : 'hidden';
     $('srvC').style.visibility = server() === 'C' ? 'visible' : 'hidden';
-    $('lvName').textContent = (tb ? 'タイブレーク ・ ' : '') + venue.name + ' ・ ' + lv.name;
+    $('lvName').textContent = (tb ? 'タイブレーク ・ ' : '') + (tourOpp ? '' : venue.name + ' ・ ') + lv.name;
   }
 
   function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1.1 }); }
@@ -1614,7 +1705,7 @@
       else target = cpu.plan = cpu.plan || planIntercept();
     } else if (state === 'rally' || state === 'pause') {
       // recover to the middle right after hitting; after floating up a sitter, back off deep to defend the smash
-      target = { x: CX + (player.x - CX) * .25, y: cpu.defend ? -3.2 : -1 };
+      target = { x: CX + (player.x - CX) * .25, y: cpu.defend ? -3.2 : cpu.rush ? NET_Y - 2.4 : -1 };
     }
     if (target) {
       const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
@@ -1630,7 +1721,10 @@
     if (state === 'serve' && server() === 'C') {
       cpuServeT -= dt;
       if (ball.held && cpuServeT <= 0) toss();
-      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 5, slice: 4, top: 1 }), rand(...lv.power));
+      else if (tossing && ball.vz <= .3) {
+        const big = bigPoint() !== '', q = clamp(rand(...lv.serve) + (big && Q('nerve') ? -.3 : big && Q('clutch') ? .15 : 0), 0, 1);
+        serveHit('C', q, pickWeighted(lv.srv ? lv.srv.mix : { flat: 5, slice: 4, top: 1 }), lv.srv ? rand(.8, 1) : rand(...lv.power));
+      }
     }
   }
 
@@ -1773,6 +1867,7 @@
     }
     const t = performance.now() / 1000;
     crowd.forEach((c, i) => {
+      if (i >= crowd.length * stage.fill) return;
       const y = c.v * (wallTop - 6) + 3 + (rally > 4 ? Math.sin(t * 9 + i) * 1.5 : 0) - Math.abs(Math.sin(t * 13 + i * 1.7)) * 5 * Math.min(1, cheer);
       ctx.fillStyle = c.c; ctx.beginPath(); ctx.arc(c.u * W, y, 2 + c.v * 2.5, 0, Math.PI * 2); ctx.fill();
     });
@@ -1935,6 +2030,7 @@
 
   const OUTLINE = 'rgba(18,20,38,.6)';
   function figure(o, kit, ch) {
+    const FIG = BASE_FIG * (o.size || 1), BUILD = o.build || 1;
     const { R, Fw } = facing(o);
     const pose = poseOf(o, ch);
     let hop = o.hop > 0 ? Math.sin(Math.PI * (1 - o.hop / HOP)) * .09 : 0;
@@ -1949,9 +2045,9 @@
     const rot = (l, a) => [l[0] * Math.cos(a) + l[1] * Math.sin(a), -l[0] * Math.sin(a) + l[1] * Math.cos(a), l[2]];
     const W3 = l => [o.x + (R[0] * l[0] + Fw[0] * l[1]) * FIG, o.y + (R[1] * l[0] + Fw[1] * l[1]) * FIG, l[2] * FIG];
     const yaw = pose.yaw;
-    const hipL = W3(rot([-.12, 0, hipZ], yaw * .5)), hipR = W3(rot([.12, 0, hipZ], yaw * .5));
+    const hipL = W3(rot([-.12 * BUILD, 0, hipZ], yaw * .5)), hipR = W3(rot([.12 * BUILD, 0, hipZ], yaw * .5));
     const shZ = hipZ + .55;
-    const shL = W3(rot([-.21, lean, shZ], yaw)), shR = W3(rot([.21, lean, shZ], yaw));
+    const shL = W3(rot([-.21 * BUILD, lean, shZ], yaw)), shR = W3(rot([.21 * BUILD, lean, shZ], yaw));
     // upper body sways with acceleration
     const sway = p => [p[0] + (o.lx || 0) * FIG, p[1] + (o.ly || 0) * FIG, p[2]];
     [shL, shR].forEach((p, i) => { const q = sway(p); p[0] = q[0]; p[1] = q[1]; });
@@ -1978,7 +2074,7 @@
     const base = P(o.x, o.y), s = base.s * FIG;
     const Q = p => P(p[0], p[1], p[2]);
     const parts = [];
-    const limb = (a, b, w, color, depthBias = 0) => parts.push({
+    const limb = (a, b, w0, color, depthBias = 0, w = w0 * (.85 + .15 * BUILD)) => parts.push({
       y: (a[1] + b[1]) / 2 + depthBias,
       f: () => {
         const A = Q(a), B = Q(b);
@@ -2047,7 +2143,10 @@
           ctx.fillRect(Hd.x - r * 1.02, Hd.y - r * .45, r * 2.04, r * .32);
         } else {            // seen from the front: face and a headband
           ctx.fillStyle = kit.hair; ctx.beginPath(); ctx.arc(Hd.x, Hd.y - r * .2, r * 1.02, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
-          ctx.fillStyle = kit.trim; ctx.fillRect(Hd.x - r, Hd.y - r * .5, r * 2, r * .25);
+          if (kit.head === 'cap') {
+            ctx.fillStyle = kit.shirt; ctx.beginPath(); ctx.arc(Hd.x, Hd.y - r * .15, r * 1.05, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+            ctx.fillStyle = kit.trim; ctx.fillRect(Hd.x - r * 1.1, Hd.y - r * .45, r * 2.2, r * .2);
+          } else if (kit.head !== 'none') { ctx.fillStyle = kit.trim; ctx.fillRect(Hd.x - r, Hd.y - r * .5, r * 2, r * .25); }
           ctx.fillStyle = '#1a1a1a';
           ctx.beginPath(); ctx.arc(Hd.x - r * .38 + turn, Hd.y + r * .05, r * .11, 0, 7); ctx.arc(Hd.x + r * .38 + turn, Hd.y + r * .05, r * .11, 0, 7); ctx.fill();
           ctx.strokeStyle = 'rgba(80,30,30,.7)'; ctx.lineWidth = Math.max(1, r * .1);
@@ -2090,6 +2189,7 @@
   }
   const KIT_P = { shirt: '#ff5d73', trim: '#fff', shorts: '#f4f4f4', skin: '#f0c8a0', hair: '#3a2a22', cap: '#c9384d', shoe: '#ffffff', racket: '#d7263d' };
   const KIT_C = { shirt: '#4a6fd1', trim: '#ffd166', shorts: '#1f2b55', skin: '#c68a5a', hair: '#1b1b1b', cap: '#1b1b1b', shoe: '#ffd166', racket: '#2b2f4a' };
+  let cpuKit = KIT_C;
 
   // simple stand-in people for the officials
   function person(x, y, z0, shirt, h, opts = {}) {
@@ -2245,7 +2345,7 @@
       { y: NET_Y, f: drawNet },
       { y: UMP.y + .02, f: drawUmpire },
       ...judges.map(j => ({ y: j.y, f: () => drawJudge(j) })),
-      { y: cpu.y, f: () => figure(cpu, KIT_C) },
+      { y: cpu.y, f: () => figure(cpu, cpuKit) },
       { y: player.y, f: () => figure(player, KIT_P, charge) },
     ];
     if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
