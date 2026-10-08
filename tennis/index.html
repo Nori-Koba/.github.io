@@ -1128,7 +1128,19 @@
   let tour = null, tourOpp = null; // tourOpp: the CPU you are playing right now in the tournament
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   function saveTour() { try { tour ? localStorage.setItem(TKEY, JSON.stringify(tour)) : localStorage.removeItem(TKEY); } catch (e) {} }
-  function loadTour() { try { const t = JSON.parse(localStorage.getItem(TKEY)); return t && t.players && t.draw ? t : null; } catch (e) { return null; } }
+  // ratings (0 = easy, .5 = normal, 1 = hard): seeds run from 1.3 (#2) down to about .91 (#32); the rest sit between normal and hard
+  const seedRating = seed => seed ? 1.3 - (seed - 2) * .013 : .62 + Math.random() * .16;
+  function loadTour() {
+    try {
+      const t = JSON.parse(localStorage.getItem(TKEY));
+      if (!(t && t.players && t.draw)) return null;
+      if (!t.v) { // a tournament saved before the level-up: bring its players up to the new strength
+        t.players.forEach((p, i) => { if (i) p.r = +(p.seed ? seedRating(p.seed) : .62 + (p.r - .45) / .15 * .16).toFixed(3); });
+        t.v = 2;
+      }
+      return t;
+    } catch (e) { return null; }
+  }
 
   function newTour() {
     const names = [], used = new Set();
@@ -1140,7 +1152,7 @@
       let full; do full = INITIALS[Math.floor(Math.random() * INITIALS.length)] + '. ' + nm.sur; while (used.has(full)); used.add(full);
       const seed = i < 32 ? i + 1 : 0;
       // seeds get steadily weaker from #2 to #32; the other 96 are all about "normal" strength
-      const r = seed ? 1.05 - (seed - 2) * .012 : .45 + Math.random() * .15;
+      const r = seedRating(seed);
       const st = ['big', 'base', 'slice', 'all'][Math.floor(Math.random() * 4)];
       players.push({ n: full, sur: nm.sur, cc: nm.cc, seed, r: +r.toFixed(3), st });
     }
@@ -1154,7 +1166,7 @@
     const rest = shuffle([...Array(96)].map((_, i) => 32 + i));
     for (let i = 0; i < 128; i++) if (draw[i] < 0) draw[i] = rest.pop();
     const vkey = Object.keys(VENUES).find(k => VENUES[k] === venue) || 'mel';
-    return { venue: vkey, players, draw, res: [], out: false };
+    return { v: 2, venue: vkey, players, draw, res: [], out: false };
   }
   const entrants = r => r === 0 ? tour.draw : tour.res[r - 1].map(m => m.w);
   const userMatch = r => Math.floor(entrants(r).indexOf(0) / 2);
@@ -1196,8 +1208,8 @@
     const lerp = (a, b, t) => a + (b - a) * t, r = p.r;
     const [A, B, t] = r < .5 ? [LEVELS.easy, LEVELS.normal, r / .5] : [LEVELS.normal, LEVELS.hard, (r - .5) / .5];
     const f = k => lerp(A[k], B[k], t), f2 = (k, i) => lerp(A[k][i], B[k][i], t);
-    const lv = { name: p.n, speed: f('speed'), react: Math.max(.1, f('react')), reach: f('reach'), err: Math.max(.012, f('err')),
-                 power: [f2('power', 0), Math.min(1, f2('power', 1))], noise: Math.max(.18, f('noise')),
+    const lv = { name: p.n, speed: f('speed'), react: Math.max(.08, f('react')), reach: Math.min(1.36, f('reach')), err: Math.max(.008, f('err')),
+                 power: [f2('power', 0), Math.min(1, f2('power', 1))], noise: Math.max(.12, f('noise')),
                  serve: [Math.min(.85, f2('serve', 0)), Math.min(1, f2('serve', 1))],
                  mix: { top: lerp(A.mix.top, B.mix.top, t), slice: lerp(A.mix.slice, B.mix.slice, t), flat: lerp(A.mix.flat, B.mix.flat, t) },
                  tactic: clamp(f('tactic'), 0, .75), aim: clamp(f('aim'), 0, .8) };
@@ -1208,7 +1220,7 @@
     return lv;
   }
 
-  const stars = r => { const n = clamp(Math.round((r - .3) / .15), 1, 5); return '★'.repeat(n) + '☆'.repeat(5 - n); };
+  const stars = r => { const n = clamp(Math.round((r - .4) / .18), 1, 5); return '★'.repeat(n) + '☆'.repeat(5 - n); };
   const seedTag = p => p.seed ? `<span class="sd">${p.seed}</span> ` : '';
   const pname = id => { const p = tour.players[id]; return id === 0 ? `${seedTag(p)}<b>あなた</b>` : `${seedTag(p)}${p.n} <small>${p.cc}</small>`; };
 
