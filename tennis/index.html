@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bumpy Tennis</title>
+<style>
+  :root { --ink: #1f2340; --accent: #ff5d73; --sub: #6b6f8f; --ball: #e8ff3a;
+    --top: #ff9f43; --slice: #4cc9f0; --flat: #f1f1f1; --lob: #c77dff; --drop: #80ed99; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #22304d; color: #fff;
+    font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", "Yu Gothic", system-ui, sans-serif; }
+  body { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #wrap { position: fixed; inset: 0; }
+  canvas { width: 100%; height: 100%; display: block; }
+  #board { position: absolute; top: 12px; left: 12px; background: rgba(15, 20, 40, .85); border-radius: 10px;
+    padding: 6px 10px; font-weight: bold; font-size: 15px; line-height: 1.6; min-width: 180px; }
+  #board .r { display: flex; align-items: center; gap: 8px; }
+  #board .srv { width: 10px; color: var(--ball); font-size: 11px; }
+  #board .n { flex: 1; }
+  #board .g { width: 22px; text-align: center; }
+  #board .p { min-width: 40px; text-align: center; background: var(--ball); color: var(--ink); border-radius: 5px; padding: 0 5px; }
+  #board .lv { font-size: 11px; color: #aab; font-weight: normal; }
+  #topR { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+  #topR button, #topR a { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(15, 20, 40, .85);
+    color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+  #shots { position: absolute; right: 12px; bottom: 18px; display: none; grid-template-columns: repeat(3, 74px); gap: 8px; }
+  .coarse #shots { display: grid; }
+  #shots button { height: 54px; border: 0; border-radius: 16px; font: inherit; font-weight: bold; font-size: 12px; color: var(--ink); white-space: nowrap; padding: 0;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, .35); touch-action: none; }
+  #shots button:active, #shots button.on { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .35); }
+  #shots .big { height: 70px; font-size: 14px; }
+  #shots [data-shot=top] { background: var(--top); grid-column: span 2; }
+  #shots [data-shot=slice] { background: var(--slice); }
+  #shots [data-shot=flat] { background: var(--flat); }
+  #shots [data-shot=lob] { background: var(--lob); }
+  #shots [data-shot=drop] { background: var(--drop); }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(20, 28, 50, .45); }
+  .card { background: #fff; color: var(--ink); border-radius: 18px; padding: 22px 20px; max-width: 480px; width: 100%;
+    text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); max-height: 100%; overflow: auto; }
+  .card h2 { margin: 0 0 6px; font-size: 28px; }
+  .card p { margin: 6px 0; line-height: 1.6; font-size: 14px; }
+  .card .how { text-align: left; background: #f6f3ee; border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+  .shotlist { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 6px 0; align-items: baseline; }
+  .shotlist .t { font-weight: bold; padding: 0 8px; border-radius: 6px; color: var(--ink); white-space: nowrap; font-size: 12px; }
+  .shotlist small { color: var(--sub); }
+  .card .big { font-size: 46px; font-weight: bold; color: var(--accent); margin: 2px 0; }
+  .btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .card button { font: inherit; font-weight: bold; font-size: 16px; border: 0; border-radius: 999px; padding: 11px 20px;
+    background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 4px 0 #c9384d; }
+  .card button.alt { background: #4a6fd1; box-shadow: 0 4px 0 #2f4ea3; }
+  .card button.dark { background: #2b2f4a; box-shadow: 0 4px 0 #111; }
+  .card button:active { transform: translateY(3px); box-shadow: none; }
+  .card label { font-size: 14px; display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; cursor: pointer; }
+  .card a { color: var(--sub); font-size: 13px; }
+  .pc { display: inline; } .coarse .pc { display: none; }
+  .sp { display: none; } .coarse .sp { display: inline; }
+  .card button.pick { background: #eef0f6; color: var(--ink); box-shadow: 0 3px 0 #c9cde0; font-size: 14px; padding: 8px 14px;
+    display: inline-flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.2; }
+  .card button.pick small { font-size: 11px; font-weight: normal; color: var(--sub); }
+  .card button.pick.on { background: var(--ink); color: #fff; box-shadow: 0 3px 0 #000; }
+  .card button.pick.on small { color: #cfd3e6; }
+  .card button.pick .sw { width: 34px; height: 12px; border-radius: 4px; display: block; margin-bottom: 3px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="board" class="hidden">
+    <div class="r"><span class="srv" id="srvP">●</span><span class="n">あなた <span class="lv">パワースピン</span></span><span class="g" id="gP">0</span><span class="p" id="pP">0</span></div>
+    <div class="r"><span class="srv" id="srvC">●</span><span class="n">CPU <span class="lv">スライス</span> <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
+  </div>
+  <div id="topR">
+    <button id="quit" title="メニューへ" class="hidden">☰</button>
+    <button id="mute" title="サウンド">🔊</button>
+    <a href="../index.html" title="ホームへ">🏠</a>
+  </div>
+  <div id="shots">
+    <button data-shot="lob">ロブ</button>
+    <button data-shot="drop">ドロップ</button>
+    <button data-shot="flat">フラット</button>
+    <button data-shot="slice" class="big">スライス</button>
+    <button data-shot="top" class="big">トップスピン</button>
+  </div>
+
+  <div class="overlay" id="menu">
+    <div class="card">
+      <h2>🎾 Bumpy Tennis</h2>
+      <p>CPU と 1 対 1 のテニス勝負！</p>
+      <p style="margin:8px 0 4px"><b>会場</b></p>
+      <div class="btns venues" style="margin-top:0">
+        <button data-venue="mel" class="pick"><span class="sw" style="background:#2f6fc4"></span>メルボルン<small>ハード</small></button>
+        <button data-venue="par" class="pick"><span class="sw" style="background:#c8643a"></span>パリ<small>クレー</small></button>
+        <button data-venue="lon" class="pick"><span class="sw" style="background:#4f9a3e"></span>ロンドン<small>芝</small></button>
+        <button data-venue="ny" class="pick"><span class="sw" style="background:#3d63b8;box-shadow:0 0 0 3px #3f7f56 inset"></span>ニューヨーク<small>ハード・夜</small></button>
+      </div>
+      <p style="margin:8px 0 4px"><b>試合形式</b></p>
+      <div class="btns formats" style="margin-top:0">
+        <button data-format="set" class="pick">1 セット<small>6 ゲーム先取・6-6 でタイブレーク</small></button>
+        <button data-format="short" class="pick">ショート<small>3 ゲーム先取</small></button>
+      </div>
+      <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）</p>
+      <div class="how">
+        <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
+        <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球（光る輪）は決めどころ！ 高ければ<b>スマッシュ</b>、腰〜肩の高さならコート後方から<b>ドライブボレー</b>（トップスピン / フラット）でノーバウンドで叩ける。<br>
+        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを高く越えてまっすぐ高く跳ね、ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
+        <div class="shotlist">
+          <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
+          <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
+          <span class="t" style="background:var(--flat)">フラット</span><span><span class="pc">C・L・ホイールクリック</span> <small>一番速い。でもミスしやすい</small></span>
+          <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">V・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
+          <span class="t" style="background:var(--drop)">ドロップ</span><span><span class="pc">B・O・Shift+右クリック</span> <small>ネット際にポトリ。後ろの相手に効く</small></span>
+        </div>
+        <b>球種の使い分け</b>：<br>
+        ・低く弾んだ球はスライスで返すと安全（フラットやトップは持ち上げにくい）<br>
+        ・高く跳ねた球はトップスピンで。腰の高さの打ちごろの球はフラットで強打！<br>
+        ・同じ球種ばかりだと CPU に<b>読まれる</b>。3 種類続けて打ち分けると CPU が<b>揺さぶられて</b>崩れる<br>
+        <b>コツ</b>：ショットのボタンを長押しすると、ボールの打ちやすい所（ボレー・スマッシュの位置やバウンド後の頂点）へ自動で走る。ノーバウンドの高い球はスマッシュ：地面の<b>赤い印</b>の所で待つと頭上の打ちやすい高さに落ちてくる。ボールが赤く光って「今!」が出たら打てる。練習モードで球出し練習もできる。
+      </div>
+      <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
+      <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
+      <div class="btns">
+        <button class="alt" data-level="easy">やさしい</button>
+        <button data-level="normal">ふつう</button>
+        <button class="dark" data-level="hard">つよい</button>
+      </div>
+      <p style="margin-top:12px"><b>練習モード</b>（CPU が球出し）</p>
+      <div class="btns">
+        <button class="alt" data-drill="stroke">ストローク</button>
+        <button class="alt" data-drill="volley">ボレー</button>
+        <button class="alt" data-drill="smash">スマッシュ</button>
+        <button class="alt" data-drill="drop">ドロップ拾い</button>
+        <button class="alt" data-drill="chance">チャンスボール</button>
+        <button class="alt" data-drill="random">ランダム</button>
+      </div>
+      <p style="margin-top:12px"><a href="../party/index.html">🎉 Bumpy Party! であそぶ</a></p>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="result">
+    <div class="card">
+      <h2 id="resTitle"></h2>
+      <div class="big" id="resScore"></div>
+      <p id="resDetail"></p>
+      <div class="btns">
+        <button id="again">もう一回</button>
+        <button class="alt" id="toMenu">メニュー</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- court (meters) ----------
+  const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
+  const G = 9.8, TS = 0.85, CAM_BACK = 16;
+  const PSPEED = 8.5, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
+  // how far from your body each stroke can reach (m): topspin needs the ball close, slice can stretch
+  const REACHES = { top: 1.05, flat: 1.2, smash: 1.3, lob: 1.4, drop: 1.5, slice: 1.8 };
+  const reachOf = type => REACHES[type] || 1.2;
+  const BALL_TS = 1;   // rallies run at real ball speed too
+  const SERVE_TS = 1;  // serves fly at full speed: returners only get a step or two
+  // returning a serve: the faster it comes, the later you react and the fewer steps you get
+  const serveHurry = () => clamp(((ball.serveKmh || 0) - 110) / 80, 0, 1);
+  const SERVE_RETURN = { react: () => .05 + .2 * serveHurry(), speed: () => 1 - .45 * serveHurry() };
+  // in rallies too, a hard-hit ball leaves the CPU less time to read it and get going
+  const rallyHurry = () => clamp(((ball.shotKmh || 0) - 95) / 55, 0, 1);
+  const STRETCH = 1.35; // how far past its normal reach the CPU can lunge for a slice
+  const footSpeed = () => ball.serve ? SERVE_RETURN.speed() : 1 - .05 * rallyHurry();
+  const ballTS = () => (ball.serve ? SERVE_TS : BALL_TS);
+  const FIG = .72;     // people are drawn at 72% size
+  const P_ACC = 26, P_DEC = 40, C_ACC = 19, C_DEC = 32; // m/s^2: people need time to start and stop
+  const TOSS_V = 6.3, TOSS_PEAK = 1.1 + TOSS_V * TOSS_V / (2 * G), SERVE_CHARGE = .55;
+
+  // mg: Magnus strength (+ topspin pulls the ball down harder the faster it flies, - backspin holds it up)
+  // bz / bh: how much height / forward speed survives the bounce
+  // margin: how far above the net tape the shot aims to pass
+  const SHOTS = {
+    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .7, bh: .88, margin: .35, speed: [29, 41], err: .8 },
+    slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .6, bh: .7,  margin: .12, speed: [28, 48], err: 1.3 },
+    lob:   { name: 'ロブ',         color: '#c77dff', mg: .006, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
+    drop:  { name: 'ドロップ',     color: '#80ed99', mg: -.005, bz: .62, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
+  };
+  // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
+  const STYLE = {
+    P: { name: 'パワースピン型', top: { mg: .018, bz: .66, bh: .9, margin: .45, speed: [32, 45] } },
+    C: { name: 'スライス型',
+         slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
+         flat:  { speed: [28, 46] },
+         top:   { speed: [30, 44] } },
+  };
+  const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
+  const LEVELS = {
+    easy:   { name: 'やさしい', speed: 4,   react: .32, reach: 1,    err: .15, power: [.3, .65], noise: .8,  serve: [.45, .9],
+              mix: { top: 6, slice: 3, flat: 1 }, tactic: .2, aim: .15 },
+    normal: { name: 'ふつう',   speed: 5.1, react: .22, reach: 1.1,  err: .06, power: [.45, .8], noise: .5,  serve: [.55, 1],
+              mix: { top: 8, slice: 2.5, flat: 1.5 }, tactic: .4, aim: .4 },
+    hard:   { name: 'つよい',   speed: 6.1, react: .13, reach: 1.25, err: .03, power: [.65, 1],  noise: .25, serve: [.7, 1],
+              mix: { top: 8, slice: 2, flat: 2 }, tactic: .6, aim: .7 },
+  };
+
+  // Venues modelled on the four majors' surfaces. bz / bh scale how high / how fast the ball comes off the court.
+  const VENUES = {
+    mel: { name: 'メルボルン', surf: 'ハード', banner: 'BUMPY OPEN · MELBOURNE', court: '#2f6fc4', outer: '#4f9ee2', wall: '#17407a',
+           sky: ['#0f2a55', '#3a6fb0'], line: '#ffffff', bz: 1, bh: 1, dust: '215,225,245', slide: 16 },
+    par: { name: 'パリ', surf: 'クレー', banner: 'BUMPY OPEN · PARIS', court: '#c8643a', outer: '#bf5d35', wall: '#1d5a3a',
+           sky: ['#4a7fb8', '#a9cbe8'], line: '#f6f0e4', bz: 1.12, bh: .86, dust: '205,115,65', slide: 9, clay: true },
+    lon: { name: 'ロンドン', surf: '芝', banner: 'BUMPY OPEN · LONDON', court: '#4f9a3e', outer: '#4a9339', wall: '#12422a',
+           sky: ['#5d84b8', '#cfe0f0'], line: '#ffffff', bz: .8, bh: 1.08, dust: '140,180,100', slide: 14, grass: true },
+    ny:  { name: 'ニューヨーク', surf: 'ハード', banner: 'BUMPY OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
+           sky: ['#04060d', '#151d33'], line: '#ffffff', bz: .97, bh: 1.04, dust: '215,225,245', slide: 16, night: true },
+  };
+  let venue = VENUES.mel, format = 'set';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('c'), ctx = canvas.getContext('2d');
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  if (coarse) { document.body.classList.add('coarse'); $('auto').checked = true; }
+
+  // ---------- projection ----------
+  let W, H, F, hy, camH;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // fit the court width first, then raise/lower the camera to fill the height
+    const dNear = 13, dFar = L + CAM_BACK + 3, k = 1 / dNear - 1 / dFar;
+    F = (W / 2) * dNear / 5.6;
+    camH = H * .8 / (F * k);
+    if (camH < 5) { camH = 5; F = H * .8 / (camH * k); }
+    camH = Math.min(camH, 20);
+    const span = camH * F * k;
+    hy = H - Math.max(8, (H * 0.9 - span) / 2) - camH * F / dNear;
+  }
+  addEventListener('resize', resize);
+  resize();
+  function P(x, y, z = 0) {
+    const s = F / Math.max(1, L + CAM_BACK - y);
+    return { x: W / 2 + (x - CX) * s, y: hy + (camH - z) * s, s };
+  }
+  function unproject(sx, sy) {
+    const d = camH * F / Math.max(1, sy - hy);
+    return { x: CX + (sx - W / 2) * d / F, y: L + CAM_BACK - d };
+  }
+
+  // ---------- sound ----------
+  let audio = null, muted = false, bus = null, longBuf = null, clapBuf = null, murmur = null;
+  // one shared audio graph: everything goes through `bus`, which adds a little stadium reverb
+  function ac() {
+    if (!audio) {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      const sr = audio.sampleRate, ir = audio.createBuffer(2, sr * 1.6, sr);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.5); }
+      const conv = audio.createConvolver(), wet = audio.createGain();
+      conv.buffer = ir; wet.gain.value = .2;
+      bus = audio.createGain();
+      bus.connect(audio.destination); bus.connect(conv); conv.connect(wet).connect(audio.destination);
+      longBuf = audio.createBuffer(1, sr * 3, sr);
+      const d = longBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (audio.state === 'suspended') audio.resume();
+    return audio;
+  }
+  function tone(freq, dur, type = 'triangle', vol = .12, delay = 0, slide = 0) {
+    if (muted) return;
+    try {
+      ac();
+      const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + delay;
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g).connect(bus); o.start(t); o.stop(t + dur + .02);
+    } catch (e) {}
+  }
+  function noise(dur, filterType, freq, q, vol, delay = 0) {
+    if (muted) return;
+    try {
+      ac();
+      const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain(), t = audio.currentTime + delay;
+      src.buffer = longBuf; f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      src.connect(f).connect(g).connect(bus); src.start(t, Math.random() * 2); src.stop(t + dur + .02);
+    } catch (e) {}
+  }
+  // a struck ball rings at a few resonant modes: [frequency, decay, level]
+  function modes(list, vol, delay = 0) {
+    if (muted) return;
+    try {
+      ac();
+      const t0 = audio.currentTime + delay;
+      list.forEach(([f, d, a]) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(f, t0); o.frequency.exponentialRampToValueAtTime(f * .93, t0 + d);
+        g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(vol * a, t0 + .0015); g.gain.exponentialRampToValueAtTime(.0001, t0 + d);
+        o.connect(g).connect(bus); o.start(t0); o.stop(t0 + d + .02);
+      });
+    } catch (e) {}
+  }
+  // racket hit: a contact click, the ball's hollow ring and a short bright string ping; harder = lower and fuller
+  const sHit = power => {
+    const v = .55 + power * .45, k = 1 - power * .12;
+    noise(.012, 'highpass', 2800, .7, .5 * v);
+    modes([[640 * k, .075, 1], [1320 * k, .045, .5], [2480 * k, .03, .25], [3600, .018, .16]], .32 * v);
+    noise(.05, 'bandpass', 900 * k, 1.5, .14 * v, .002);
+  };
+  // bounce: dry on hard courts, dull on clay, a soft thud on grass
+  const sBounce = impact => {
+    const c = venue.clay ? { f: 230, cut: 900, v: .5 } : venue.grass ? { f: 200, cut: 600, v: .3 } : { f: 320, cut: 2200, v: .8 };
+    const v = Math.min(1, impact / 12) * c.v;
+    noise(.03, 'lowpass', c.cut, .7, .45 * v);
+    modes([[c.f, .05, 1], [c.f * 2.9, .025, .35]], .25 * v);
+  };
+  const sSqueak = vol => { if (venue.clay || venue.grass) return; tone(2700, .09, 'sine', .05 * vol, 0, 1900); tone(3400, .06, 'sine', .025 * vol, .01, 2500); };
+  const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
+  const sLose = () => [392, 311].forEach((f, i) => tone(f, .18, 'triangle', .09, i * .12));
+  // crowd: applause built from hundreds of short claps, a filtered roar for a cheer, a falling "ooh"
+  function crowdClap(intensity, dur = 2.2) {
+    if (muted) return;
+    try {
+      ac();
+      if (!clapBuf) {
+        const sr = audio.sampleRate, n = sr * 3; clapBuf = audio.createBuffer(2, n, sr);
+        for (let c = 0; c < 2; c++) {
+          const d = clapBuf.getChannelData(c);
+          for (let k = 0; k < 1100; k++) {
+            const at = Math.floor(Math.random() * n), len = Math.floor(sr * (.006 + Math.random() * .012)), a = .3 + Math.random() * .7;
+            for (let i = 0; i < len && at + i < n; i++) d[at + i] += (Math.random() * 2 - 1) * a * Math.exp(-i / (len * .3));
+          }
+        }
+      }
+      const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain(), t = audio.currentTime;
+      src.buffer = clapBuf; f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = .6;
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.3 * intensity, t + .15);
+      g.gain.setValueAtTime(.3 * intensity, t + dur * .45); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      src.connect(f).connect(g).connect(bus); src.start(t, Math.random() * .5); src.stop(t + dur + .05);
+    } catch (e) {}
+  }
+  function crowdVoice(kind, intensity) {
+    if (muted) return;
+    try {
+      ac();
+      const t = audio.currentTime, src = audio.createBufferSource(), f = audio.createBiquadFilter(), lp = audio.createBiquadFilter(), g = audio.createGain();
+      src.buffer = longBuf; f.type = 'bandpass'; lp.type = 'lowpass'; lp.frequency.value = 2400;
+      if (kind === 'cheer') {
+        f.frequency.setValueAtTime(480, t); f.frequency.linearRampToValueAtTime(900, t + .4); f.Q.value = .8;
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.45 * intensity, t + .25); g.gain.exponentialRampToValueAtTime(.0001, t + 2.4);
+      } else {
+        f.frequency.setValueAtTime(480, t); f.frequency.exponentialRampToValueAtTime(290, t + .9); f.Q.value = 3;
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.6 * intensity, t + .15); g.gain.exponentialRampToValueAtTime(.0001, t + 1.2);
+      }
+      src.connect(f).connect(lp).connect(g).connect(bus); src.start(t, Math.random()); src.stop(t + 2.5);
+    } catch (e) {}
+  }
+  // a soft stadium murmur that hushes during the rally
+  function setMurmur(level) {
+    if (muted) level = 0;
+    try {
+      ac();
+      if (!murmur) {
+        const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+        src.buffer = longBuf; src.loop = true; f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = .5; g.gain.value = 0;
+        src.connect(f).connect(g).connect(bus); src.start(); murmur = g;
+      }
+      murmur.gain.setTargetAtTime(level, audio.currentTime, .4);
+    } catch (e) {}
+  }
+  // chair umpire / line judge voices (speech synthesis, when the browser has it)
+  function say(text, pitch = .9, rate = 1) {
+    if (muted || !('speechSynthesis' in window)) return;
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.pitch = pitch; u.rate = rate; speechSynthesis.speak(u); } catch (e) {}
+  }
+  $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; if (muted) { setMurmur(0); try { speechSynthesis.cancel(); } catch (e) {} } };
+
+  // ---------- input ----------
+  const KEYMAP = { ' ': 'top', z: 'top', j: 'top', x: 'slice', k: 'slice', c: 'flat', l: 'flat', v: 'lob', i: 'lob', b: 'drop', o: 'drop' };
+  const keys = {};
+  const MOVE_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'];
+  // switching windows can swallow keyup events: forget every held key and charge
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; charge = null; ptr = null; });
+  let ptr = null, mouseShot = null;
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
+    if (MOVE_KEYS.includes(k)) ptr = null; // keyboard takes over from the mouse until it moves again
+    if (charge && !keys[k]) { // a quick tap while charging picks the aim right away
+      const dx = { arrowleft: -1, a: -1, arrowright: 1, d: 1 }[k], dy = { arrowup: 1, w: 1, arrowdown: -1, s: -1 }[k];
+      if (dx) aimX = dx * AIM_X;
+      if (dy) aimD = dy;
+    }
+    keys[k] = true;
+    if (k.startsWith('arrow') || k === ' ') e.preventDefault();
+  });
+  addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    keys[k] = false;
+    if (KEYMAP[k]) release(KEYMAP[k]);
+  });
+  function setPtr(e) {
+    const r = canvas.getBoundingClientRect();
+    const mouse = e.pointerType === 'mouse';
+    ptr = { x: e.clientX - r.left, y: e.clientY - r.top - (mouse ? 0 : 50), mouse };
+  }
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => {
+    setPtr(e);
+    if (e.pointerType === 'mouse') {
+      mouseShot = e.button === 1 ? 'flat' : e.button === 2 ? (e.shiftKey ? 'drop' : 'slice') : (e.shiftKey ? 'lob' : 'top');
+      press(mouseShot);
+      e.preventDefault();
+    } else canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => { if ((e.pointerType === 'mouse' && (e.movementX || e.movementY)) || e.buttons) setPtr(e); });
+  canvas.addEventListener('pointerup', e => {
+    if (e.pointerType === 'mouse') { if (mouseShot) release(mouseShot); mouseShot = null; }
+    else ptr = null;
+  });
+  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') ptr = null; });
+  document.querySelectorAll('#shots button').forEach(b => {
+    const s = b.dataset.shot;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.setPointerCapture(e.pointerId); b.classList.add('on'); press(s); });
+    const up = () => { if (b.classList.contains('on')) { b.classList.remove('on'); release(s); } };
+    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+  });
+
+  // ---------- state ----------
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const other = w => (w === 'P' ? 'C' : 'P');
+  const leftOf = w => (w === 'P' ? -1 : 1); // world-x of a right-hander's left side (player faces the far end)
+  const pickWeighted = mix => {
+    let r = Math.random() * Object.values(mix).reduce((a, b) => a + b, 0);
+    for (const [k, w] of Object.entries(mix)) if ((r -= w) < 0) return k;
+    return 'top';
+  };
+
+  let lvKey = 'normal', lv = LEVELS.normal, state = 'menu';
+  let practice = null, pstats = null; // practice drill (null = match) and its tally
+  const body = () => ({ phase: 0, sp: 0, hop: 0, crouch: 0, stroke: { kind: 'fh', spin: 'top' } });
+  const player = { x: CX, y: L + 1, vx: 0, vy: 0, swing: 0, cool: 0, shot: 'top', power: 0, ...body() };
+  const cpu = { x: CX, y: -1, vx: 0, vy: 0, swing: 0, plan: null, react: 0, ...body() };
+  const ball = { x: CX, y: L, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, mg: 0, bz: .7, bh: .85, type: 'flat', spin: 0,
+                 live: false, held: false, serve: false, last: null, bounces: 0, rolling: false, trail: [] };
+  let pts = [0, 0], games = [0, 0], faults = 0, rally = 0, maxRally = 0, maxSpeed = 0, tossing = false, cpuServeT = 0;
+  let dust = [];
+  let aimX = 0, aimD = 0; // where you are aiming while a shot is charged: -1..1 across, -1 short .. 1 deep
+  let pauseT = 0, pauseCb = null, msg = null, popups = [], marks = [], charge = null, history = [], cpuMod = { err: 0, react: 0, noise: 1 };
+
+  // tiebreak: the player due to serve serves the first point, then each serves two in a row
+  let tb = false, tbStart = 'P', tbScore = null;
+  const server = () => {
+    if (tb) { const n = pts[0] + pts[1]; return n === 0 ? tbStart : Math.floor((n - 1) / 2) % 2 === 0 ? other(tbStart) : tbStart; }
+    return (games[0] + games[1]) % 2 === 0 ? 'P' : 'C';
+  };
+  const setWon = i => format === 'short' ? games[i] >= 3 : (games[i] >= 6 && games[i] - games[1 - i] >= 2) || games[i] === 7;
+  const winsGameNext = i => tb ? pts[i] + 1 >= 7 && pts[i] + 1 - pts[1 - i] >= 2 : pts[i] + 1 >= 4 && pts[i] + 1 - pts[1 - i] >= 2;
+  const winsSetNext = i => { if (!winsGameNext(i)) return false; if (tb) return true; games[i]++; const w = setWon(i); games[i]--; return w; };
+  // the label for the next point (match point / break point), or ''
+  function bigPoint() {
+    for (const i of [0, 1]) if (winsSetNext(i)) return i === 0 ? 'マッチポイント（あなた）' : 'マッチポイント（CPU）';
+    const recv = other(server()), ri = recv === 'P' ? 0 : 1;
+    if (!tb && winsGameNext(ri)) return recv === 'P' ? 'ブレークポイント!' : 'ブレークポイント（CPU）';
+    return '';
+  }
+  const deuce = () => (pts[0] + pts[1]) % 2 === 0;
+  function serveBox(recv, dc) {
+    const left = { x0: 0, x1: CX }, right = { x0: CX, x1: CW };
+    return recv === 'C'
+      ? { ...(dc ? left : right), y0: NET_Y - SVC, y1: NET_Y }
+      : { ...(dc ? right : left), y0: NET_Y, y1: NET_Y + SVC };
+  }
+  const T = .04; // line tolerance: touching the line is in
+  const inBox = b => ball.x >= b.x0 - T && ball.x <= b.x1 + T && ball.y >= b.y0 - T && ball.y <= b.y1 + T;
+  const inCourt = recv => ball.x >= -T && ball.x <= CW + T &&
+    (recv === 'C' ? ball.y >= -T && ball.y <= NET_Y : ball.y >= NET_Y && ball.y <= L + T);
+
+  function startMatch(key) {
+    practice = null; $('quit').classList.remove('hidden');
+    tb = false; tbScore = null;
+    $('board').innerHTML = BOARD_HTML;
+    lvKey = key; lv = LEVELS[key];
+    pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; maxSpeed = 0; popups = []; marks = [];
+    ptr = null; // the click on the menu button is not a move order
+    $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.remove('hidden');
+    $('lvName').textContent = lv.name;
+    setupServe();
+  }
+
+  function setupServe() {
+    const dc = deuce();
+    Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [],
+                          mg: 0, bz: .7, bh: .85, ax: 0, kick: 0, spin: 0, type: 'flat' });
+    tossing = false; rally = 0; msg = null; charge = null; history = []; cpuMod = { err: 0, react: 0, noise: 1 };
+    if (server() === 'P') {
+      Object.assign(player, { x: CX + (dc ? .9 : -.9), y: L + .4 });
+      Object.assign(cpu, { x: CX + (dc ? -2.6 : 2.6), y: -.8 });
+    } else {
+      Object.assign(cpu, { x: CX + (dc ? -.9 : .9), y: -.4 });
+      Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
+    }
+    player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
+    player.slide = cpu.slide = player.anim = cpu.anim = 0; ballGone = false;
+    cpuServeT = 1.0;
+    state = 'serve';
+    updateBoard();
+  }
+
+  function holdBall() {
+    const s = server() === 'P' ? player : cpu, dir = s === player ? 1 : -1;
+    Object.assign(ball, { x: s.x + .3 * dir, y: s.y - .3 * dir, z: 1, vx: 0, vy: 0, vz: 0, ax: 0, mg: 0, bz: .7, bh: .85 });
+  }
+  function toss() { ball.held = false; ball.z = 1.1; ball.vz = TOSS_V; ball.vx = ball.vy = 0; tossing = true; }
+
+  // One physics step, shared by the real ball and the AI's look-ahead. Returns impact speed on a bounce.
+  // Air drag slows the ball (so it falls more steeply late in flight) and the Magnus force from spin
+  // acts across the direction of travel: topspin pulls the ball down, backspin holds it up.
+  const KD = .016;
+  function physStep(b, dt) {
+    if (!b.rolling) {
+      const v = Math.hypot(b.vx, b.vy, b.vz), vh = Math.hypot(b.vx, b.vy) || 1e-6, m = b.mg * v;
+      b.vx += (-KD * v * b.vx + m * b.vz * b.vx / vh + b.ax) * dt;
+      b.vy += (-KD * v * b.vy + m * b.vz * b.vy / vh) * dt;
+      b.vz += (-G - KD * v * b.vz - m * vh) * dt;
+    } else b.vx += b.ax * dt;
+    b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+    if (b.z <= 0 && b.vz < 0) {
+      const impact = -b.vz;
+      const bh = Math.min(.98, b.bh * venue.bh); // the surface: clay grips and sits up, grass skids through low
+      b.z = 0; b.vz = impact * b.bz * venue.bz; b.vx *= bh; b.vy *= bh;
+      if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
+      // spin mostly wears off after the first bounce; court friction on later bounces
+      b.mg *= .4; b.ax = 0; b.bz = .68; b.bh = .7;
+      if (b.vz < 1) { b.vz = 0; b.rolling = true; }
+      return impact;
+    }
+    return 0;
+  }
+
+  // Fly a copy of the ball from (x, y, z) and report where it first lands and how high it passes the net.
+  function flyTo(x, y, z, S, th, ang, mg, ax) {
+    const b = { x, y, z, vx: S * Math.cos(th) * Math.cos(ang), vy: S * Math.cos(th) * Math.sin(ang), vz: S * Math.sin(th), mg, ax };
+    let netZ = -9;
+    for (let i = 0; i < 1400; i++) {
+      const py = b.y;
+      physStep(b, 1 / 200);
+      if ((py - NET_Y) * (b.y - NET_Y) < 0) netZ = b.z;
+      if (b.z <= 0) break;
+    }
+    return { x: b.x, y: b.y, netZ };
+  }
+
+  // Launch the ball from where it is so that it lands on (tx, ty): pick the launch angle for the wanted
+  // speed (or the speed for a fixed angle, e.g. lobs), raise the arc until it clears the net by the
+  // shot's margin, then correct the aim for any sidespin curve.
+  // side: world-x direction the sidespin pulls toward (default: away from the center line)
+  function shoot(tx, ty, type, { speed = 25, angle = null, noClear = false, curve = 1, side = 0, who = null, over = null } = {}) {
+    const sh = { ...styled(type, who), ...over };
+    const ax = sh.curve ? (side || (tx > CX ? 1 : -1)) * sh.curve * curve : 0;
+    const { x, y, z } = ball, D = Math.hypot(tx - x, ty - y);
+    let ang = Math.atan2(ty - y, tx - x);
+    const range = (S, th) => { const r = flyTo(x, y, z, S, th, ang, sh.mg, 0); return Math.hypot(r.x - x, r.y - y); };
+    const speedFor = th => { let lo = 2, hi = 80; for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; range(m, th) < D ? lo = m : hi = m; } return (lo + hi) / 2; };
+    let S = speed, th;
+    if (angle !== null) { th = angle; S = speedFor(th); }
+    else {
+      for (let k = 0; k < 20; k++) {
+        if (range(S, .8) < D) { S *= 1.1; continue; }   // too slow to get there at all
+        if (range(S, -.25) > D) { S *= .9; continue; }  // too fast to keep it in
+        let lo = -.25, hi = .8;
+        for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; range(S, m) < D ? lo = m : hi = m; }
+        th = (lo + hi) / 2; break;
+      }
+      if (th === undefined) th = .1;
+    }
+    if (!noClear) {
+      for (let k = 0; k < 40; k++) {
+        const r = flyTo(x, y, z, S, th, ang, sh.mg, 0);
+        if (r.netZ > NET_H + sh.margin || r.netZ === -9) break;
+        th += .025; S = speedFor(th);
+      }
+    }
+    // sidespin: rotate the aim until the curving ball lands on the target line
+    for (let k = 0; ax && k < 3; k++) {
+      const r = flyTo(x, y, z, S, th, ang, sh.mg, ax);
+      const err = Math.atan2(r.y - y, r.x - x) - Math.atan2(ty - y, tx - x);
+      ang -= err;
+    }
+    Object.assign(ball, {
+      vx: S * Math.cos(th) * Math.cos(ang), vy: S * Math.cos(th) * Math.sin(ang), vz: S * Math.sin(th),
+      ax, mg: sh.mg, bz: sh.bz, bh: sh.bh, kick: 0, type, rolling: false, trail: [],
+      spin: sh.mg * 1800 + (type === 'flat' ? 6 : 0),
+    });
+    return Math.round(S * 3.6);
+  }
+
+  // default aim: the side of the court the CPU is not covering
+  const openCourt = () => (cpu.x > CX ? -1 : 1) * AIM_X * .8;
+
+  // the spot a charged shot is aimed at (without the random error), for the aim marker and the shot itself
+  function aimTarget(type, ax, ad) {
+    if (state === 'serve') {
+      const box = serveBox('C', deuce()), hw = (box.x1 - box.x0) / 2 - .45;
+      return { x: (box.x0 + box.x1) / 2 + ax * hw, y: box.y0 + 1.2 };
+    }
+    if (type === 'drop') return { x: CX + ax * (CX - 1), y: NET_Y - 2.2 };
+    if (type === 'lob') return { x: CX + ax * (CX - 1), y: lerp(2.2, .9, Math.max(0, ad)) };
+    const short = Math.max(0, -ad);
+    // corners sit ~0.45 m inside the sideline; the short angle cuts right out to the line
+    return { x: CX + ax * (CX - .45 + short * .3), y: ad >= 0 ? lerp(3, 1.5, ad) : lerp(3, 7.2, short) };
+  }
+
+  // q: toss timing (1 = hit at the top of the toss), power: how long the button was held
+  function serveHit(who, q, type, power) {
+    if (faults) type = 'top'; // second serve: always the safe kick serve
+    if (type === 'lob') type = 'top';
+    if (type === 'drop') type = 'slice';
+    const recv = other(who), box = serveBox(recv, deuce()), sh = SHOTS[type];
+    const aim = who === 'P' ? aimX : rand(-1, 1);
+    const bx = (box.x0 + box.x1) / 2, hw = (box.x1 - box.x0) / 2 - .45;
+    // bad timing and big power both widen the error; topspin (kick) is the safest serve
+    // flat = fastest first serve, slice = fast curving first serve, kick = safe second serve
+    const SERVE = {
+      flat:  { speed: [30, 58], timing: 1.3, risk: 1.3, over: null },
+      slice: { speed: [30, 52], timing: 1.1, risk: 1.1, over: { mg: .003, margin: .22, bz: .5, bh: .85 } },  // sidespin, not backspin
+      top:   { speed: [22, 32], timing: .45, risk: .25, over: { mg: .026, margin: 1.1, bz: .55, bh: .85 } },  // high over the net, big kick
+    }[type];
+    const err = (1 - q) * 1.6 * SERVE.timing + power * power * SERVE.risk;
+    const tx = bx + aim * hw + rand(-err, err);
+    const deep = rand(.6, 2);
+    const ty = recv === 'C' ? box.y0 + deep - rand(-err * .4, err) : box.y1 - deep + rand(-err * .4, err);
+    const speed = lerp(SERVE.speed[0], SERVE.speed[1], power) * (.75 + .25 * q);
+    // a right-hander's slice serve curves to the server's left
+    const kmh = shoot(tx, ty, type, { speed, noClear: q < .25 && type !== 'top', curve: type === 'slice' ? 3.6 + power * 2.6 : 1, side: leftOf(who), who, over: SERVE.over });
+    if (type === 'top') { // kick serve: jumps up high and off to the server's right
+      ball.bz = .52 + power * .06; ball.bh = .85; ball.kick = 0; // kicks straight up
+    } else if (type === 'flat') { ball.bz = .45; ball.bh = .75; } // flat serve skids through low
+    Object.assign(ball, { live: true, serve: true, last: who, bounces: 0, serveKmh: kmh, chance: false });
+    tossing = false; state = 'rally';
+    const s = who === 'P' ? player : cpu;
+    startAnim(s, 'serve', type, .32);
+    (who === 'P' ? cpu : player).hop = HOP;
+    sHit(power);
+    popupAt(s.x, s.y, 2.6, `${sh.name}サーブ ${kmh}km/h`, sh.color);
+    if (who === 'P') {
+      maxSpeed = Math.max(maxSpeed, kmh);
+      const t = q > .85 ? (power >= 1 ? 'ジャスト! MAX!' : 'ジャスト!') : q < .35 ? 'タイミングずれ…' : '';
+      popupAt(player.x, player.y, 3.2, t, q > .85 ? '#e8ff3a' : '#fff');
+      cpu.plan = null; cpu.react = lv.react + SERVE_RETURN.react();
+    }
+  }
+
+  const serveTiming = () => clamp(1 - Math.max(0, TOSS_PEAK - ball.z) / 1.1, 0, 1);
+  function serveRelease() {
+    const c = charge; charge = null;
+    serveHit('P', serveTiming(), c.type, Math.min(1, c.t / c.full));
+  }
+
+  function press(type) {
+    if (state === 'serve' && server() === 'P') {
+      if (ball.held) toss();
+      else if (tossing && !charge) { charge = { type: faults ? 'top' : type, key: type, t: 0, full: SERVE_CHARGE, serve: true, p0: ptr && { ...ptr } }; aimX = aimD = 0; }
+      return;
+    }
+    if ((state === 'rally' || state === 'pause') && !charge) { charge = { type, key: type, t: 0, full: FULL_CHARGE, p0: ptr && { ...ptr } }; aimX = openCourt(); aimD = 0; }
+  }
+  function release(type) {
+    if (!charge || charge.key !== type) return;
+    charge.serve ? serveRelease() : fireSwing();
+  }
+  // stroke animation: kind = fh / bh / volley / serve / smash; `from` is where in the motion to start (0..1)
+  const ANIM = { serve: .75, smash: .6, volley: .38 };
+  function startAnim(o, kind, spin, from = 0) {
+    const dur = ANIM[kind] || .62;
+    o.stroke = { kind, spin, side: kind === 'volley' ? sideKind(o) : kind };
+    o.animDur = dur; o.anim = dur * (1 - from);
+  }
+  const strokeKind = o => (ball.z > 2.3 && ball.bounces === 0 ? 'smash'
+    : ball.bounces === 0 && !ball.serve && !(o === player && isDriveVolley()) ? 'volley' : sideKind(o));
+  // a floater taken out of the air from mid-court with a full swing
+  const isDriveVolley = () => ball.bounces === 0 && !ball.serve && ball.z > 1 && ball.z <= 2.3 && player.y > NET_Y + 2.5;
+  function fireSwing() {
+    if (player.cool > 0) { charge = null; return; }
+    player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
+    startAnim(player, strokeKind(player), charge.type);
+    player.swing = SWING; player.cool = .42; player.aimX = aimX; player.aimD = aimD; player.closest = null;
+    charge = null;
+  }
+
+  function canHit(w) {
+    if (!ball.live || ball.last === w) return false;
+    if (ball.bounces === 1) return true;
+    if (w === 'C') return ball.bounces === 0 && ball.chance && ball.y < NET_Y; // the CPU volleys / smashes sitters
+    return w === 'P' && ball.bounces === 0 && !ball.serve && ball.y > NET_Y; // volley
+  }
+
+  function playerHit(d) {
+    let type = player.shot;
+    const power = player.power;
+    const smash = ball.z > 2.1 && ball.bounces === 0 && type !== 'lob' && type !== 'drop';
+    const drive = !smash && isDriveVolley() && (type === 'top' || type === 'flat');
+    const chance = ball.chance; // the CPU's floater
+    if (smash) type = 'flat';
+    const sh = styled(type, 'P');
+    const r = reachOf(smash ? 'smash' : player.shot);
+    // three grades by where in the ring you meet the ball: inner = nice, middle = normal, edge = scrambling
+    let rel = d / r;
+    if (chance && (smash || drive)) rel *= .6; // a sitter is easy to time: put it away
+    const grade = rel <= .45 ? 'nice' : rel <= .8 ? 'normal' : 'edge';
+    player.lastGrade = grade;
+    const scramble = grade === 'edge' && !smash, mishit = scramble && Math.random() < .45;
+    const q = grade === 'nice' ? 1 : grade === 'normal' ? .7 : mishit ? .05 : .4;
+    const goal = aimTarget(type, player.aimX, player.aimD);
+    // timing errors plus the risk of hitting hard
+    // aiming close to the lines is risky: corners and deep targets widen the error
+    let err = (1 - q) * 1.6 + power * power * sh.err * .9 + .3 * Math.abs(player.aimX) + .25 * Math.max(0, player.aimD), speedMul = 1, note = '';
+    // the height you meet the ball at decides which shot is safe
+    if (!smash && ball.bounces === 1) {
+      if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += type === 'top' ? .3 : .6; speedMul = .85; note = type === 'top' ? '' : '低い球はスライスで!'; }
+      else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = '高い球はトップスピンで!'; }
+      else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = '打ちごろ! 強打!'; }
+    }
+    let tx = goal.x + rand(-err, err) + rand(-.3, .3);
+    let ty, opts;
+    if (type === 'lob') {
+      tx = goal.x + rand(-err * .6, err * .6);
+      ty = goal.y + rand(-.6, .6) + rand(-err * .8, err * .3) - power * 1.2;
+      opts = { angle: .7 - power * .12 + rand(-.04, .04) };
+    } else if (type === 'drop') {
+      ty = goal.y + rand(-.7, .7) + rand(-err * .6, err * .6);
+      opts = { angle: .32 + rand(0, .06), noClear: q < .35 };
+    } else {
+      ty = (smash ? goal.y + rand(-1, 2.5) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
+      if (drive) speedMul *= 1.12;
+      const speed = smash ? 37 + power * 9 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
+      opts = { speed, noClear: q < .2 };
+    }
+    if (mishit) { tx += rand(-2.5, 2.5); ty += rand(-2, 1); opts = { speed: rand(14, 24), noClear: true }; }
+    else if (scramble) { // just got there: the ball floats back short and high — a sitter for the opponent
+      type = 'top'; tx = CX + rand(-1.8, 1.8); ty = NET_Y - rand(5.5, 8); opts = { angle: rand(.68, .8) };
+    }
+    if (scramble) startSlide(player);
+    opts.curve = 0; opts.who = 'P'; // groundstroke slice goes straight and skids; only the slice serve curves
+    const kmh = shoot(tx, ty, type, opts);
+    Object.assign(ball, { last: 'P', bounces: 0, serve: false });
+    // jump the swing animation to the moment of contact if the ball arrived early
+    const ct = .38 * player.animDur;
+    if (player.anim > player.animDur - ct) player.anim = player.animDur - ct;
+    ball.shotKmh = kmh;
+    rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
+    sHit(smash ? 1 : power);
+    const label = smash ? 'スマッシュ!' : sh.name;
+    popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
+    ball.chance = scramble && !mishit; // your floater is now a sitter for the CPU
+    if (chance && (smash || drive)) popupAt(player.x, player.y, 3.6, smash ? '叩き込んだ!' : 'ドライブボレー!', '#ff5d73');
+    else if (drive) popupAt(player.x, player.y, 3.6, 'ドライブボレー!', '#ff9f43');
+    if (grade === 'nice' && !smash) popupAt(player.x, player.y, 3.1, 'ナイスショット!', '#e8ff3a');
+    else if (mishit) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
+    else if (scramble) popupAt(player.x, player.y, 3.1, 'なんとか返球…', '#9ad');
+    if (note) popupAt(player.x, player.y, 3.6, note, '#fff');
+    if (smash) player.stroke = { kind: 'smash', spin: 'flat', side: 'smash' };
+    cpu.hop = HOP;
+    if (!practice) readPlayer(smash ? 'smash' : type);
+  }
+
+  // The CPU learns your habits: the same shot over and over gets read,
+  // mixing three different shots in a row throws it off balance.
+  function readPlayer(type) {
+    history.push(type);
+    const last3 = history.slice(-3), kinds = new Set(last3).size, prev = history[history.length - 2];
+    cpuMod = { err: 0, react: 0, noise: 1 };
+    if (last3.length === 3 && kinds === 1) {
+      cpuMod = { err: -.6, react: -.4, noise: .4 };
+      popupAt(cpu.x, cpu.y, 2.6, '読まれてる…', '#ff8080');
+    } else if (last3.length === 3 && kinds === 3) {
+      cpuMod = { err: .1, react: .45, noise: 1.6 };
+      popupAt(cpu.x, cpu.y, 2.6, '揺さぶり!', '#e8ff3a');
+    } else if (prev && prev !== type) {
+      cpuMod = { err: .04, react: .2, noise: 1.2 };
+    }
+    cpu.plan = null; cpu.react = lv.react * (1 + cpuMod.react) + .04 * rallyHurry();
+    cpu.closest = null;
+  }
+
+  // the CPU puts a sitter away out of the air: a smash if it is high, a firm volley otherwise
+  function cpuPutAway() {
+    const air = ball.bounces === 0, smash = ball.z > 2.1, openLeft = player.x > CX;
+    const tx = openLeft ? rand(.5, 1.4) : CW - rand(.5, 1.4), ty = L - rand(1.5, 5);
+    let opts = { speed: smash ? rand(40, 46) : air ? rand(30, 36) : rand(36, 42), noClear: false, curve: 0, who: 'C' };
+    let gx = tx, gy = ty;
+    if (Math.random() < lv.err * .6 + .02) { gx = openLeft ? -rand(.2, 1.2) : CW + rand(.2, 1.2); } // even sitters get missed now and then
+    // groundstroke and volley put-aways are ripped with heavy topspin so they dive in; smashes go flat
+    const kmh = smash ? shoot(gx, gy, 'flat', opts) : shoot(gx, gy, 'top', { ...opts, over: { mg: .024, margin: .15 } });
+    Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
+    rally++; maxRally = Math.max(maxRally, rally);
+    startAnim(cpu, smash ? 'smash' : air ? 'volley' : sideKind(cpu), 'flat', .3);
+    cpu.swing = SWING * .6; cpu.defend = false; player.hop = HOP; sHit(1);
+    popupAt(cpu.x, cpu.y, 2.8, `${smash ? 'スマッシュ' : air ? 'ボレー' : '強打'}! ${kmh}km/h`, '#ff5d73');
+  }
+
+  function cpuHit(d) {
+    if (ball.bounces === 0 || ball.chance) return cpuPutAway(); // a sitter, in the air or after the bounce
+    const incoming = Math.hypot(ball.vx, ball.vy);
+    const stretched = d > lv.reach;
+    let type = pickWeighted(lv.mix);
+    if (player.y < NET_Y + 5 && Math.random() < lv.tactic) type = 'lob';           // passing lob over a net rusher
+    else if (player.y > L + 1.2 && Math.random() < lv.tactic * .3) type = 'drop';   // drop shot vs. a deep player
+    if (ball.z > 2.4) type = 'flat';
+    if (stretched) type = 'slice';
+    const sh = styled(type, 'C'), power = stretched ? rand(.1, .35) : rand(...lv.power);
+    let errP = lv.err + (d / lv.reach) * .04 + Math.min(rally, 20) * .002
+      + power * power * sh.err * .08
+      + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
+      + (ball.z > 1.9 ? .06 : 0)                       // high kicking topspin is hard to control
+      + Math.max(0, incoming - 26) * .006              // really fast balls rush the swing
+      + (ball.type === 'drop' && d > lv.reach * .8 ? .1 : 0)
+      + (stretched ? .2 : d > lv.reach * .8 ? .05 : 0);
+    errP = Math.max(.01, errP * (1 + Math.min(0, cpuMod.err)) + Math.max(0, cpuMod.err));
+    // attack the open court: the better the CPU, the closer to the lines it aims; sometimes it wrong-foots you
+    const openLeft = Math.random() < .2 ? player.x < CX : player.x > CX;
+    const edge = .55 + (1 - lv.aim) * rand(0, 1.8);
+    let tx = openLeft ? edge : CW - edge;
+    if (stretched) tx = CX + rand(-1.8, 1.8); // a lunging get floats back to the middle
+    let ty, opts;
+    if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
+    else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
+    else if (stretched) { ty = NET_Y + rand(5.5, 8); opts = { angle: rand(.68, .8) }; } // a high floater dropping around the service line
+    else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
+    if (Math.random() < errP) {
+      const r = Math.random();
+      if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
+      else if (r < .75) ty = type === 'drop' ? NET_Y + rand(-.5, .2) : L + rand(.2, 2);
+      else { type = 'flat'; ty = NET_Y + rand(1, 3); opts = { speed: 30, noClear: true }; }
+    }
+    opts.curve = 0; opts.who = 'C';
+    const kmh = shoot(tx, ty, type, opts);
+    Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
+    rally++; maxRally = Math.max(maxRally, rally);
+    startAnim(cpu, ball.z > 2.3 ? 'smash' : sideKind(cpu), type, .3); // the CPU's swing is shown from just before contact
+    cpu.swing = SWING * .6; player.hop = HOP; sHit(power);
+    cpu.defend = stretched;
+    if (stretched) { startSlide(cpu); ball.chance = true; popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
+    else if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
+  }
+
+  // where should the CPU go to meet the ball in time?
+  function planIntercept() {
+    if (ball.chance && ball.bounces === 0) { // a floater: move in and meet it in the air, as close to the net as it can get
+      const b = { ...ball, trail: null }, step = 1 / 120, spd = lv.speed;
+      for (let t = 0, i = 0; i < 700; i++) {
+        if (physStep(b, step)) break;
+        t += step;
+        if (b.y < NET_Y - 1.3 && b.y > -3 && b.z > 1 && b.z < 3) {
+          const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .6) / spd + spd / (2 * C_ACC);
+          if (need <= t / ballTS()) return { x: b.x, y: b.y, air: true };
+        }
+      }
+    }
+    const b = { ...ball, trail: null }, step = 1 / 120;
+    let bounces = ball.bounces, t = 0, last = null;
+    for (let i = 0; i < 700; i++) {
+      if (physStep(b, step) && ++bounces >= 2) break;
+      t += step;
+      if (bounces === 1 && b.z < 2.3) {
+        last = { x: b.x, y: b.y };
+        const spd = lv.speed * footSpeed();
+        const need = Math.max(0, Math.hypot(b.x - cpu.x, b.y - cpu.y) - lv.reach * .7) / spd + spd / (2 * C_ACC);
+        if (need <= t / ballTS()) break; // t is ball time, need is people time
+      }
+    }
+    const p = last || { x: ball.x, y: ball.y };
+    return { x: p.x + rand(-lv.noise, lv.noise) * .6 * cpuMod.noise, y: p.y };
+  }
+
+  function predictBounce() {
+    const b = { ...ball, trail: null }, step = 1 / 60;
+    for (let i = 0; i < 300; i++) if (physStep(b, step)) return b;
+    return null;
+  }
+
+  // ---------- rules ----------
+  // ---------- practice: the CPU feeds balls, nothing is scored ----------
+  const DRILLS = {
+    stroke: { name: 'ストローク', spot: () => [CX, L + .6], feeder: [CX, -.5] },
+    volley: { name: 'ボレー', spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, -.5] },
+    smash:  { name: 'スマッシュ', spot: () => [CX + rand(-.4, .4), NET_Y + 3.5], feeder: [CX, 1] },
+    drop:   { name: 'ドロップ拾い', spot: () => [CX, L + 1], feeder: [CX, 1.5] },
+    chance: { name: 'チャンスボール', spot: () => [CX + rand(-1, 1), L + .5], feeder: [CX, -.5] },
+  };
+  let drill = 'stroke';
+  function startPractice(key) {
+    lvKey = 'normal'; lv = LEVELS.normal; practice = key;
+    pstats = { n: 0, ok: 0, nice: 0, streak: 0, best: 0 };
+    pts = [0, 0]; games = [0, 0]; faults = 0; popups = []; marks = [];
+    $('menu').classList.add('hidden'); $('result').classList.add('hidden');
+    $('board').classList.remove('hidden'); $('quit').classList.remove('hidden');
+    feedNext();
+  }
+  function practiceBoard() {
+    const d = practice === 'random' ? 'ランダム' : DRILLS[practice].name;
+    $('board').innerHTML = `<div class="r"><span class="n">練習：${d}</span></div>` +
+      `<div class="r"><span class="n" style="font-size:13px">成功 ${pstats.ok} / ${pstats.n} ・ ナイス ${pstats.nice} ・ 連続 ${pstats.streak}（最高 ${pstats.best}）</span></div>`;
+  }
+  function feedNext() {
+    drill = practice === 'random' ? pick(Object.keys(DRILLS)) : practice;
+    const D = DRILLS[drill], [px, py] = D.spot();
+    Object.assign(player, { x: px, y: py, vx: 0, vy: 0, feet: null, slide: 0, anim: 0, swing: 0, closest: null });
+    Object.assign(cpu, { x: D.feeder[0], y: D.feeder[1], vx: 0, vy: 0, feet: null, slide: 0, plan: null });
+    Object.assign(ball, { x: cpu.x - .3, y: cpu.y + .3, z: 1, held: false, rolling: false, live: true, serve: false,
+                          last: 'C', bounces: 0, chance: false, trail: [] });
+    tossing = false; charge = null; rally = 0; msg = null;
+    let kmh;
+    if (drill === 'stroke') {
+      const t = pick(['top', 'top', 'slice', 'flat']);
+      kmh = shoot(rand(.8, CW - .8), L - rand(2, 5.5), t, { speed: rand(24, 32), who: 'C', curve: 0 });
+    } else if (drill === 'volley') { // a firm ball that passes you at about waist height
+      kmh = shoot(player.x + rand(-1.6, 1.6), L + rand(.5, 2), 'flat', { speed: rand(19, 24), who: 'C' });
+    } else if (drill === 'smash') { // a lob that comes down around you
+      kmh = shoot(player.x + rand(-1.2, 1.2), player.y + rand(-.5, 1.5), 'lob', { angle: rand(.85, 1), who: 'C' });
+    } else if (drill === 'chance') { // the same floater the CPU sends up after a lunge
+      kmh = shoot(CX + rand(-1.8, 1.8), NET_Y + rand(5.5, 8), 'top', { angle: rand(.68, .8), who: 'C' });
+      ball.chance = true;
+      popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a');
+    } else {
+      kmh = shoot(rand(1.5, CW - 1.5), NET_Y + rand(1.5, 3), 'drop', { angle: rand(.32, .38), who: 'C' });
+    }
+    ball.shotKmh = kmh;
+    startAnim(cpu, sideKind(cpu), drill === 'drop' ? 'drop' : 'top', .3);
+    state = 'rally'; practiceBoard();
+  }
+  function practiceDone(ok, label) {
+    ball.live = false;
+    pstats.n++;
+    if (ok) { pstats.ok++; pstats.streak++; pstats.best = Math.max(pstats.best, pstats.streak); sWin(); }
+    else { pstats.streak = 0; sLose(); }
+    if (ok && player.lastGrade === 'nice') pstats.nice++;
+    popupAt(player.x, player.y, 3, label, ok ? '#e8ff3a' : '#ff8080');
+    practiceBoard();
+    state = 'pause'; msg = null; pauseT = 1; pauseCb = feedNext;
+  }
+
+  function onBounce() {
+    if (practice) {
+      if (!ball.live) return;
+      ball.bounces++;
+      if (ball.last === 'P') practiceDone(ball.bounces === 1 && inCourt('C'), ball.bounces === 1 && inCourt('C') ? 'イン!' : 'アウト');
+      else if ((drill === 'volley' || drill === 'smash') && ball.bounces === 1) practiceDone(false, 'ノーバウンドで打とう');
+      else if (ball.bounces >= 2) practiceDone(false, '取れなかった…');
+      return;
+    }
+    if (!ball.live) return;
+    ball.bounces++;
+    const recv = other(ball.last);
+    if (ball.bounces === 1) {
+      const ok = ball.serve ? inBox(serveBox(recv, deuce())) : inCourt(recv);
+      marks.push({ x: ball.x, y: ball.y, life: venue.clay ? 5 : 1.2, ok }); // clay keeps the ball mark
+      if (ok && ball.serve && ball.type === 'top') popupAt(ball.x, ball.y, 1.4, 'キック!', SHOTS.top.color);
+      if (!ok) {
+        lineCall(ball.serve ? 'Fault' : 'Out');
+        if (outBy() < .5) crowdVoice('ooh', .8); // so close!
+        ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
+      }
+    } else {
+      const ace = ball.serve ? 'サービスエース!' : null;
+      pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
+    }
+  }
+  function onNet() {
+    if (practice) return practiceDone(false, 'ネット');
+    ball.serve ? fault('ネット') : pointTo(other(ball.last), 'ネット!');
+  }
+
+  function fault(label) {
+    ball.live = false;
+    if (faults === 0) { faults = 1; if (label === 'ネット') umpire('Fault'); pause(label, 'セカンドサーブ', 1.2, setupServe); }
+    else { umpire('Double fault'); pointTo(other(ball.last), 'ダブルフォールト'); }
+  }
+
+  // ---------- the stadium: chair umpire, line judges, ball kids, crowd ----------
+  const UMP = { x: CW + ALLEY + 2.3, y: NET_Y };
+  const judges = [[-1.8, -6], [CW + 1.8, -6], [-ALLEY - 2.6, 4], [-ALLEY - 2.6, L - 4], [CW + ALLEY + 2.6, L - 4], [CW + ALLEY + 2.6, 4]]
+    .map(([x, y]) => ({ x, y, call: 0 }));
+  const kids = [[-ALLEY - 1.7, NET_Y + .7], [CW + ALLEY + 1.4, NET_Y - 1.2], [CX - 3.2, -6.8], [CX + 3.2, -6.8]]
+    .map(([x, y]) => ({ x, y, hx: x, hy: y, task: null, phase: 0 }));
+  let umpCall = null, cheer = 0, ballGone = false;
+  const NAME = { P: 'Bumpy', C: 'C P U' };
+  function umpire(text, delay = 0) {
+    setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay);
+  }
+  function lineCall(text) { // the nearest line judge shouts and points
+    let best = judges[0];
+    judges.forEach(j => { if (d2(j, ball) < d2(best, ball)) best = j; });
+    best.call = 1.4;
+    popupAt(best.x, best.y, 2, text.toUpperCase(), '#fff');
+    say(text, 1.25, 1.15);
+  }
+  // how far outside the lines the ball landed (0 if in)
+  const outBy = () => Math.max(0, -ball.x, ball.x - CW, ball.y < NET_Y ? -ball.y : ball.y - L);
+  function scoreCall(w, gameWon, over, tiebreakNow) {
+    if (over) return `Game, set and match, ${NAME[w]}`;
+    if (tiebreakNow) return 'Six games all. Tiebreak';
+    if (gameWon) return `Game, ${NAME[w]}`;
+    const si = server() === 'P' ? 0 : 1, a = pts[si], b = pts[1 - si];
+    if (tb) return `${a}, ${b}`;
+    const N = ['love', 'fifteen', 'thirty', 'forty'];
+    if (a >= 3 && b >= 3) return a === b ? 'Deuce' : `Advantage, ${NAME[a > b ? server() : other(server())]}`;
+    return a === b ? `${N[a]} all` : `${N[a]}, ${N[b]}`;
+  }
+  // after a point a ball kid runs out, picks up the ball and runs back
+  function fetchBall() {
+    if (ball.live || ballGone || kids.some(k => k.task)) return;
+    if (ball.x < -7 || ball.x > CW + 7 || ball.y < -7.5 || ball.y > L + 7) return;
+    let best = kids[0];
+    kids.forEach(k => { if (d2(k, ball) < d2(best, ball)) best = k; });
+    best.task = 'go';
+  }
+  function moveKids(dt) {
+    kids.forEach(k => {
+      const tgt = k.task === 'go' ? ball : k.task === 'back' ? { x: k.hx, y: k.hy } : null;
+      if (!tgt) return;
+      const dx = tgt.x - k.x, dy = tgt.y - k.y, l = Math.hypot(dx, dy), v = 5.5 * dt;
+      k.phase += dt * 14;
+      if (l <= v + .25) {
+        if (k.task === 'go') { ballGone = true; k.task = 'back'; } else { k.x = k.hx; k.y = k.hy; k.task = null; }
+      } else { k.x += dx / l * v; k.y += dy / l * v; }
+    });
+  }
+
+  function pause(title, sub, sec, cb) { state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb; }
+
+  function pointTo(w, label) {
+    ball.live = false; faults = 0;
+    const i = w === 'P' ? 0 : 1;
+    pts[i]++;
+    const longRally = rally >= 8, ace = /エース/.test(label), error = /アウト|ネット|ダブル/.test(label);
+    let inten = (w === 'P' ? .8 : .55) * (error ? .6 : 1);
+    if (ace || longRally) inten = 1;
+    crowdClap(inten, 2.2); if (inten >= .9) crowdVoice('cheer', inten);
+    cheer = 1.4 * inten;
+    if (navigator.vibrate && w === 'C') navigator.vibrate(60);
+    let title = w === 'P' ? 'あなたのポイント!' : 'CPU のポイント';
+    const gameWon = tb ? pts[i] >= 7 && pts[i] - pts[1 - i] >= 2 : pts[i] >= 4 && pts[i] - pts[1 - i] >= 2;
+    if (gameWon) {
+      if (tb) tbScore = [...pts];
+      games[i]++; pts = [0, 0];
+      title = tb ? (w === 'P' ? '🎾 タイブレークを取った!' : 'CPU がタイブレークを取った')
+                 : w === 'P' ? '🎾 あなたがゲームを取った!' : 'CPU がゲームを取った';
+      tb = false;
+      if (setWon(i)) {
+        crowdClap(1, 4); crowdVoice('cheer', 1); umpire(scoreCall(w, true, true), 600);
+        updateBoard(); pause(title, label, 1.8, () => endMatch(w)); return;
+      }
+      crowdClap(.9, 3);
+      if (format === 'set' && games[0] === 6 && games[1] === 6) { // 6-6: tiebreak
+        tbStart = server(); tb = true; umpire(scoreCall(w, true, false, true), 600);
+        updateBoard(); pause('6-6 タイブレーク!', '7 ポイント先取（2 点差）', 2, setupServe); return;
+      }
+    }
+    updateBoard();
+    umpire(scoreCall(w, gameWon), 650);
+    pause(title, label, 1.6, setupServe);
+  }
+
+  function endMatch(w) {
+    state = 'over'; msg = null;
+    $('resTitle').textContent = w === 'P' ? '🏆 勝利!' : '😢 まけちゃった…';
+    $('resScore').textContent = `${games[0]} - ${games[1]}` + (tbScore ? ` (${Math.min(...tbScore)})` : '');
+    $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
+      (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
+    $('result').classList.remove('hidden');
+  }
+
+  function scoreText(a, b) {
+    if (tb) return String(a);
+    if (a >= 3 && b >= 3) return a === b ? '40' : a > b ? 'Ad' : '40';
+    return ['0', '15', '30', '40'][Math.min(a, 3)];
+  }
+  function updateBoard() {
+    $('gP').textContent = games[0]; $('gC').textContent = games[1];
+    $('pP').textContent = scoreText(pts[0], pts[1]); $('pC').textContent = scoreText(pts[1], pts[0]);
+    $('srvP').style.visibility = server() === 'P' ? 'visible' : 'hidden';
+    $('srvC').style.visibility = server() === 'C' ? 'visible' : 'hidden';
+    $('lvName').textContent = (tb ? 'タイブレーク ・ ' : '') + venue.name + ' ・ ' + lv.name;
+  }
+
+  function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1.1 }); }
+
+  // ---------- update ----------
+  function movePlayer(dt) {
+    let mx = 0, my = 0;
+    if (keys['arrowleft'] || keys['a']) mx--;
+    if (keys['arrowright'] || keys['d']) mx++;
+    if (keys['arrowup'] || keys['w']) my--;
+    if (keys['arrowdown'] || keys['s']) my++;
+    const serving = state === 'serve' && server() === 'P';
+    if (serving) my = 0;
+    const max = PSPEED;
+    let tvx = 0, tvy = 0;
+    if (charge) {
+      // while a shot is charged the controls aim instead of moving you
+      aimFromInput(mx, my);
+      const g = charge.serve ? null : assistTarget();
+      if (g) {
+        const dx = g.x - player.x, dy = g.y - player.y, l = Math.hypot(dx, dy), sp = Math.min(PSPEED * .75, l * 6);
+        if (l > .05) { tvx = dx / l * sp; tvy = dy / l * sp; }
+      }
+    } else if (mx || my) {
+      const l = Math.hypot(mx, my); tvx = mx / l * max; tvy = my / l * max;
+    } else if (ptr) {
+      // the cursor on your side of the net moves you; on the far side it is only for aiming
+      const g = unproject(ptr.x, ptr.y), dx = g.x - player.x, dy = serving ? 0 : g.y - player.y, l = Math.hypot(dx, dy);
+      if (l > .12 && !(ptr.mouse && g.y < NET_Y)) { const s = Math.max(2.5, Math.min(max, l * 10)); tvx = dx / l * s; tvy = dy / l * s; }
+    }
+    if (player.swing > 0) { tvx *= .25; tvy *= .25; } // planted while swinging
+    if (player.slide > 0) accelTo(player, 0, 0, dt, P_ACC, venue.slide); // sliding: no control; skids 1-2 m (further on clay)
+    else accelTo(player, tvx, tvy, dt, P_ACC, P_DEC);
+    player.x += player.vx * dt; player.y += player.vy * dt;
+    const [x0, x1, y0, y1] = serving
+      ? (deuce() ? [CX + .3, CX + 3.6] : [CX - 3.6, CX - .3]).concat([player.y, player.y])
+      : [-3, CW + 3, NET_Y + .8, L + 3];
+    if (player.x < x0 || player.x > x1) { player.x = clamp(player.x, x0, x1); player.vx = 0; }
+    if (player.y < y0 || player.y > y1) { player.y = clamp(player.y, y0, y1); player.vy = 0; }
+    animateBody(player, dt);
+  }
+
+  // Aiming snaps to a 3 x 3 grid (left / middle / right x deep / normal / short) for keys and touch,
+  // and follows the cursor directly when the mouse points at the opponent's court.
+  const AIM_X = .85;
+  function aimFromInput(mx, my) {
+    if (mx) aimX = mx * AIM_X;           // keys: a press picks the column / row and it stays picked
+    if (my) aimD = -my;
+    if (mx || my || !ptr) return;
+    if (ptr.mouse) {
+      const g = unproject(ptr.x, ptr.y);
+      if (g.y < NET_Y) {
+        if (state === 'serve') {
+          const box = serveBox('C', deuce()), hw = (box.x1 - box.x0) / 2 - .45;
+          aimX = clamp((g.x - (box.x0 + box.x1) / 2) / hw, -1, 1);
+        } else {
+          aimX = clamp((g.x - CX) / (CX - .7), -1, 1);
+          aimD = g.y <= 2.8 ? clamp((2.8 - g.y) / 1.8, 0, 1) : -clamp((g.y - 2.8) / 4, 0, 1);
+        }
+        return;
+      }
+    }
+    // touch (or the mouse on your own side): flick from where the shot button was pressed
+    if (!charge.p0) charge.p0 = { ...ptr };
+    const dx = ptr.x - charge.p0.x, dy = charge.p0.y - ptr.y, step = Math.min(W, H) * .07;
+    aimX = Math.abs(dx) > step ? Math.sign(dx) * AIM_X : 0;
+    aimD = Math.abs(dy) > step ? Math.sign(dy) : 0;
+  }
+
+  // where to stand (x) to meet the incoming ball on the forehand or backhand side
+  // Where to go to meet the incoming ball (while a shot is charged, the player is walked there):
+  // volley it where you stand if it passes you at a playable height, get under a high ball that comes
+  // down in front of you, otherwise go to where it peaks after the bounce (all the way in for a drop shot).
+  // Where an incoming high ball will come down through the ideal smash height (2.1-2.5 m) on your side.
+  function smashSpot() {
+    if (!ball.live || ball.last !== 'C' || ball.bounces !== 0 || ball.serve) return null;
+    const b = { ...ball, trail: null }, step = 1 / 120;
+    let high = ball.z > 2.6;
+    for (let i = 0; i < 500; i++) {
+      if (physStep(b, step)) return null;
+      if (b.z > 2.6) high = true;
+      if (high && b.vz < 0 && b.z <= 2.5 && b.y > NET_Y + .8) return b.z >= 2.1 ? { x: b.x, y: b.y } : null;
+    }
+    return null;
+  }
+
+  function assistTarget() {
+    if (!ball.live || ball.last !== 'C') return null;
+    const ss = smashSpot();
+    if (ss && (player.y < NET_Y + 9 || ball.chance)) { // get under it (rush in for a sitter) so it drops onto the racket above your head
+      const side = ss.x >= player.x - .1 ? 1 : -1;
+      return { x: ss.x - side * .25, y: clamp(ss.y + .25, NET_Y + .8, L + 3) };
+    }
+    const b = { ...ball, trail: null }, step = 1 / 60;
+    let bounces = ball.bounces, air = null, post = null, cross = null;
+    for (let i = 0; i < 300; i++) {
+      const py = b.y;
+      if (physStep(b, step) && ++bounces >= 2) break;
+      if (bounces === 0 && py < player.y - .2 && b.y >= player.y - .2 && b.z > .4 && b.z < 2.8) { cross = { x: b.x, y: player.y }; break; }
+      if (bounces === 0 && !air && b.y > NET_Y + 1 && b.vz < 0 && b.z < 2.8 && b.z > 1) air = { x: b.x, y: b.y };
+      if (bounces === 1 && !post && b.vz <= 0) { post = { x: b.x, y: b.y }; break; }
+    }
+    const g = cross || (air && player.y < NET_Y + 7 ? air : null) || post || { x: b.x, y: player.y };
+    const side = g.x >= player.x - .1 ? 1 : -1;
+    // stand so the ball passes in the sweet spot, a little to the side
+    return { x: g.x - side * reachOf(charge ? charge.type : 'top') * .3, y: clamp(g.y + .3, NET_Y + .8, L + 3) };
+  }
+
+  // after a scrambling get the player slides on, low and wide, and is slow to recover
+  const SLIDE = .45;
+  function startSlide(o) { o.slide = SLIDE; }
+
+  // accelerate toward a target velocity, braking harder than speeding up
+  function accelTo(o, tvx, tvy, dt, acc, dec) {
+    let dx = tvx - o.vx, dy = tvy - o.vy;
+    const dl = Math.hypot(dx, dy), braking = tvx * o.vx + tvy * o.vy < (o.vx * o.vx + o.vy * o.vy) * .7;
+    const a = (braking ? dec : acc) * dt;
+    if (dl > a) { dx = dx / dl * a; dy = dy / dl * a; }
+    o.vx += dx; o.vy += dy;
+  }
+  // Feet stay planted on the court and step to a new spot when the body leaves them behind.
+  function footIdeal(o, i) {
+    const { R, Fw } = facing(o);
+    const serving = state === 'serve' && isServer(o) && !(o.anim > 0);
+    let l = serving ? (i < 0 ? [-.08, .3] : [.32, -.22]) : [i * (.19 + o.crouch * .07), 0];
+    const k = o.stroke.side || o.stroke.kind, front = k === 'bh' ? 1 : -1; // forehand: left foot steps in, backhand: right foot
+    const animP = o.anim > 0 ? 1 - o.anim / o.animDur : 1;
+    if (o.anim > 0 && animP < .85 && i === front && k !== 'serve' && k !== 'smash') l = [l[0] * 1.3, l[1] + (k === 'volley' ? .45 : .36)];
+    if (o.slide > 0) l = i < 0 ? [-.5, .32] : [.42, -.3]; // splits-style slide
+    return [o.x + (R[0] * l[0] + Fw[0] * l[1]) * FIG + o.vx * .1, o.y + (R[1] * l[0] + Fw[1] * l[1]) * FIG + o.vy * .1];
+  }
+  function stepFeet(o, dt) {
+    const sp = Math.hypot(o.vx, o.vy);
+    if (!o.feet) o.feet = [-1, 1].map(i => { const w = footIdeal(o, i); return { x: w[0], y: w[1], z: 0, step: 0 }; });
+    if (o.slide > 0) { // the leading foot skids out ahead, the trailing foot stays planted
+      const { R } = facing(o), lead = o.vx * R[0] + o.vy * R[1] >= 0 ? 1 : 0;
+      const f = o.feet[lead], w = footIdeal(o, lead ? 1 : -1);
+      f.x += (w[0] - f.x) * Math.min(1, dt * 14); f.y += (w[1] - f.y) * Math.min(1, dt * 14); f.z = 0; f.step = 0;
+      return;
+    }
+    o.feet.forEach(f => {
+      if (!f.step) return;
+      f.step += dt / f.dur;
+      const p = Math.min(1, f.step), e = smooth(p);
+      f.x = lerp(f.fx, f.tx, e); f.y = lerp(f.fy, f.ty, e); f.z = Math.sin(Math.PI * p) * f.lift;
+      if (p >= 1) { f.step = 0; f.z = 0; }
+    });
+    // one foot at a time (the other may start once this one is half way through)
+    const busy = o.feet.some(f => f.step && f.step < .5);
+    if (busy) return;
+    let best = -1, worst = 0;
+    o.feet.forEach((f, k) => {
+      if (f.step) return;
+      const w = footIdeal(o, k ? 1 : -1), d = Math.hypot(w[0] - f.x, w[1] - f.y);
+      if (d > worst) { worst = d; best = k; }
+    });
+    if (best < 0 || worst < (sp > .6 ? .16 : .09) * FIG + .02) return;
+    const f = o.feet[best], w = footIdeal(o, best ? 1 : -1);
+    f.dur = clamp(.2 - sp * .013, .1, .2);
+    f.fx = f.x; f.fy = f.y; f.tx = w[0] + o.vx * f.dur * .5; f.ty = w[1] + o.vy * f.dur * .5;
+    f.lift = (.05 + Math.min(sp, 8) * .016) * FIG; f.step = 1e-4;
+  }
+
+  function animateBody(o, dt) {
+    const sp = Math.hypot(o.vx, o.vy);
+    stepFeet(o, dt);
+    o.anim = Math.max(0, (o.anim || 0) - dt);
+    if (o.slide > 0) {
+      o.slide -= dt;
+      if (Math.random() < dt * 30) dust.push({ x: o.x + rand(-.3, .3), y: o.y + rand(-.3, .3), life: .5, r: rand(.15, .35) });
+    }
+    // lean into acceleration, back when braking
+    const ax = (o.vx - (o.pvx || 0)) / dt, ay = (o.vy - (o.pvy || 0)) / dt;
+    o.pvx = o.vx; o.pvy = o.vy;
+    o.squeak = Math.max(0, (o.squeak || 0) - dt);
+    if (Math.hypot(ax, ay) > 28 && sp > 2.5 && !o.squeak) { sSqueak(o === player ? 1 : .4); o.squeak = .6; }
+    const k = Math.min(1, dt * 12);
+    o.lx = (o.lx || 0) + (clamp(ax * .006, -.14, .14) - (o.lx || 0)) * k;
+    o.ly = (o.ly || 0) + (clamp(ay * .006, -.14, .14) - (o.ly || 0)) * k;
+    o.phase += sp * dt * 2.7;
+    o.sp += (Math.min(1, sp / 5) - o.sp) * Math.min(1, dt * 10);
+    o.hop = Math.max(0, o.hop - dt);
+    const target = o.slide > 0 ? 1.15 : state === 'serve' ? (isServer(o) ? .1 : .75) : state === 'rally' ? .65 : .3;
+    o.crouch += (target - o.crouch) * Math.min(1, dt * 5);
+  }
+
+  function moveCpu(dt) {
+    if (practice) { accelTo(cpu, 0, 0, dt, C_ACC, C_DEC); cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt; animateBody(cpu, dt); return; }
+    let target = null, speed = lv.speed * (ball.live && ball.last === 'P' ? footSpeed() : 1);
+    if (state === 'rally' && ball.live && ball.last === 'P') {
+      if (cpu.react > 0) cpu.react -= dt;
+      else target = cpu.plan = cpu.plan || planIntercept();
+    } else if (state === 'rally' || state === 'pause') {
+      // recover to the middle right after hitting; after floating up a sitter, back off deep to defend the smash
+      target = { x: CX + (player.x - CX) * .25, y: cpu.defend ? -3.2 : -1 };
+    }
+    if (target) {
+      const dx = target.x - cpu.x, dy = clamp(target.y, -4, NET_Y - 1.2) - cpu.y, l = Math.hypot(dx, dy);
+      const s = Math.min(speed, l * 5), sw = cpu.swing > 0 ? .25 : 1;
+      if (!(cpu.slide > 0)) accelTo(cpu, l > .01 ? dx / l * s * sw : 0, l > .01 ? dy / l * s * sw : 0, dt, C_ACC, C_DEC);
+    } else accelTo(cpu, 0, 0, dt, C_ACC, C_DEC);
+    if (cpu.slide > 0) accelTo(cpu, 0, 0, dt, C_ACC, venue.slide); // still sliding after a lunge
+    cpu.x += cpu.vx * dt; cpu.y += cpu.vy * dt;
+    if (cpu.x < -3 || cpu.x > CW + 3) { cpu.x = clamp(cpu.x, -3, CW + 3); cpu.vx = 0; }
+    if (cpu.y < -4 || cpu.y > NET_Y - 1.2) { cpu.y = clamp(cpu.y, -4, NET_Y - 1.2); cpu.vy = 0; }
+    animateBody(cpu, dt);
+
+    if (state === 'serve' && server() === 'C') {
+      cpuServeT -= dt;
+      if (ball.held && cpuServeT <= 0) toss();
+      else if (tossing && ball.vz <= .3) serveHit('C', rand(...lv.serve), pickWeighted({ flat: 5, slice: 4, top: 1 }), rand(...lv.power));
+    }
+  }
+
+  function moveBall(dt) {
+    if (ball.held) { holdBall(); return; }
+    const py = ball.y;
+    const impact = physStep(ball, dt);
+    if (ball.rolling) { const f = Math.pow(.25, dt); ball.vx *= f; ball.vy *= f; }
+    ball.spin *= Math.pow(.6, dt);
+    if (tossing && ball.vz < 0 && ball.z < .8) { ball.held = true; tossing = false; return; } // missed toss: try again
+    if (impact) { if (impact > 2) sBounce(impact); onBounce(); }
+    if ((py - NET_Y) * (ball.y - NET_Y) < 0 && ball.x > -2.3 && ball.x < CW + 2.3) {
+      const nh = NET_H + Math.min(1, Math.abs(ball.x - CX) / (CX + 2.3)) * .155;
+      if (ball.z < nh) {
+        ball.y = NET_Y + Math.sign(py - NET_Y) * .06; ball.vy *= -.15; ball.vx *= .3; ball.ax = 0;
+        if (ball.live) onNet();
+      }
+    }
+  }
+
+  function step(dt) {
+    movePlayer(dt);
+    moveCpu(dt);
+    moveBall(dt * ballTS());
+    player.swing = Math.max(0, player.swing - dt); player.cool -= dt;
+    cpu.swing = Math.max(0, cpu.swing - dt);
+    if (charge) charge.t += dt;
+    // held too long: the toss drops and you have to swing anyway
+    if (charge && charge.serve && tossing && ball.vz < 0 && ball.z < 1.9) serveRelease();
+
+    if (state === 'rally') {
+      const dp = d2(ball, player), reachable = canHit('P') && ball.z < 3.2;
+      if (charge && reachable && dp < reachOf(charge.type) * .95 && player.cool <= 0) fireSwing(); // charged shot fires on contact
+      else if (!charge && $('auto').checked && reachable && ball.z < 2.6 && player.cool <= 0) {
+        // auto swing: topspin when the ball is close, a defensive slice when you have to stretch
+        const t = dp < reachOf('top') * .9 ? 'top' : dp < reachOf('slice') * .9 ? 'slice' : null;
+        if (t) {
+          player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = openCourt(); player.aimD = 0; player.closest = null;
+          startAnim(player, strokeKind(player), t);
+        }
+      }
+      // contact happens where the ball passes closest to you during the swing, not where it enters the ring
+      const inRing = reachable && dp < reachOf(player.shot);
+      if (player.swing > 0 && inRing && (player.closest == null || dp < player.closest)) player.closest = dp;
+      else if (player.closest != null && (!inRing || dp > player.closest || player.swing <= 0)) {
+        if (reachable) playerHit(player.closest);
+        player.closest = null;
+      }
+      const dc = d2(ball, cpu);
+      // the CPU also meets the ball where it passes closest (it can stretch past its reach with a
+      // defensive slice), and lets a ball that just bounced rise to a hittable height first
+      const cIn = !practice && state === 'rally' && canHit('C') && dc < lv.reach * STRETCH && ball.z < (ball.bounces === 0 ? 3.1 : 2.6);
+      const rising = ball.z < .35 && ball.vz > 0;
+      if (cIn && (cpu.closest == null || dc < cpu.closest || rising)) cpu.closest = Math.min(cpu.closest ?? dc, dc);
+      else if (cpu.closest != null) {
+        if (state === 'rally' && canHit('C')) cpuHit(cpu.closest);
+        cpu.closest = null;
+      }
+    }
+  }
+
+  function update(dt) {
+    dt *= TS;
+    for (let i = 0; i < 3; i++) step(dt / 3);
+    if (ball.live || tossing) {
+      ball.trail.unshift({ x: ball.x, y: ball.y, z: ball.z });
+      ball.trail.length = Math.min(ball.trail.length, 10);
+    }
+    if (state === 'pause' && (pauseT -= dt) <= 0) { state = 'wait'; pauseCb(); }
+    popups.forEach(p => { p.z += dt * 1.2; p.life -= dt; });
+    popups = popups.filter(p => p.life > 0);
+    marks.forEach(m => (m.life -= dt));
+    if (state === 'pause' && !practice) fetchBall();
+    moveKids(dt);
+    cheer = Math.max(0, cheer - dt);
+    judges.forEach(j => (j.call = Math.max(0, j.call - dt)));
+    if (umpCall && (umpCall.life -= dt) <= 0) umpCall = null;
+    setMurmur(state === 'rally' ? .012 + Math.min(rally, 12) * .003 : state === 'over' || state === 'menu' ? 0 : .04);
+    dust.forEach(d => { d.life -= dt; d.r += dt * .6; });
+    dust = dust.filter(d => d.life > 0);
+    marks = marks.filter(m => m.life > 0);
+  }
+
+  // ---------- drawing ----------
+  const crowd = Array.from({ length: 260 }, () => ({
+    u: Math.random(), v: Math.random(),
+    c: ['#ff5d73', '#ffd166', '#06d6a0', '#118ab2', '#f4f1de', '#ef8354', '#a78bfa'][Math.floor(Math.random() * 7)],
+  }));
+
+  function poly(pts, fill) {
+    ctx.beginPath();
+    pts.forEach(([x, y, z], i) => { const p = P(x, y, z || 0); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  }
+  function line(x1, y1, x2, y2, w = .06, color = 'rgba(255,255,255,.95)', z1 = 0, z2 = 0) {
+    const a = P(x1, y1, z1), b = P(x2, y2, z2);
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, w * (a.s + b.s) / 2);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  // fictional sponsors on LED boards: the back wall panels change every few seconds
+  const SPONSORS = [['BUMPY SPORTS', '#ff5d73'], ['KOBA WATER', '#2ab7ca'], ['AERO AIR', '#3d5af1'], ['SPEED WATCH', '#222'],
+                    ['CLOUD BANK', '#0a9396'], ['NORI DRINK', '#f4a261'], ['TOPSPIN TV', '#8338ec'], ['GRAND SLAM SHOES', '#e63946']];
+  function adPanel(x0, x1, y0, y1, z0, z1, [name, col], vertical) {
+    const pts = vertical ? [[x0, y0, z1], [x1, y1, z1], [x1, y1, z0], [x0, y0, z0]] : null;
+    const q = pts.map(([x, y, z]) => P(x, y, z));
+    ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+    const c = P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), h = Math.abs(q[3].y - q[0].y), w = Math.abs(q[1].x - q[0].x);
+    const size = Math.min(h * .55, w * .9 / (name.length * .62));
+    if (size < 6) return; // too small to read: just the colour
+    ctx.save(); ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${size}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(name, c.x, c.y);
+    ctx.restore();
+  }
+  function drawAds(t) {
+    const shift = Math.floor(t / 5);
+    for (let k = 0, x = -15; x < CW + 15; x += 5.2, k++) {
+      if (x + 5 > CX - 3.2 && x < CX + 3.2) continue; // leave the middle for the event banner
+      adPanel(x, x + 5, -7.95, -7.95, .25, 1.9, SPONSORS[(k + shift) % SPONSORS.length], true);
+    }
+    for (let k = 0, y = -6; y < L + 3; y += 5.5, k++) { // side boards
+      adPanel(-ALLEY - 4, -ALLEY - 4, y, y + 5, 0, .9, SPONSORS[(k + 3) % SPONSORS.length], true);
+      adPanel(CW + ALLEY + 4, CW + ALLEY + 4, y, y + 5, 0, .9, SPONSORS[(k + 5) % SPONSORS.length], true);
+    }
+  }
+  const stripes = (x0, x1, y0, y1, step, c1, c2) => {
+    for (let y = y0, k = 0; y < y1; y += step, k++) poly([[x0, y], [x1, y], [x1, Math.min(y1, y + step)], [x0, Math.min(y1, y + step)]], k % 2 ? c1 : c2);
+  };
+  function drawCourt() {
+    const V = venue, wallTop = P(0, -8, 2.2).y, wallBot = P(0, -8, 0).y;
+    const sky = ctx.createLinearGradient(0, 0, 0, wallTop);
+    sky.addColorStop(0, V.sky[0]); sky.addColorStop(1, V.sky[1]);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, wallTop);
+    if (V.night) { // floodlights over a night session
+      [.12, .38, .62, .88].forEach(u => {
+        const g = ctx.createRadialGradient(u * W, 6, 0, u * W, 6, 60);
+        g.addColorStop(0, 'rgba(255,255,235,.95)'); g.addColorStop(1, 'rgba(255,255,235,0)');
+        ctx.fillStyle = g; ctx.fillRect(u * W - 60, 0, 120, 70);
+      });
+    }
+    const t = performance.now() / 1000;
+    crowd.forEach((c, i) => {
+      const y = c.v * (wallTop - 6) + 3 + (rally > 4 ? Math.sin(t * 9 + i) * 1.5 : 0) - Math.abs(Math.sin(t * 13 + i * 1.7)) * 5 * Math.min(1, cheer);
+      ctx.fillStyle = c.c; ctx.beginPath(); ctx.arc(c.u * W, y, 2 + c.v * 2.5, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = V.wall; ctx.fillRect(0, wallTop, W, wallBot - wallTop);
+    const mid = P(CX, -8, 1.1);
+    drawAds(t);
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.font = `bold ${Math.max(10, mid.s * .75)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const bw = ctx.measureText(V.banner).width + 24;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(mid.x - bw / 2, P(CX, -8, 1.9).y, bw, P(CX, -8, .3).y - P(CX, -8, 1.9).y);
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fillText(V.banner, mid.x, mid.y);
+    // the playing surface
+    ctx.fillStyle = V.outer; ctx.fillRect(0, wallBot, W, H - wallBot);
+    if (V.grass) { // mowing stripes and worn patches behind the baselines
+      stripes(-12, CW + 12, -8, L + 12, 1.6, '#4f9a3e', '#469036');
+      [0, L].forEach(y => {
+        const p = P(CX, y + (y ? 1 : -1)), r = 2.6;
+        ctx.fillStyle = 'rgba(176,160,98,.55)';
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, r * p.s, r * .45 * p.s, 0, 0, 7); ctx.fill();
+      });
+    } else {
+      poly([[-ALLEY, 0], [CW + ALLEY, 0], [CW + ALLEY, L], [-ALLEY, L]], V.court);
+      if (V.clay) { // brushed clay
+        ctx.strokeStyle = 'rgba(120,45,15,.12)'; ctx.lineWidth = 1;
+        for (let y = -6; y < L + 6; y += .7) { const a = P(-4, y), b2 = P(CW + 4, y + .3); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke(); }
+      }
+    }
+    const lc = V.line;
+    [-ALLEY, 0, CW, CW + ALLEY].forEach(x => line(x, 0, x, L, .06, lc));
+    [0, L].forEach(y => line(-ALLEY, y, CW + ALLEY, y, .08, lc));
+    [NET_Y - SVC, NET_Y + SVC].forEach(y => line(0, y, CW, y, .06, lc));
+    line(CX, NET_Y - SVC, CX, NET_Y + SVC, .06, lc);
+    line(CX, 0, CX, .25, .06, lc); line(CX, L, CX, L - .25, .06, lc);
+  }
+
+  function drawNet() {
+    const px = ALLEY + .91;
+    ctx.beginPath();
+    [[-px, 0], [-px, 1.07], [CX, NET_H], [CW + px, 1.07], [CW + px, 0]].forEach(([x, z], i) => {
+      const p = P(x, NET_Y, z); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y);
+    });
+    ctx.closePath(); ctx.fillStyle = 'rgba(15,18,30,.45)'; ctx.fill();
+    for (let x = -px; x <= CW + px; x += .5) {
+      const top = 1.07 - (1.07 - NET_H) * (1 - Math.abs(x - CX) / (CX + px));
+      line(x, NET_Y, x, NET_Y, .01, 'rgba(255,255,255,.18)', 0, top);
+    }
+    line(-px, NET_Y, CX, NET_Y, .07, '#fff', 1.07, NET_H);
+    line(CX, NET_Y, CW + px, NET_Y, .07, '#fff', NET_H, 1.07);
+    line(-px, NET_Y, -px, NET_Y, .1, '#333', 0, 1.07);
+    line(CW + px, NET_Y, CW + px, NET_Y, .1, '#333', 0, 1.07);
+  }
+
+  // ---------- people ----------
+  // Poses are keyframes in the body's own frame: x = to the player's right, y = forward (toward the net), z = up.
+  // hand / dir: racket hand and racket direction, off: the other hand ('grip' = both hands on the racket,
+  // 'throat' = resting on the racket throat), yaw: how far the shoulders are turned (+ = right shoulder back).
+  const K = (t, yaw, hand, dir, off) => ({ t, yaw, hand, dir, off });
+  const READY = K(0, 0, [.2, .38, 1], [-.3, .75, .55], 'throat');
+  // Strokes: 0 = take-back, ~.38 = contact, 1 = finish.
+  const FH = {
+    // unit turn, racket head drops behind (lag), low-to-high through contact, windshield-wiper wrap over the shoulder
+    top: [K(0, 1.25, [.55, -.45, 1.15], [.1, -.75, .65], [.15, .6, 1.3]),
+          K(.24, 1, [.62, -.3, .82], [.25, -.6, -.75], [.05, .5, 1.2]),
+          K(.38, .1, [.48, .5, .85], [.9, .42, .1], [-.2, .35, 1.05]),
+          K(.55, -.45, [.15, .8, 1.25], [.2, .9, .35], [-.3, .2, 1.1]),
+          K(1, -1.2, [-.35, 0, 1.6], [-.3, -.6, -.75], [-.3, .05, 1.25])],
+    flat: [K(0, 1.2, [.55, -.45, 1.1], [.15, -.8, .5], [.15, .6, 1.3]),
+           K(.24, .95, [.62, -.3, .95], [.3, -.8, -.3], [.05, .5, 1.2]),
+           K(.38, .1, [.48, .5, .95], [.92, .4, .02], [-.2, .35, 1.05]),
+           K(.55, -.45, [.15, .85, 1.05], [.3, .95, .05], [-.3, .2, 1.1]),
+           K(1, -1.1, [-.4, .1, 1.35], [-.4, -.8, -.2], [-.3, .05, 1.2])],
+    // slice: high take-back, open face, long forward finish, off arm opens for balance
+    slice: [K(0, 1.1, [.45, -.3, 1.5], [.15, -.5, .85], [.1, .6, 1.35]),
+            K(.38, .1, [.45, .5, 1], [.85, .45, -.15], [-.25, .2, 1.1]),
+            K(.6, -.1, [.25, .85, .85], [.6, .75, -.2], [-.4, -.2, 1.1]),
+            K(1, -.2, [.15, .75, .95], [.5, .8, .1], [-.45, -.35, 1.15])],
+  };
+  FH.lob = [FH.top[0], FH.top[1], K(.38, .05, [.45, .45, .72], [.75, .4, .55], [-.2, .35, 1.05]),
+            K(1, -.9, [-.2, .2, 2], [-.2, -.3, .9], [-.3, .1, 1.3])];
+  FH.drop = [FH.slice[0], K(.38, .1, [.42, .45, 1.05], [.8, .5, -.25], [-.2, .25, 1.1]),
+             K(1, -.05, [.3, .6, .95], [.6, .7, -.35], [-.35, -.15, 1.1])];
+  const mirror = k => K(k.t, -k.yaw, [-k.hand[0], k.hand[1], k.hand[2]], [-k.dir[0], k.dir[1], k.dir[2]],
+    typeof k.off === 'string' ? k.off : [-k.off[0], k.off[1], k.off[2]]);
+  // two-handed backhand for drives (both hands on the grip, finish over the right shoulder);
+  // one-handed slice / drop with the left arm opening back behind
+  const BH = {};
+  for (const sp in FH) BH[sp] = FH[sp].map(k => { const m = mirror(k); if (sp !== 'slice' && sp !== 'drop') m.off = 'grip'; return m; });
+  BH.slice = BH.slice.map((k, i) => ({ ...k, off: [[.05, .55, 1.25], [-.35, -.25, 1.1], [-.5, -.42, 1.15], [-.55, -.5, 1.2]][i] }));
+  BH.drop = BH.drop.map((k, i) => ({ ...k, off: [[.05, .55, 1.25], [-.35, -.25, 1.1], [-.5, -.42, 1.15]][i] }));
+  // volley: no backswing, a short firm punch out in front
+  const VOLLEY_FH = [K(0, .5, [.45, .3, 1.25], [.3, .4, .85], [.1, .55, 1.25]),
+                     K(.38, .15, [.45, .75, 1.15], [.55, .75, .35], [-.1, .45, 1.15]),
+                     K(1, .1, [.42, .8, 1.1], [.5, .8, .3], [-.1, .4, 1.1])];
+  const VOLLEY_BH = VOLLEY_FH.map(mirror);
+  const SERVE_STANCE = K(0, .95, [.3, -.05, .8], [.15, .35, -.9], [.1, .4, 1.05]);
+  const TROPHY = K(0, .95, [.4, -.25, 1.6], [.15, -.35, .9], [.05, .3, 2.05]);
+  const RACKET_DROP = K(0, .9, [.3, -.2, 1.7], [0, -.25, -1], [.05, .3, 2]);
+  // serve: racket drop behind the back, drive up to full stretch, pronate and finish across the left hip
+  const OVERHEAD = [RACKET_DROP,
+                    K(.3, .35, [.25, .1, 2.15], [.1, .2, 1], [-.1, .25, 1.6]),
+                    K(.4, .1, [.15, .38, 2.35], [.05, .35, 1], [-.15, .3, 1.35]),
+                    K(.6, -.4, [.05, .62, 1.5], [.1, .8, -.6], [-.25, .15, 1.05]),
+                    K(1, -.9, [-.35, .35, .8], [-.3, -.2, -.95], [-.3, 0, 1])];
+  // smash: side-on, left hand pointing up at the ball, then the same overhead swing
+  const SMASH = [K(0, 1, [.35, -.2, 1.75], [0, -.3, -1], [.1, .55, 2.2]), ...OVERHEAD.slice(1)];
+  const keysFor = st => st.kind === 'serve' ? OVERHEAD : st.kind === 'smash' ? SMASH
+    : st.kind === 'volley' ? (st.side === 'bh' ? VOLLEY_BH : VOLLEY_FH)
+    : (st.kind === 'bh' ? BH : FH)[st.spin] || FH.top;
+
+  const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  const smooth = t => t * t * (3 - 2 * t);
+  function blendKey(a, b, t) {
+    t = smooth(clamp(t, 0, 1));
+    const off = typeof a.off === 'string' || typeof b.off === 'string' ? (t < .5 ? a.off : b.off) : lerp3(a.off, b.off, t);
+    return K(0, lerp(a.yaw, b.yaw, t), lerp3(a.hand, b.hand, t), lerp3(a.dir, b.dir, t), off);
+  }
+  function sample(keys, p) {
+    for (let i = 1; i < keys.length; i++)
+      if (p <= keys[i].t) return blendKey(keys[i - 1], keys[i], (p - keys[i - 1].t) / (keys[i].t - keys[i - 1].t));
+    return keys[keys.length - 1];
+  }
+  const facing = o => (o === player ? { R: [1, 0], Fw: [0, -1] } : { R: [-1, 0], Fw: [0, 1] });
+  const sideKind = o => ((ball.x - o.x) * facing(o).R[0] >= 0 ? 'fh' : 'bh');
+  const isServer = o => (server() === 'P') === (o === player);
+
+  function poseOf(o, ch) {
+    if (o.anim > 0) return sample(keysFor(o.stroke), 1 - o.anim / o.animDur);
+    if (state === 'serve' && isServer(o)) {
+      if (ball.held) return SERVE_STANCE;
+      const up = blendKey(SERVE_STANCE, TROPHY, (ball.z - 1.1) / (TOSS_PEAK - 1.1) * 1.4);
+      return ch ? blendKey(up, RACKET_DROP, ch.t / ch.full) : up;
+    }
+    // get the racket back as the ball comes in (or while charging)
+    const mine = o === player ? 'P' : 'C';
+    let prep = 0, st = { kind: sideKind(o), spin: ch ? ch.type : 'top' };
+    if (ball.live && ball.last !== mine) prep = clamp((5.5 - d2(ball, o)) / 3.5, 0, 1);
+    if (ch) prep = Math.max(prep, .4 + .6 * Math.min(1, ch.t / ch.full));
+    if (prep > 0 && ball.z > 2.3 && ball.bounces === 0) st.kind = 'smash';
+    else if (prep > 0 && o === player && ball.bounces === 0 && player.y < NET_Y + 5) { st.side = st.kind; st.kind = 'volley'; }
+    let pose = prep > 0 ? blendKey(READY, keysFor(st)[0], prep) : READY;
+    if (o.sp > .25 && prep < .3) { // pump the arms while running
+      const sw = Math.sin(o.phase) * .28 * o.sp;
+      pose = { ...pose, hand: [pose.hand[0] + .05, pose.hand[1] - sw * .5, pose.hand[2] - .05], off: [-.28, .15 + sw, 1.02] };
+    }
+    return pose;
+  }
+
+  // two-bone IK: from root toward target with segment lengths a, b; the joint bends toward `pole`
+  function ik(root, target, a, b, pole) {
+    let d = [target[0] - root[0], target[1] - root[1], target[2] - root[2]];
+    let dl = Math.hypot(...d);
+    const reach = a + b - .001;
+    if (dl > reach) { d = d.map(v => v / dl * reach); dl = reach; target = root.map((v, i) => v + d[i]); }
+    const n = d.map(v => v / (dl || 1));
+    const along = (a * a - b * b + dl * dl) / (2 * dl || 1), h = Math.sqrt(Math.max(0, a * a - along * along));
+    const pd = pole[0] * n[0] + pole[1] * n[1] + pole[2] * n[2];
+    let pp = pole.map((v, i) => v - n[i] * pd); const pl = Math.hypot(...pp) || 1; pp = pp.map(v => v / pl);
+    return { joint: root.map((v, i) => v + n[i] * along + pp[i] * h), end: target };
+  }
+
+  const OUTLINE = 'rgba(18,20,38,.6)';
+  function figure(o, kit, ch) {
+    const { R, Fw } = facing(o);
+    const pose = poseOf(o, ch);
+    let hop = o.hop > 0 ? Math.sin(Math.PI * (1 - o.hop / HOP)) * .09 : 0;
+    if (o.anim > 0 && (o.stroke.kind === 'serve' || o.stroke.kind === 'smash')) {
+      const p = 1 - o.anim / o.animDur; // spring up into the ball, land after contact
+      hop += Math.sin(Math.PI * clamp((p - .15) / .5, 0, 1)) * (o.stroke.kind === 'smash' ? .3 : .22);
+    }
+    const bob = (o.feet ? Math.max(...o.feet.map(f => f.z)) : 0) / FIG * .35 - o.sp * .03;
+    const hipZ = .93 - o.crouch * .17 + hop + bob;
+    const lean = o.crouch * .1 + o.sp * .07;
+    // body-local -> world (meters); yaw turns the shoulders, hips follow half way
+    const rot = (l, a) => [l[0] * Math.cos(a) + l[1] * Math.sin(a), -l[0] * Math.sin(a) + l[1] * Math.cos(a), l[2]];
+    const W3 = l => [o.x + (R[0] * l[0] + Fw[0] * l[1]) * FIG, o.y + (R[1] * l[0] + Fw[1] * l[1]) * FIG, l[2] * FIG];
+    const yaw = pose.yaw;
+    const hipL = W3(rot([-.12, 0, hipZ], yaw * .5)), hipR = W3(rot([.12, 0, hipZ], yaw * .5));
+    const shZ = hipZ + .55;
+    const shL = W3(rot([-.21, lean, shZ], yaw)), shR = W3(rot([.21, lean, shZ], yaw));
+    // upper body sways with acceleration
+    const sway = p => [p[0] + (o.lx || 0) * FIG, p[1] + (o.ly || 0) * FIG, p[2]];
+    [shL, shR].forEach((p, i) => { const q = sway(p); p[0] = q[0]; p[1] = q[1]; });
+    const neck = sway(W3([0, lean * 1.2, shZ + .06])), head = sway(W3([0, lean * 1.3, shZ + .25]));
+    const hand = sway(W3([pose.hand[0], pose.hand[1], pose.hand[2] + hop]));
+    let dir = [R[0] * pose.dir[0] + Fw[0] * pose.dir[1], R[1] * pose.dir[0] + Fw[1] * pose.dir[1], pose.dir[2]];
+    const dl = Math.hypot(...dir); dir = dir.map(v => v / dl);
+    const at = (p, k) => p.map((v, i) => v + dir[i] * k * FIG);
+    let offT;
+    if (pose.off === 'grip') offT = [hand[0] - dir[0] * .07, hand[1] - dir[1] * .07, hand[2] - dir[2] * .07 - .02];
+    else if (pose.off === 'throat') offT = at(hand, .26);
+    else offT = sway(W3([pose.off[0], pose.off[1], pose.off[2] + hop]));
+    const down = [0, 0, -1];
+    const poleOut = s => [R[0] * s * .6 - Fw[0] * .3, R[1] * s * .6 - Fw[1] * .3, -1];
+    const armR = ik(shR, hand, .3 * FIG, .28 * FIG, poleOut(1)), armL = ik(shL, offT, .3 * FIG, .28 * FIG, poleOut(-1));
+
+    // feet come from the planted-foot stepper
+    const sp = Math.hypot(o.vx, o.vy), md = sp > .1 ? [o.vx / sp, o.vy / sp] : [0, 0];
+    if (!o.feet) stepFeet(o, 0);
+    const feet = o.feet.map(f => [f.x, f.y, f.z + hop * .8 * FIG]);
+    const kneePole = [Fw[0] + md[0] * .5, Fw[1] + md[1] * .5, .1];
+    const legL = ik(hipL, feet[0], .47 * FIG, .46 * FIG, kneePole), legR = ik(hipR, feet[1], .47 * FIG, .46 * FIG, kneePole);
+
+    const base = P(o.x, o.y), s = base.s * FIG;
+    const Q = p => P(p[0], p[1], p[2]);
+    const parts = [];
+    const limb = (a, b, w, color, depthBias = 0) => parts.push({
+      y: (a[1] + b[1]) / 2 + depthBias,
+      f: () => {
+        const A = Q(a), B = Q(b);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = w * s + 2;
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        ctx.strokeStyle = color; ctx.lineWidth = w * s;
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+      },
+    });
+    const mid = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.beginPath(); ctx.ellipse(base.x, base.y, .5 * s * (1 - hop), .16 * s * (1 - hop), 0, 0, Math.PI * 2); ctx.fill();
+
+    // legs (skin, shorts over the thigh, sock and shoe)
+    [[hipL, legL, feet[0]], [hipR, legR, feet[1]]].forEach(([hip, leg, foot]) => {
+      limb(hip, leg.joint, .15, kit.skin);
+      limb(leg.joint, foot, .12, kit.skin);
+            limb(mid(leg.joint, foot, .75), foot, .115, '#fafafa', .01);
+      const toe = [foot[0] + (Fw[0] * .12 + md[0] * .05) * FIG, foot[1] + (Fw[1] * .12 + md[1] * .05) * FIG, foot[2]];
+      limb([foot[0], foot[1], foot[2] + .03 * FIG], [toe[0], toe[1], toe[2] + .03 * FIG], .12, kit.shoe, .02);
+    });
+    // shorts across the hips, then the torso over them
+    const torsoY = (shL[1] + shR[1] + hipL[1] + hipR[1]) / 4;
+    parts.push({
+      y: torsoY - .002,
+      f: () => {
+        const pts = [hipL, hipR, mid(hipR, legR.joint, .5), mid(hipL, legL.joint, .5)].map(Q);
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+        ctx.lineJoin = 'round'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = .16 * s + 2; ctx.stroke();
+        ctx.fillStyle = kit.shorts; ctx.fill(); ctx.strokeStyle = kit.shorts; ctx.lineWidth = .16 * s; ctx.stroke();
+      },
+    });
+    parts.push({
+      y: torsoY,
+      f: () => {
+        const pts = [shL, shR, hipR, hipL].map(Q);
+        ctx.lineJoin = 'round';
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = .13 * s + 2; ctx.stroke();
+        ctx.fillStyle = kit.shirt; ctx.fill();
+        ctx.strokeStyle = kit.shirt; ctx.lineWidth = .13 * s; ctx.stroke();
+        // stripe across the shirt, shaded as the shoulders turn
+        const a = Q(mid(shL, hipL, .35)), b = Q(mid(shR, hipR, .35));
+        ctx.strokeStyle = kit.trim; ctx.lineWidth = .05 * s;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        const shade = Math.abs(Math.sin(yaw)) * .25;
+        if (shade > .02) { ctx.fillStyle = `rgba(0,0,0,${shade})`; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.fill(); }
+      },
+    });
+    // head (always over the torso it sits on)
+    parts.push({
+      y: torsoY + .003,
+      f: () => {
+        const N = Q(neck), Hd = Q(head), r = .125 * s;
+        ctx.strokeStyle = kit.skin; ctx.lineWidth = .09 * s; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(N.x, N.y); ctx.lineTo(Hd.x, Hd.y + r * .5); ctx.stroke();
+        ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(Hd.x, Hd.y, r + 1, 0, 7); ctx.fill();
+        ctx.fillStyle = kit.skin; ctx.beginPath(); ctx.arc(Hd.x, Hd.y, r, 0, 7); ctx.fill();
+        const turn = Math.sin(yaw) * r * .5 * (o === player ? 1 : -1);
+        if (o === player) { // seen from behind: hair and a cap
+          ctx.fillStyle = kit.hair; ctx.beginPath(); ctx.arc(Hd.x, Hd.y, r * .97, 0, 7); ctx.fill();
+          ctx.fillStyle = kit.cap; ctx.beginPath(); ctx.arc(Hd.x, Hd.y - r * .15, r * 1.02, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+          ctx.fillRect(Hd.x - r * 1.02, Hd.y - r * .45, r * 2.04, r * .32);
+        } else {            // seen from the front: face and a headband
+          ctx.fillStyle = kit.hair; ctx.beginPath(); ctx.arc(Hd.x, Hd.y - r * .2, r * 1.02, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+          ctx.fillStyle = kit.trim; ctx.fillRect(Hd.x - r, Hd.y - r * .5, r * 2, r * .25);
+          ctx.fillStyle = '#1a1a1a';
+          ctx.beginPath(); ctx.arc(Hd.x - r * .38 + turn, Hd.y + r * .05, r * .11, 0, 7); ctx.arc(Hd.x + r * .38 + turn, Hd.y + r * .05, r * .11, 0, 7); ctx.fill();
+          ctx.strokeStyle = 'rgba(80,30,30,.7)'; ctx.lineWidth = Math.max(1, r * .1);
+          ctx.beginPath(); ctx.arc(Hd.x + turn, Hd.y + r * .35, r * .25, .2, Math.PI - .2); ctx.stroke();
+        }
+      },
+    });
+    // arms (short sleeve, forearm, hand)
+    [[shR, armR], [shL, armL]].forEach(([sh, arm]) => {
+      limb(sh, arm.joint, .1, kit.skin);
+      limb(sh, mid(sh, arm.joint, .45), .14, kit.shirt, .005);
+      limb(arm.joint, arm.end, .085, kit.skin);
+      limb(arm.end, arm.end, .1, kit.skin, .006);
+    });
+    // racket
+    parts.push({
+      y: at(hand, .45)[1] + .01,
+      f: () => {
+        const A = Q(hand), B = Q(at(hand, .25)), C = Q(at(hand, .5)), D = Q(at(hand, .72));
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#222'; ctx.lineWidth = Math.max(2, .045 * s);
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        const len = Math.max(3, Math.hypot(D.x - B.x, D.y - B.y) / 2), ang = Math.atan2(D.y - B.y, D.x - B.x);
+        ctx.beginPath(); ctx.ellipse(C.x, C.y, len, Math.max(2, .12 * s), ang, 0, 7);
+        ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fill();
+        ctx.strokeStyle = kit.racket; ctx.lineWidth = Math.max(1.5, .035 * s); ctx.stroke();
+      },
+    });
+    parts.sort((a, b) => a.y - b.y).forEach(p => p.f());
+
+    // charge meter
+    if (ch) {
+      const p = Math.min(1, ch.t / ch.full), w = Math.max(44, 1.1 * s), y = P(o.x, o.y, 2.35 * FIG).y, col = SHOTS[ch.type].color;
+      ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(base.x - w / 2 - 2, y - 5, w + 4, 10);
+      ctx.fillStyle = p >= 1 && Math.floor(performance.now() / 80) % 2 ? '#fff' : col;
+      ctx.fillRect(base.x - w / 2, y - 3, w * p, 6);
+      ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = col; ctx.fillText(SHOTS[ch.type].name + (p >= 1 ? ' MAX' : ''), base.x, y - 7);
+    }
+  }
+  const KIT_P = { shirt: '#ff5d73', trim: '#fff', shorts: '#f4f4f4', skin: '#f0c8a0', hair: '#3a2a22', cap: '#c9384d', shoe: '#ffffff', racket: '#d7263d' };
+  const KIT_C = { shirt: '#4a6fd1', trim: '#ffd166', shorts: '#1f2b55', skin: '#c68a5a', hair: '#1b1b1b', cap: '#1b1b1b', shoe: '#ffd166', racket: '#2b2f4a' };
+
+  // simple stand-in people for the officials and ball kids
+  function person(x, y, z0, shirt, h, opts = {}) {
+    const b = P(x, y, z0), s = b.s, zy = z => P(x, y, z0 + z).y;
+    if (!opts.noShadow) { ctx.fillStyle = 'rgba(0,0,0,.2)'; const g = P(x, y); ctx.beginPath(); ctx.ellipse(g.x, g.y, .35 * s, .12 * s, 0, 0, 7); ctx.fill(); }
+    ctx.lineCap = 'round';
+    if (!opts.seated) {
+      const run = opts.run ? Math.sin(opts.run) * .12 : 0;
+      ctx.strokeStyle = '#2b2f4a'; ctx.lineWidth = Math.max(1.5, .09 * s);
+      ctx.beginPath(); ctx.moveTo(b.x - .08 * s, zy(.5 * h)); ctx.lineTo(b.x - (.1 + run) * s, b.y);
+      ctx.moveTo(b.x + .08 * s, zy(.5 * h)); ctx.lineTo(b.x + (.1 - run) * s, b.y); ctx.stroke();
+    }
+    ctx.fillStyle = shirt;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(b.x - .2 * s, zy(.92 * h), .4 * s, .42 * h * s, .08 * s) : ctx.rect(b.x - .2 * s, zy(.92 * h), .4 * s, .42 * h * s); ctx.fill();
+    ctx.fillStyle = '#e8c09a'; ctx.beginPath(); ctx.arc(b.x, zy(1.04 * h), .11 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = opts.cap || '#1d2440'; ctx.beginPath(); ctx.arc(b.x, zy(1.07 * h), .115 * s, Math.PI, 0); ctx.fill();
+    if (opts.arm) { // raised arm pointing out
+      ctx.strokeStyle = shirt; ctx.lineWidth = Math.max(1.5, .08 * s);
+      ctx.beginPath(); ctx.moveTo(b.x + .18 * s, zy(.85 * h)); ctx.lineTo(b.x + .45 * s, zy(1.35 * h)); ctx.stroke();
+    }
+  }
+  function drawUmpire() {
+    const base = P(UMP.x, UMP.y), seat = P(UMP.x, UMP.y, 1.9), s = base.s;
+    ctx.strokeStyle = '#3a3f55'; ctx.lineWidth = Math.max(2, .07 * s);
+    [-.35, .35].forEach(o => { const a = P(UMP.x + o, UMP.y, 0), b = P(UMP.x + o * .6, UMP.y, 1.9); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+    ctx.fillStyle = '#2b3150'; ctx.fillRect(seat.x - .35 * s, seat.y - .1 * s, .7 * s, .14 * s);
+    person(UMP.x, UMP.y, 1.95, '#1f2b55', 1.25, { seated: true, noShadow: true, cap: '#cfd5e6' });
+    if (umpCall) {
+      const head = P(UMP.x, UMP.y, 3.6);
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      const w = ctx.measureText(umpCall.text).width + 16;
+      ctx.globalAlpha = Math.min(1, umpCall.life * 2);
+      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(head.x - w + 10, head.y - 26, w, 22, 8) : ctx.rect(head.x - w + 10, head.y - 26, w, 22); ctx.fill();
+      ctx.fillStyle = '#1f2340'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(umpCall.text, head.x - w / 2 + 10, head.y - 15);
+      ctx.globalAlpha = 1;
+    }
+  }
+  function drawJudge(j) {
+    const chair = P(j.x, j.y, .45), s = chair.s;
+    ctx.fillStyle = '#3a3f55'; ctx.fillRect(chair.x - .2 * s, chair.y, .4 * s, .45 * s);
+    person(j.x, j.y, .45, venue.clay ? '#2c4a7a' : '#1f2b55', 1.05, { seated: true, arm: j.call > 0 });
+  }
+  function drawKid(k) {
+    const crouch = k.task ? 0 : .25;
+    person(k.x, k.y, 0, '#7b2cbf', 1.25 - crouch, { run: k.task ? k.phase : 0, cap: '#7b2cbf' });
+    if (k.task === 'back') { const h = P(k.x + .2, k.y, .9); ctx.fillStyle = '#e8ff3a'; ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(2, .06 * h.s), 0, 7); ctx.fill(); }
+  }
+
+  function drawBall() {
+    if (ballGone) return;
+    const col = ball.live ? SHOTS[ball.type].color : '#e8ff3a';
+    ball.trail.forEach((t, i) => {
+      const p = P(t.x, t.y, t.z);
+      ctx.globalAlpha = .45 - i * .04;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, .09 * p.s * (1 - i * .05)), 0, 7); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    const p = P(ball.x, ball.y, ball.z), r = Math.max(2.5, .1 * p.s);
+    ctx.fillStyle = '#e8ff3a'; ctx.strokeStyle = '#7c8a10'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill(); ctx.stroke();
+    if (r > 3.5) { // rotating seam shows the spin
+      const a = performance.now() / 1000 * ball.spin;
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1, r * .25);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, r * .75, r * Math.abs(Math.cos(a)) * .75 + .1, 0, 0, 7); ctx.stroke();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    drawCourt();
+
+    dust.forEach(d => {
+      const p = P(d.x, d.y);
+      ctx.fillStyle = `rgba(${venue.dust},${d.life * (venue.clay ? .8 : .5)})`;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y - d.r * p.s * .3, d.r * p.s, d.r * p.s * .45, 0, 0, 7); ctx.fill();
+    });
+    marks.forEach(m => {
+      const p = P(m.x, m.y);
+      ctx.globalAlpha = Math.min(1, m.life);
+      ctx.strokeStyle = m.ok ? '#e8ff3a' : '#ff4d4d'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, .25 * p.s, .1 * p.s, 0, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    // smash guide: where the ball comes down to smash height, and a flash when it is in range right now
+    const ss = state === 'rally' ? smashSpot() : null;
+    if (ss) {
+      const g = P(ss.x, ss.y), top = P(ss.x, ss.y, 2.3), pulse = 1 + Math.sin(performance.now() / 100) * .12;
+      ctx.strokeStyle = '#ff5d73'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(g.x, g.y, .45 * g.s * pulse, .18 * g.s * pulse, 0, 0, 7); ctx.stroke();
+      ctx.setLineDash([4, 4]); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(top.x, top.y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#ff5d73'; ctx.beginPath(); ctx.arc(top.x, top.y, 4, 0, 7); ctx.fill();
+      ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('スマッシュ', top.x, top.y - 6);
+    }
+    if (state === 'rally' && canHit('P') && ball.bounces === 0 && ball.z > 2.1 && ball.z < 3.2 && d2(ball, player) < reachOf('smash')) {
+      const q = P(ball.x, ball.y, ball.z);
+      ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(10, .35 * q.s), 0, 7); ctx.stroke();
+      ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#ff2d55'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('今!', q.x, q.y - Math.max(12, .4 * q.s));
+    }
+    if (ball.chance && ball.live && ball.last === 'C') { // highlight the sitter (and its shadow) so you go for it
+      const q = P(ball.x, ball.y, ball.z), g = P(ball.x, ball.y), pulse = 1 + Math.sin(performance.now() / 70) * .25;
+      ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(8, .32 * q.s) * pulse, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(g.x, g.y, .5 * g.s * pulse, .2 * g.s * pulse, 0, 0, 7); ctx.stroke();
+    }
+    if (state === 'rally' && ball.live && ball.last === 'C' && ball.bounces === 0) {
+      const b = predictBounce();
+      if (b) {
+        const p = P(b.x, b.y), pulse = 1 + Math.sin(performance.now() / 90) * .15;
+        ctx.strokeStyle = 'rgba(232,255,58,.7)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, .35 * p.s * pulse, .13 * p.s * pulse, 0, 0, 7); ctx.stroke();
+      }
+    }
+    // hitting range around your feet: one ring for the charged shot, or topspin (inner) and slice (outer)
+    if (state === 'rally' || state === 'pause' || (state === 'serve' && server() === 'C')) {
+      const ring = (r, col, alpha, dash, fill) => {
+        ctx.beginPath();
+        for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, q = P(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        ctx.setLineDash(dash); ctx.globalAlpha = alpha; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      };
+      const inRange = r => canHit('P') && ball.z < 3.2 && d2(ball, player) < r;
+      if (charge && !charge.serve) {
+        const r = reachOf(charge.type), on = inRange(r);
+        ring(r, SHOTS[charge.type].color, .95, [], on ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)');
+      } else {
+        ring(reachOf('slice'), SHOTS.slice.color, .55, [6, 5], null);
+        ring(reachOf('top'), SHOTS.top.color, .7, [], inRange(reachOf('top')) ? 'rgba(255,255,255,.12)' : null);
+      }
+    }
+    if (charge && (state === 'rally' || state === 'pause' || state === 'serve')) {
+      const g = aimTarget(charge.type, aimX, aimD), p = P(g.x, g.y), col = SHOTS[charge.type].color;
+      if (state !== 'serve') { // 3 x 3 aiming guide on the far court
+        const xs = [0, CW / 3, CW * 2 / 3, CW], ys = [0, 2.2, 4.2, NET_Y - .5];
+        ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
+        xs.forEach(x => { const a = P(x, 0), b = P(x, NET_Y - .5); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+        ys.forEach(y => { const a = P(0, y), b = P(CW, y); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+        const ci = clamp(Math.floor(g.x / (CW / 3)), 0, 2), ri = g.y < 2.2 ? 0 : g.y < 4.2 ? 1 : 2;
+        poly([[xs[ci], ys[ri]], [xs[ci + 1], ys[ri]], [xs[ci + 1], ys[ri + 1]], [xs[ci], ys[ri + 1]]], 'rgba(255,255,255,.14)');
+      }
+      const pulse = 1 + Math.sin(performance.now() / 110) * .12, rx = .65 * p.s * pulse, ry = .26 * p.s * pulse;
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x - rx * 1.4, p.y); ctx.lineTo(p.x + rx * 1.4, p.y); ctx.moveTo(p.x, p.y - ry * 1.6); ctx.lineTo(p.x, p.y + ry * 1.6); ctx.stroke();
+    }
+    if (state !== 'menu') {
+      const sp = P(ball.x, ball.y);
+      ctx.fillStyle = 'rgba(0,0,0,.3)';
+      ctx.beginPath(); ctx.ellipse(sp.x, sp.y, Math.max(2, .12 * sp.s), Math.max(1, .05 * sp.s), 0, 0, 7); ctx.fill();
+    }
+
+    const items = [
+      { y: NET_Y, f: drawNet },
+      { y: UMP.y + .02, f: drawUmpire },
+      ...judges.map(j => ({ y: j.y, f: () => drawJudge(j) })),
+      ...kids.map(k => ({ y: k.y, f: () => drawKid(k) })),
+      { y: cpu.y, f: () => figure(cpu, KIT_C) },
+      { y: player.y, f: () => figure(player, KIT_P, charge) },
+    ];
+    if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
+    items.sort((a, b) => a.y - b.y).forEach(i => i.f());
+
+    popups.forEach(p => {
+      const s = P(p.x, p.y, p.z);
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.strokeText(p.text, s.x, s.y);
+      ctx.fillStyle = p.color; ctx.fillText(p.text, s.x, s.y);
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (rally >= 3 && (state === 'rally' || state === 'pause')) {
+      ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#e8ff3a';
+      ctx.fillText(`ラリー ${rally}`, W / 2, 24);
+    }
+    if (state === 'serve') {
+      const mine = server() === 'P';
+      const text = mine
+        ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '球種を長押し → 一番高いところで離せ!')
+        : 'CPU のサーブ…';
+      const t2 = [bigPoint(), faults ? 'セカンドサーブ（スピンサーブ）' : ''].filter(Boolean).join(' ・ ');
+      ctx.font = 'bold 18px system-ui, sans-serif';
+      const w = ctx.measureText(text).width + 32, y = coarse ? H * .42 : H - 40;
+      ctx.fillStyle = 'rgba(15,20,40,.75)';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W / 2 - w / 2, y - 20, w, 40, 20) : ctx.rect(W / 2 - w / 2, y - 20, w, 40); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(text, W / 2, y);
+      if (t2) { ctx.font = 'bold 14px system-ui, sans-serif'; ctx.fillStyle = '#ffd166'; ctx.fillText(t2, W / 2, y - 34); }
+    }
+    if (msg) {
+      const y = coarse ? H * .5 : H - 150;
+      ctx.font = 'bold 28px system-ui, sans-serif';
+      const w = Math.max(ctx.measureText(msg.title).width, 160) + 48;
+      ctx.fillStyle = 'rgba(15,20,40,.82)';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W / 2 - w / 2, y - 42, w, msg.sub ? 92 : 64, 18) : ctx.rect(W / 2 - w / 2, y - 42, w, 92); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(msg.title, W / 2, y - 10);
+      if (msg.sub) { ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#e8ff3a'; ctx.fillText(msg.sub, W / 2, y + 26); }
+    }
+  }
+
+  let lastT = performance.now();
+  function loop(t) {
+    const dt = Math.min(.04, (t - lastT) / 1000);
+    lastT = t;
+    if (state !== 'menu' && state !== 'over') update(dt);
+    else setMurmur(0);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  const BOARD_HTML = $('board').innerHTML;
+  const pickOne = (sel, attr, val) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('on', b.dataset[attr] === val));
+  document.querySelectorAll('[data-venue]').forEach(b => (b.onclick = () => { venue = VENUES[b.dataset.venue]; pickOne('[data-venue]', 'venue', b.dataset.venue); }));
+  document.querySelectorAll('[data-format]').forEach(b => (b.onclick = () => { format = b.dataset.format; pickOne('[data-format]', 'format', format); }));
+  pickOne('[data-venue]', 'venue', 'mel'); pickOne('[data-format]', 'format', 'set');
+  document.querySelectorAll('[data-level]').forEach(b => (b.onclick = () => startMatch(b.dataset.level)));
+  document.querySelectorAll('[data-drill]').forEach(b => (b.onclick = () => startPractice(b.dataset.drill)));
+  $('quit').onclick = () => {
+    practice = null; state = 'menu'; msg = null; ball.live = false;
+    $('result').classList.add('hidden'); $('board').classList.add('hidden'); $('quit').classList.add('hidden'); $('menu').classList.remove('hidden');
+  };
+  $('again').onclick = () => startMatch(lvKey);
+  $('toMenu').onclick = () => {
+    $('quit').classList.add('hidden'); $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); $('board').classList.add('hidden'); state = 'menu'; };
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

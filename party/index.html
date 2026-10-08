@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bumpy Party!</title>
+<style>
+  :root {
+    --bg: #fff8ef;
+    --ink: #2b2240;
+    --accent: #ff5d73;
+    --sub: #7a6f8f;
+    --panel: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", "Yu Gothic", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; overflow: hidden; touch-action: none; }
+  header { width: 100%; max-width: 960px; padding: 10px 16px 6px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+  header h1 span { color: var(--accent); }
+  .hud { display: flex; gap: 14px; font-weight: bold; font-size: 15px; align-items: center; }
+  .hud button { border: 0; background: none; font-size: 18px; cursor: pointer; padding: 0; }
+  #prompt { width: 100%; max-width: 960px; padding: 0 16px 8px; text-align: center; font-size: 15px; color: var(--sub); min-height: 44px; }
+  #prompt b { display: inline-block; font-size: 26px; color: var(--ink); background: var(--panel); padding: 2px 16px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0,0,0,.08); margin-left: 6px; }
+  #wrap { position: relative; width: calc(100% - 32px); max-width: 928px; flex: 1; margin-bottom: 16px; min-height: 0; }
+  canvas { width: 100%; height: 100%; display: block; background: #fff; border-radius: 18px; box-shadow: 0 6px 0 rgba(0,0,0,.06), inset 0 0 0 3px #f1e6d6; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; }
+  .card { background: var(--panel); border-radius: 18px; padding: 24px 22px; max-width: 420px; box-shadow: 0 8px 30px rgba(43,34,64,.15); }
+  .card h2 { margin: 0 0 8px; font-size: 28px; }
+  .card p { margin: 6px 0; line-height: 1.6; font-size: 14px; }
+  .card .big { font-size: 40px; font-weight: bold; color: var(--accent); margin: 4px 0; }
+  .card button { margin-top: 14px; font: inherit; font-weight: bold; font-size: 18px; border: 0; border-radius: 999px; padding: 12px 34px; background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 4px 0 #c9384d; }
+  .card button:active { transform: translateY(3px); box-shadow: 0 1px 0 #c9384d; }
+  .hidden { display: none; }
+  @media (max-width: 520px) { header h1 { font-size: 16px; } .hud { gap: 8px; font-size: 13px; } #prompt b { font-size: 20px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎉 Bumpy <span>Party!</span></h1>
+  <div class="hud">
+    <span id="hearts">❤️❤️❤️</span>
+    <span>⏱ <span id="time">60</span></span>
+    <span>⭐ <span id="score">0</span></span>
+    <button id="mute" title="サウンド">🔊</button>
+  </div>
+</header>
+<div id="prompt">この挨拶をしている人にぶつかろう！<b id="greeting">—</b></div>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="overlay" id="startScreen">
+    <div class="card">
+      <h2>🎉 Bumpy Party!</h2>
+      <p>国際交流パーティーへようこそ！<br>
+      上に出る<b>挨拶</b>を話す国の人に<b>ぶつかって</b>友達になろう。</p>
+      <p>友達はあなたの後ろについて<b>行列</b>になります。<br>
+      違う国の人や、自分の行列にぶつかると❤️が減るよ。</p>
+      <p style="color:var(--sub)">操作：マウス／タッチで移動・矢印キー／WASD</p>
+      <button id="startBtn">スタート</button>
+    </div>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <div class="card">
+      <h2 id="endTitle">パーティー終了！</h2>
+      <div class="big" id="finalScore">0</div>
+      <p id="endDetail"></p>
+      <p id="best" style="color:var(--sub)"></p>
+      <button id="retryBtn">もう一回</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const COUNTRIES = [
+    { name: 'フランス', hello: 'Bonjour!', color: '#4f6bed' },
+    { name: 'スペイン', hello: '¡Hola!', color: '#f2a516' },
+    { name: 'ドイツ', hello: 'Hallo!', color: '#3b3b3b' },
+    { name: 'イタリア', hello: 'Ciao!', color: '#2fa35b' },
+    { name: '中国', hello: '你好!', color: '#e23b3b' },
+    { name: '韓国', hello: '안녕하세요!', color: '#3a7bd5' },
+    { name: 'ブラジル', hello: 'Olá!', color: '#1fae6a' },
+    { name: 'アメリカ', hello: 'Hello!', color: '#2c4a9a' },
+    { name: 'ロシア', hello: 'Привет!', color: '#8a5cf5' },
+    { name: 'タイ', hello: 'สวัสดี!', color: '#d64f9c' },
+    { name: 'インド', hello: 'नमस्ते!', color: '#ff8a2b' },
+    { name: 'ケニア', hello: 'Jambo!', color: '#9b3d22' },
+    { name: 'トルコ', hello: 'Merhaba!', color: '#c7213a' },
+    { name: 'ベトナム', hello: 'Xin chào!', color: '#d9a400' },
+    { name: 'エジプト', hello: 'مرحبا!', color: '#b08a4a' },
+    { name: 'スウェーデン', hello: 'Hej!', color: '#2a8fd6' },
+  ];
+  const GAME_TIME = 60, MAX_HEARTS = 3, R = 18, SEG_GAP = 26;
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+  let W = 0, H = 0, dpr = 1;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- sound ----------
+  let audio = null, muted = false;
+  function beep(freqs, dur = 0.09, type = 'triangle', vol = 0.12) {
+    if (muted) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      freqs.forEach((f, i) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        const t = audio.currentTime + i * dur;
+        o.type = type; o.frequency.value = f;
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur * 1.6);
+        o.connect(g).connect(audio.destination);
+        o.start(t); o.stop(t + dur * 1.7);
+      });
+    } catch (e) {}
+  }
+  $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; };
+
+  // ---------- input ----------
+  const keys = {};
+  let pointer = null;
+  addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.startsWith('Arrow')) e.preventDefault(); });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  function setPointer(e) {
+    const r = canvas.getBoundingClientRect();
+    pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  canvas.addEventListener('pointerdown', e => { setPointer(e); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) setPointer(e); });
+  canvas.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') pointer = null; });
+  canvas.addEventListener('pointerleave', () => { pointer = null; });
+
+  // ---------- state ----------
+  let state = 'title', player, guests, trail, friends, target, score, combo, bestCombo, hearts, timeLeft,
+      invuln, particles, popups, lastT, shake;
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  function makeGuest(country) {
+    let x, y, tries = 0;
+    do { x = rand(R * 2, W - R * 2); y = rand(R * 2, H - R * 2); tries++; }
+    while (player && dist({ x, y }, player) < 140 && tries < 30);
+    const a = rand(0, Math.PI * 2);
+    return { x, y, vx: Math.cos(a), vy: Math.sin(a), country, wobble: rand(0, 6), pop: 0 };
+  }
+
+  function guestCount() { return Math.min(5 + Math.floor(friends.length / 3), 10); }
+
+  function pickTarget() {
+    const present = [...new Set(guests.map(g => g.country))];
+    const choices = present.filter(c => c !== target);
+    target = pick(choices.length ? choices : present);
+    const el = $('greeting');
+    el.textContent = target.hello;
+    el.animate([{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 250, easing: 'ease-out' });
+  }
+
+  function fillGuests() {
+    while (guests.length < guestCount()) {
+      // keep countries mostly distinct so the puzzle stays fair
+      const used = new Set(guests.map(g => g.country));
+      const pool = COUNTRIES.filter(c => !used.has(c));
+      guests.push(makeGuest(pick(pool.length ? pool : COUNTRIES)));
+    }
+  }
+
+  function start() {
+    resize();
+    player = { x: W / 2, y: H / 2, vx: 0, vy: 0, face: 0 };
+    guests = []; friends = []; trail = []; particles = []; popups = [];
+    target = null; score = 0; combo = 1; bestCombo = 1; hearts = MAX_HEARTS;
+    timeLeft = GAME_TIME; invuln = 0; shake = 0;
+    fillGuests(); pickTarget();
+    $('startScreen').classList.add('hidden');
+    $('endScreen').classList.add('hidden');
+    state = 'play';
+    lastT = performance.now();
+    beep([523, 659, 784]);
+  }
+
+  function end() {
+    state = 'over';
+    let best = 0;
+    try { best = +localStorage.getItem('bumpy-best') || 0; } catch (e) {}
+    const isBest = score > best;
+    if (isBest) { best = score; try { localStorage.setItem('bumpy-best', score); } catch (e) {} }
+    $('endTitle').textContent = hearts <= 0 ? 'ちょっと疲れちゃった…' : 'パーティー終了！';
+    $('finalScore').textContent = score;
+    $('endDetail').innerHTML = `友達 <b>${friends.length}</b> 人 ・ 最大コンボ <b>×${bestCombo}</b><br>${rank()}`;
+    $('best').textContent = isBest ? '🏆 ベスト更新！' : `ベスト: ${best}`;
+    $('endScreen').classList.remove('hidden');
+    beep(hearts <= 0 ? [392, 330, 262] : [523, 659, 784, 1047], 0.12);
+  }
+
+  function rank() {
+    const n = friends.length;
+    if (n >= 25) return '称号：🌍 パーティーの主役';
+    if (n >= 15) return '称号：✈️ 世界の人気者';
+    if (n >= 8) return '称号：🤝 交流上手';
+    if (n >= 3) return '称号：🙂 はじめの一歩';
+    return '称号：🫣 壁の花';
+  }
+
+  function burst(x, y, color, n = 16) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2), s = rand(60, 260);
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(.4, .8), color, size: rand(3, 6) });
+    }
+  }
+  function popup(x, y, text, color) { popups.push({ x, y, text, color, life: 1.1 }); }
+
+  function hurt(x, y, msg) {
+    hearts--; combo = 1; invuln = 1.2; shake = 10;
+    popup(x, y, msg, '#e23b3b');
+    beep([220, 160], 0.12, 'square', 0.08);
+    if (navigator.vibrate) navigator.vibrate(80);
+    if (hearts <= 0) end();
+  }
+
+  // ---------- update ----------
+  function update(dt) {
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; end(); return; }
+    invuln = Math.max(0, invuln - dt);
+    shake = Math.max(0, shake - dt * 40);
+
+    // player movement
+    const speed = 260;
+    let ax = 0, ay = 0;
+    if (keys['arrowleft'] || keys['a']) ax -= 1;
+    if (keys['arrowright'] || keys['d']) ax += 1;
+    if (keys['arrowup'] || keys['w']) ay -= 1;
+    if (keys['arrowdown'] || keys['s']) ay += 1;
+    let tvx = 0, tvy = 0;
+    if (ax || ay) {
+      const l = Math.hypot(ax, ay); tvx = ax / l * speed; tvy = ay / l * speed;
+    } else if (pointer) {
+      const dx = pointer.x - player.x, dy = pointer.y - player.y, l = Math.hypot(dx, dy);
+      if (l > 4) { const s = Math.min(speed, l * 6); tvx = dx / l * s; tvy = dy / l * s; }
+    }
+    const k = 1 - Math.exp(-dt * 12);
+    player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k;
+    player.x = Math.max(R, Math.min(W - R, player.x + player.vx * dt));
+    player.y = Math.max(R, Math.min(H - R, player.y + player.vy * dt));
+    if (Math.hypot(player.vx, player.vy) > 20) player.face = Math.atan2(player.vy, player.vx);
+
+    // trail -> friends follow along the path
+    const last = trail[0];
+    if (!last || dist(last, player) > 3) trail.unshift({ x: player.x, y: player.y });
+    trail.length = Math.min(trail.length, Math.ceil((friends.length + 2) * SEG_GAP / 3) + 20);
+    friends.forEach((f, i) => {
+      const p = trail[Math.min(trail.length - 1, Math.round((i + 1) * SEG_GAP / 3))];
+      if (p) { f.x += (p.x - f.x) * 0.5; f.y += (p.y - f.y) * 0.5; }
+    });
+
+    // bumping into your own conga line
+    if (!invuln) {
+      for (let i = 3; i < friends.length; i++) {
+        if (dist(friends[i], player) < R * 1.5) {
+          const lost = friends.splice(i);
+          lost.forEach(f => burst(f.x, f.y, f.country.color, 6));
+          hurt(player.x, player.y - 30, `列が崩れた！ -${lost.length}人`);
+          break;
+        }
+      }
+    }
+    if (state !== 'play') return;
+
+    // guests wander
+    const gs = 50 + Math.min(friends.length * 4, 90);
+    guests.forEach(g => {
+      g.wobble += dt * 2;
+      const a = Math.atan2(g.vy, g.vx) + Math.sin(g.wobble) * dt * 1.5;
+      g.vx = Math.cos(a); g.vy = Math.sin(a);
+      g.x += g.vx * gs * dt; g.y += g.vy * gs * dt;
+      if (g.x < R) { g.x = R; g.vx = Math.abs(g.vx); }
+      if (g.x > W - R) { g.x = W - R; g.vx = -Math.abs(g.vx); }
+      if (g.y < R) { g.y = R; g.vy = Math.abs(g.vy); }
+      if (g.y > H - R) { g.y = H - R; g.vy = -Math.abs(g.vy); }
+      g.pop = Math.max(0, g.pop - dt * 4);
+    });
+
+    // bump guests
+    for (let i = guests.length - 1; i >= 0; i--) {
+      const g = guests[i];
+      if (dist(g, player) > R * 2) continue;
+      if (g.country === target) {
+        guests.splice(i, 1);
+        const gain = 10 * combo;
+        score += gain;
+        popup(g.x, g.y - 26, `${g.country.hello} +${gain}`, g.country.color);
+        burst(g.x, g.y, g.country.color, 22);
+        friends.push({ x: g.x, y: g.y, country: g.country });
+        combo++; bestCombo = Math.max(bestCombo, combo);
+        timeLeft = Math.min(GAME_TIME, timeLeft + 1.5);
+        beep([660 + combo * 20, 880 + combo * 20], 0.07);
+        fillGuests(); pickTarget();
+      } else if (!invuln) {
+        // knock the wrong guest away
+        const dx = g.x - player.x, dy = g.y - player.y, l = Math.hypot(dx, dy) || 1;
+        g.vx = dx / l; g.vy = dy / l; g.x += g.vx * 20; g.y += g.vy * 20; g.pop = 1;
+        hurt(g.x, g.y - 26, `人違い！ (${g.country.name})`);
+        if (state !== 'play') return;
+      }
+    }
+
+    particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .92; p.vy *= .92; p.life -= dt; });
+    particles = particles.filter(p => p.life > 0);
+    popups.forEach(p => { p.y -= 40 * dt; p.life -= dt; });
+    popups = popups.filter(p => p.life > 0);
+  }
+
+  // ---------- draw ----------
+  function drawPerson(x, y, color, opts = {}) {
+    const r = opts.r || R;
+    ctx.save();
+    ctx.translate(x, y);
+    if (opts.scale) ctx.scale(opts.scale, opts.scale);
+    ctx.fillStyle = 'rgba(0,0,0,.08)';
+    ctx.beginPath(); ctx.ellipse(0, r * .9, r * .9, r * .3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    if (opts.ring) { ctx.lineWidth = 3; ctx.strokeStyle = opts.ring; ctx.stroke(); }
+    const fx = Math.cos(opts.face || 0) * 3, fy = Math.sin(opts.face || 0) * 3;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-6 + fx, -3 + fy, 4.5, 0, Math.PI * 2); ctx.arc(6 + fx, -3 + fy, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(-6 + fx * 1.4, -3 + fy * 1.4, 2.2, 0, Math.PI * 2); ctx.arc(6 + fx * 1.4, -3 + fy * 1.4, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (opts.sad) ctx.arc(fx, 10 + fy, 5, Math.PI * 1.15, Math.PI * 1.85);
+    else ctx.arc(fx, 4 + fy, 6, Math.PI * .15, Math.PI * .85);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function label(x, y, text, color) {
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    const w = ctx.measureText(text).width + 12;
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - 10, w, 19, 9) : ctx.rect(x - w / 2, y - 10, w, 19); ctx.fill();
+    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+  }
+
+  function draw() {
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    if (shake) ctx.translate(rand(-shake, shake), rand(-shake, shake));
+
+    // floor: confetti dots
+    ctx.fillStyle = '#fbf3e7';
+    for (let x = 20; x < W; x += 40) for (let y = 20; y < H; y += 40) {
+      ctx.beginPath(); ctx.arc(x + ((y / 40) % 2) * 20, y, 2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    if (state === 'title') { ctx.restore(); return; }
+
+    // conga line
+    if (friends.length) {
+      ctx.strokeStyle = 'rgba(255,93,115,.18)'; ctx.lineWidth = 10; ctx.lineJoin = ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(player.x, player.y);
+      friends.forEach(f => ctx.lineTo(f.x, f.y));
+      ctx.stroke();
+    }
+    for (let i = friends.length - 1; i >= 0; i--) {
+      const f = friends[i];
+      drawPerson(f.x, f.y, f.country.color, { r: R * .8, scale: 1 + Math.sin(performance.now() / 150 + i) * .05 });
+    }
+
+    guests.forEach(g => {
+      const isT = g.country === target;
+      drawPerson(g.x, g.y, g.country.color, { face: Math.atan2(g.vy, g.vx), sad: g.pop > 0, scale: 1 + g.pop * .2 });
+      label(g.x, g.y - R - 12, g.country.name, g.country.color);
+    });
+
+    // player
+    const blink = invuln && Math.floor(invuln * 10) % 2;
+    if (!blink) drawPerson(player.x, player.y, '#ff5d73', { r: R + 2, face: player.face, ring: '#fff', sad: invuln > 0 });
+    label(player.x, player.y + R + 16, 'あなた', '#ff5d73');
+
+    particles.forEach(p => {
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    });
+    ctx.globalAlpha = 1;
+    popups.forEach(p => {
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.font = 'bold 18px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#fff';
+      ctx.strokeText(p.text, p.x, p.y); ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+    });
+    ctx.globalAlpha = 1;
+
+    if (combo > 2) {
+      ctx.font = 'bold 16px system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#ff5d73'; ctx.fillText(`COMBO ×${combo}`, W - 14, 12);
+    }
+    ctx.restore();
+  }
+
+  function hud() {
+    $('hearts').textContent = '❤️'.repeat(Math.max(0, hearts)) + '🤍'.repeat(MAX_HEARTS - Math.max(0, hearts));
+    $('time').textContent = Math.ceil(timeLeft);
+    $('time').style.color = timeLeft < 10 ? '#e23b3b' : '';
+    $('score').textContent = score;
+  }
+
+  function loop(t) {
+    if (state === 'play') {
+      const dt = Math.min(0.05, (t - lastT) / 1000);
+      update(dt);
+      hud();
+    }
+    lastT = t;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  $('startBtn').onclick = start;
+  $('retryBtn').onclick = start;
+  addEventListener('keydown', e => { if (e.key === 'Enter' && state !== 'play') start(); });
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
