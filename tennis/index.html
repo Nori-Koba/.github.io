@@ -121,9 +121,9 @@
       <div class="how">
         <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
         <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球（光る輪）は決めどころ！ 高ければ<b>スマッシュ</b>、腰〜肩の高さならコート後方から<b>ドライブボレー</b>（トップスピン / フラット）でノーバウンドで叩ける。<br>
-        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約200km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを高く越えてまっすぐ高く跳ね、ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
+        <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約210km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを高く越えて跳ね上がり、ぐっと前に伸びる。ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
         <div class="shotlist">
-          <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、高く弾む</small></span>
+          <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、弾んでぐっと前に伸びる</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
           <span class="t" style="background:var(--flat)">フラット</span><span><span class="pc">C・L・ホイールクリック</span> <small>一番速い。でもミスしやすい</small></span>
           <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">V・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
@@ -204,18 +204,18 @@
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .7, bh: .88, margin: .35, speed: [29, 41], err: .8 },
+    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .62, bh: .96, margin: .35, speed: [29, 41], err: .8 },
     slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
-    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .6, bh: .7,  margin: .12, speed: [28, 48], err: 1.3 },
+    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .0015, bz: .7, bh: .82, margin: .12, speed: [31, 54], err: 1.3 },
     lob:   { name: 'ロブ',         color: '#c77dff', mg: .006, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
     drop:  { name: 'ドロップ',     color: '#80ed99', mg: -.005, bz: .62, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { mg: .018, bz: .66, bh: .9, margin: .45, speed: [32, 45] } },
+    P: { name: 'パワースピン型', top: { mg: .018, bz: .57, bh: .98, margin: .45, speed: [32, 45] } },
     C: { name: 'スライス型',
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
-         flat:  { speed: [28, 46] },
+         flat:  { speed: [31, 52] },
          top:   { speed: [30, 44] } },
   };
   const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
@@ -564,7 +564,7 @@
     b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
     if (b.z <= 0 && b.vz < 0) {
       const impact = -b.vz;
-      const bh = Math.min(.98, b.bh * venue.bh); // the surface: clay grips and sits up, grass skids through low
+      const bh = Math.min(1, b.bh * venue.bh); // the surface: clay grips and sits up, grass skids through low
       b.z = 0; b.vz = impact * b.bz * venue.bz; b.vx *= bh; b.vy *= bh;
       if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
       // spin mostly wears off after the first bounce; court friction on later bounces
@@ -659,9 +659,9 @@
     // bad timing and big power both widen the error; topspin (kick) is the safest serve
     // flat = fastest first serve, slice = fast curving first serve, kick = safe second serve
     const SERVE = {
-      flat:  { speed: [30, 58], timing: 1.3, risk: 1.3, over: null },
+      flat:  { speed: [32, 63], timing: 1.3, risk: 1.3, over: null },
       slice: { speed: [30, 52], timing: 1.1, risk: 1.1, over: { mg: .003, margin: .22, bz: .5, bh: .85 } },  // sidespin, not backspin
-      top:   { speed: [22, 32], timing: .45, risk: .25, over: { mg: .026, margin: 1.1, bz: .55, bh: .85 } },  // high over the net, big kick
+      top:   { speed: [24, 35], timing: .45, risk: .25, over: { mg: .026, margin: 1.1, bz: .48, bh: .97 } },  // high over the net, big kick
     }[type];
     const err = (1 - q) * 1.6 * SERVE.timing + power * power * SERVE.risk;
     const tx = bx + aim * hw + rand(-err, err);
@@ -671,8 +671,8 @@
     // a right-hander's slice serve curves to the server's left
     const kmh = shoot(tx, ty, type, { speed, noClear: q < .25 && type !== 'top', curve: type === 'slice' ? 3.6 + power * 2.6 : 1, side: leftOf(who), who, over: SERVE.over });
     if (type === 'top') { // kick serve: jumps up high and off to the server's right
-      ball.bz = .52 + power * .06; ball.bh = .85; ball.kick = 0; // kicks straight up
-    } else if (type === 'flat') { ball.bz = .45; ball.bh = .75; } // flat serve skids through low
+      ball.bz = .45 + power * .05; ball.bh = .97; ball.kick = 0; // kicks up and drives through
+    } else if (type === 'flat') { ball.bz = .56; ball.bh = .86; } // flat serve: fast and sits up a little
     Object.assign(ball, { live: true, serve: true, last: who, bounces: 0, serveKmh: kmh, chance: false });
     tossing = false; state = 'rally';
     const s = who === 'P' ? player : cpu;
