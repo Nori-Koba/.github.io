@@ -775,7 +775,7 @@
     }
     if (mishit) { tx += rand(-2.5, 2.5); ty += rand(-2, 1); opts = { speed: rand(14, 24), noClear: true }; }
     else if (scramble) { // just got there: the ball floats back short and high — a sitter for the opponent
-      type = 'top'; tx = CX + rand(-1.8, 1.8); ty = NET_Y - rand(5.5, 8); opts = { angle: rand(.68, .8) };
+      type = 'top'; tx = CX + rand(-1.8, 1.8); ty = NET_Y - rand(5.5, 8); opts = { angle: rand(.5, .6) };
     }
     if (scramble) startSlide(player);
     opts.curve = 0; opts.who = 'P'; // groundstroke slice goes straight and skids; only the slice serve curves
@@ -862,7 +862,7 @@
     let ty, opts;
     if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.5, .6) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
-    else if (stretched) { ty = NET_Y + rand(5.5, 8); opts = { angle: rand(.68, .8) }; } // a high floater dropping around the service line
+    else if (stretched) { ty = NET_Y + rand(5.5, 8); opts = { angle: rand(.5, .6) }; } // a high floater dropping around the service line
     else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
@@ -920,7 +920,7 @@
   // ---------- practice: the CPU feeds balls, nothing is scored ----------
   const DRILLS = {
     stroke: { name: 'ストローク', spot: () => [CX, L + .6], feeder: [CX, -.5] },
-    volley: { name: 'ボレー', spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, -.5] },
+    volley: { name: 'ボレー', spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, NET_Y - 6] },
     smash:  { name: 'スマッシュ', spot: () => [CX + rand(-.4, .4), NET_Y + 3.5], feeder: [CX, 1] },
     drop:   { name: 'ドロップ拾い', spot: () => [CX, L + 1], feeder: [CX, 1.5] },
     chance: { name: 'チャンスボール', spot: () => [CX + rand(-1, 1), L + .5], feeder: [CX, -.5] },
@@ -952,11 +952,11 @@
       const t = pick(['top', 'top', 'slice', 'flat']);
       kmh = shoot(rand(.8, CW - .8), L - rand(2, 5.5), t, { speed: rand(24, 32), who: 'C', curve: 0 });
     } else if (drill === 'volley') { // a firm ball that passes you at about waist height
-      kmh = shoot(player.x + rand(-1.6, 1.6), L + rand(.5, 2), 'flat', { speed: rand(19, 24), who: 'C' });
+      kmh = shoot(player.x + rand(-1.6, 1.6), L - rand(0, 2.5), 'flat', { speed: rand(24, 31), who: 'C' });
     } else if (drill === 'smash') { // a lob that comes down around you
       kmh = shoot(player.x + rand(-1.2, 1.2), player.y + rand(-.5, 1.5), 'lob', { angle: rand(.85, 1), who: 'C' });
     } else if (drill === 'chance') { // the same floater the CPU sends up after a lunge
-      kmh = shoot(CX + rand(-1.8, 1.8), NET_Y + rand(5.5, 8), 'top', { angle: rand(.68, .8), who: 'C' });
+      kmh = shoot(CX + rand(-1.8, 1.8), NET_Y + rand(5.5, 8), 'top', { angle: rand(.5, .6), who: 'C' });
       ball.chance = true;
       popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a');
     } else {
