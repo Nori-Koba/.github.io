@@ -63,6 +63,22 @@
   .card button.pick.on small { color: #cfd3e6; }
   .card button.pick .sw { width: 34px; height: 12px; border-radius: 4px; display: block; margin-bottom: 3px; }
   .hidden { display: none !important; }
+  .tour h3 { margin: 12px 0 4px; font-size: 15px; }
+  .tour .opp { background: #f6f3ee; border-radius: 12px; padding: 10px; margin: 8px 0; }
+  .tour .opp .nm { font-size: 22px; font-weight: bold; }
+  .tour .sd { display: inline-block; background: var(--accent); color: #fff; border-radius: 6px; padding: 0 6px; font-size: 12px; font-weight: bold; }
+  .tour .st { color: #e0a000; letter-spacing: 1px; }
+  .tour ul { list-style: none; padding: 0; margin: 4px 0; font-size: 13px; text-align: left; }
+  .tour li { padding: 3px 6px; border-bottom: 1px solid #eee; display: flex; gap: 8px; justify-content: space-between; }
+  .tour li.me { background: #fff4d6; font-weight: bold; }
+  .tour .chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; font-size: 12px; }
+  .tour .chips span { background: #eef0f6; border-radius: 999px; padding: 2px 8px; }
+  .tour .chips span.out { text-decoration: line-through; color: #aaa; }
+  .tour details { text-align: left; font-size: 13px; margin-top: 8px; }
+  .tour .path { display: flex; gap: 3px; justify-content: center; margin: 6px 0; font-size: 11px; }
+  .tour .path span { background: #eef0f6; border-radius: 6px; padding: 2px 5px; }
+  .tour .path span.done { background: #8bd17c; color: #fff; } .tour .path span.now { background: var(--accent); color: #fff; }
+  .tour .path span.lost { background: #999; color: #fff; }
 </style>
 </head>
 <body>
@@ -70,7 +86,7 @@
   <canvas id="c"></canvas>
   <div id="board" class="hidden">
     <div class="r"><span class="srv" id="srvP">●</span><span class="n">あなた <span class="lv">パワースピン</span></span><span class="g" id="gP">0</span><span class="p" id="pP">0</span></div>
-    <div class="r"><span class="srv" id="srvC">●</span><span class="n">CPU <span class="lv">スライス</span> <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
+    <div class="r"><span class="srv" id="srvC">●</span><span class="n"><span id="cName">CPU</span> <span class="lv" id="cStyle">スライス</span> <span class="lv" id="lvName"></span></span><span class="g" id="gC">0</span><span class="p" id="pC">0</span></div>
   </div>
   <div id="topR">
     <button id="quit" title="メニューへ" class="hidden">☰</button>
@@ -126,6 +142,12 @@
         <button data-level="normal">ふつう</button>
         <button class="dark" data-level="hard">つよい</button>
       </div>
+      <p style="margin-top:12px"><b>🏆 トーナメント</b>（128 人のグランドスラム・あなたは第 1 シード）</p>
+      <p style="font-size:12px;margin:2px 0">全 7 試合・1 セット（6-6 でタイブレーク）。会場は上で選んだもの。ほかの試合は AI がシミュレーション</p>
+      <div class="btns">
+        <button id="tourNew">新しく始める</button>
+        <button class="alt hidden" id="tourCont">つづきから</button>
+      </div>
       <p style="margin-top:12px"><b>練習モード</b>（CPU が球出し）</p>
       <div class="btns">
         <button class="alt" data-drill="stroke">ストローク</button>
@@ -146,10 +168,13 @@
       <p id="resDetail"></p>
       <div class="btns">
         <button id="again">もう一回</button>
+        <button class="hidden" id="toTour">トーナメント表へ</button>
         <button class="alt" id="toMenu">メニュー</button>
       </div>
     </div>
   </div>
+
+  <div class="overlay hidden" id="tour"><div class="card" id="tourCard"></div></div>
 </div>
 
 <script>
@@ -481,15 +506,22 @@
   const inCourt = recv => ball.x >= -T && ball.x <= CW + T &&
     (recv === 'C' ? ball.y >= -T && ball.y <= NET_Y : ball.y >= NET_Y && ball.y <= L + T);
 
-  function startMatch(key) {
+  function startMatch(key, opp = null) {
     practice = null; $('quit').classList.remove('hidden');
     tb = false; tbScore = null;
     $('board').innerHTML = BOARD_HTML;
     lvKey = key; lv = LEVELS[key];
+    tourOpp = opp; NAME.C = opp ? opp.sur : 'C P U';
+    if (opp) {
+      lv = { ...levelFor(opp), name: ROUNDS[tour.res.length] };
+      $('cName').textContent = (opp.seed ? `[${opp.seed}] ` : '') + opp.n;
+      $('cStyle').textContent = TSTYLE[opp.st];
+    }
     pts = [0, 0]; games = [0, 0]; faults = 0; maxRally = 0; maxSpeed = 0; popups = []; marks = [];
     ptr = null; // the click on the menu button is not a move order
     $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.remove('hidden');
     $('lvName').textContent = lv.name;
+    $('tour').classList.add('hidden');
     setupServe();
   }
 
@@ -1057,7 +1089,199 @@
     $('resScore').textContent = `${games[0]} - ${games[1]}` + (tbScore ? ` (${Math.min(...tbScore)})` : '');
     $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
       (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
+    $('again').classList.toggle('hidden', !!tourOpp); $('toTour').classList.toggle('hidden', !tourOpp);
+    if (tourOpp) {
+      const r = tourResult(w);
+      $('resTitle').textContent = w === 'P' ? (r === 6 ? '🏆 優勝!' : `🎾 ${ROUNDS[r]} 突破!`) : `😢 ${ROUNDS[r]} で敗退…`;
+      $('resDetail').innerHTML = `相手：${tourOpp.seed ? `第${tourOpp.seed}シード ` : ''}${tourOpp.n} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
+        (w === 'P' ? (r === 6 ? '128 人の頂点に立った！ おめでとう！' : `次は ${ROUNDS[r + 1]}！`) : 'トーナメント表で優勝者を見てみよう');
+      tourOpp = null;
+    }
     $('result').classList.remove('hidden');
+  }
+
+  // ---------- tournament: a 128-player grand slam draw, you are the top seed ----------
+  const ROUNDS = ['1回戦', '2回戦', '3回戦', '4回戦', '準々決勝', '準決勝', '決勝'];
+  const TSTYLE = { big: 'ビッグサーバー', base: 'ベースライナー', slice: 'スライス職人', all: 'オールラウンド' };
+  const NAMEPOOL = { // made-up players
+    ESP: ['Moreno', 'Castell', 'Ibarra', 'Soler', 'Varela', 'Ruiz', 'Olmedo', 'Prado'],
+    FRA: ['Lemaire', 'Duval', 'Garnier', 'Roussel', 'Bertin', 'Mallet', 'Fabre', 'Vidal'],
+    ITA: ['Ferretti', 'Bellucci', 'Marchetti', 'Conti', 'Rinaldi', 'Galli', 'Serra', 'Benedetti'],
+    GER: ['Hoffer', 'Brandt', 'Kessler', 'Lindner', 'Vogt', 'Hartmann', 'Engel', 'Seidel'],
+    USA: ['Carver', 'Holloway', 'Brennan', 'Whitaker', 'Dalton', 'Mercer', 'Sutton', 'Ramsey'],
+    GBR: ['Ashby', 'Pemberton', 'Hale', 'Crossley', 'Whitlock', 'Barlow'],
+    AUS: ['Kellaway', 'Dunmore', 'Radley', 'Tasker', 'Gilchrist', 'Mabry'],
+    ARG: ['Echeverri', 'Quiroga', 'Ledesma', 'Villalba', 'Barrios', 'Arce'],
+    JPN: ['Takeda', 'Morioka', 'Hayama', 'Kanzaki', 'Sakurai', 'Onodera'],
+    CAN: ['Lachance', 'Boucher', 'McRae', 'Gendron'],
+    NED: ['Van Dijkman', 'Mulder', 'Brouwer', 'Kuiper'],
+    SWE: ['Lindqvist', 'Hedlund', 'Ekström', 'Sandell'],
+    CZE: ['Novotny', 'Kratochvil', 'Dvorak', 'Pokorny'],
+    CHI: ['Fuenzalida', 'Araya', 'Cifuentes'],
+    BRA: ['Siqueira', 'Teixeira', 'Barbosa', 'Moura'],
+    SUI: ['Imhof', 'Brunner', 'Zollinger'],
+    POL: ['Wrona', 'Kaczor', 'Sobczak'],
+    KOR: ['Baek', 'Seong', 'Hwang'],
+  };
+  const INITIALS = 'ABCDEFGHJKLMNOPRSTVW';
+  const TKEY = 'bumpyTennisTour1';
+  let tour = null, tourOpp = null; // tourOpp: the CPU you are playing right now in the tournament
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function saveTour() { try { tour ? localStorage.setItem(TKEY, JSON.stringify(tour)) : localStorage.removeItem(TKEY); } catch (e) {} }
+  function loadTour() { try { const t = JSON.parse(localStorage.getItem(TKEY)); return t && t.players && t.draw ? t : null; } catch (e) { return null; } }
+
+  function newTour() {
+    const names = [], used = new Set();
+    for (const [cc, list] of Object.entries(NAMEPOOL)) for (const sur of list) names.push({ sur, cc });
+    shuffle(names);
+    const players = [{ n: 'Bumpy', sur: 'Bumpy', cc: 'YOU', seed: 1, r: 1.1, st: 'top' }];
+    for (let i = 1; i < 128; i++) {
+      const nm = names[i % names.length];
+      let full; do full = INITIALS[Math.floor(Math.random() * INITIALS.length)] + '. ' + nm.sur; while (used.has(full)); used.add(full);
+      const seed = i < 32 ? i + 1 : 0;
+      // seeds get steadily weaker from #2 to #32; the other 96 are all about "normal" strength
+      const r = seed ? 1.05 - (seed - 2) * .012 : .45 + Math.random() * .15;
+      const st = ['big', 'base', 'slice', 'all'][Math.floor(Math.random() * 4)];
+      players.push({ n: full, sur: nm.sur, cc: nm.cc, seed, r: +r.toFixed(3), st });
+    }
+    // seeded draw: 1 top, 2 bottom, 3-4 meet them in the semis, 5-8 in the quarters, and so on
+    const draw = new Array(128).fill(-1), place = (seeds, slots) => { shuffle(slots); seeds.forEach((s, i) => (draw[slots[i]] = s - 1)); };
+    draw[0] = 0; draw[127] = 1;
+    place([3, 4], [63, 64]);
+    place([5, 6, 7, 8], [31, 32, 95, 96]);
+    place([9, 10, 11, 12, 13, 14, 15, 16], [15, 16, 47, 48, 79, 80, 111, 112]);
+    place([...Array(16)].map((_, i) => 17 + i), [7, 8, 23, 24, 39, 40, 55, 56, 71, 72, 87, 88, 103, 104, 119, 120]);
+    const rest = shuffle([...Array(96)].map((_, i) => 32 + i));
+    for (let i = 0; i < 128; i++) if (draw[i] < 0) draw[i] = rest.pop();
+    const vkey = Object.keys(VENUES).find(k => VENUES[k] === venue) || 'mel';
+    return { venue: vkey, players, draw, res: [], out: false };
+  }
+  const entrants = r => r === 0 ? tour.draw : tour.res[r - 1].map(m => m.w);
+  const userMatch = r => Math.floor(entrants(r).indexOf(0) / 2);
+
+  // one set between two CPUs, point by point: the server usually holds, the stronger player more often
+  function simSet(a, b) {
+    const pa = tour.players[a], pb = tour.players[b];
+    const form = () => (Math.random() - .5) * .08; // some days you just play better
+    const ra = pa.r + form(), rb = pb.r + form();
+    const pServe = (s, rcv, st) => clamp(.64 + (s - rcv) * .3 + (st === 'big' ? .04 : st === 'slice' ? -.01 : 0), .45, .84);
+    const pA = pServe(ra, rb, pa.st), pB = pServe(rb, ra, pb.st);
+    const g = [0, 0];
+    let srv = Math.random() < .5 ? 0 : 1, tbs = null;
+    const game = s => { const p = [0, 0], q = s === 0 ? pA : 1 - pB; for (;;) { p[Math.random() < q ? 0 : 1]++; if (Math.max(...p) >= 4 && Math.abs(p[0] - p[1]) >= 2) return p[0] > p[1] ? 0 : 1; } };
+    while (!((g[0] >= 6 || g[1] >= 6) && Math.abs(g[0] - g[1]) >= 2) && g[0] < 7 && g[1] < 7) {
+      if (g[0] === 6 && g[1] === 6) {
+        const p = [0, 0]; let n = 0;
+        while (!(Math.max(...p) >= 7 && Math.abs(p[0] - p[1]) >= 2)) {
+          const s = (Math.floor((n + 1) / 2) % 2 === 0) ? srv : 1 - srv;
+          p[Math.random() < (s === 0 ? pA : 1 - pB) ? 0 : 1]++; n++;
+        }
+        g[p[0] > p[1] ? 0 : 1]++; tbs = Math.min(...p); break;
+      }
+      g[game(srv)]++; srv = 1 - srv;
+    }
+    const wi = g[0] > g[1] ? 0 : 1;
+    return { w: wi ? b : a, l: wi ? a : b, s: `${g[wi]}-${g[1 - wi]}` + (tbs !== null ? `(${tbs})` : '') };
+  }
+  // finish round r: every match not already decided is simulated
+  function simRound(r, userRes) {
+    const e = entrants(r), out = [];
+    for (let m = 0; m < e.length / 2; m++) out.push(userRes && (e[2 * m] === 0 || e[2 * m + 1] === 0) ? userRes : simSet(e[2 * m], e[2 * m + 1]));
+    tour.res.push(out);
+  }
+  const champion = () => tour.res.length === 7 ? tour.res[6][0].w : -1;
+
+  // strength rating -> CPU level: easy at 0, normal at .5, hard at 1, a touch beyond for the top seeds
+  function levelFor(p) {
+    const lerp = (a, b, t) => a + (b - a) * t, r = p.r;
+    const [A, B, t] = r < .5 ? [LEVELS.easy, LEVELS.normal, r / .5] : [LEVELS.normal, LEVELS.hard, (r - .5) / .5];
+    const f = k => lerp(A[k], B[k], t), f2 = (k, i) => lerp(A[k][i], B[k][i], t);
+    const lv = { name: p.n, speed: f('speed'), react: Math.max(.1, f('react')), reach: f('reach'), err: Math.max(.012, f('err')),
+                 power: [f2('power', 0), Math.min(1, f2('power', 1))], noise: Math.max(.18, f('noise')),
+                 serve: [Math.min(.85, f2('serve', 0)), Math.min(1, f2('serve', 1))],
+                 mix: { top: lerp(A.mix.top, B.mix.top, t), slice: lerp(A.mix.slice, B.mix.slice, t), flat: lerp(A.mix.flat, B.mix.flat, t) },
+                 tactic: clamp(f('tactic'), 0, .75), aim: clamp(f('aim'), 0, .8) };
+    if (p.st === 'big') { lv.serve = [Math.min(.95, lv.serve[0] + .12), 1]; lv.mix.flat *= 2; }
+    if (p.st === 'base') { lv.mix.top *= 1.4; lv.err *= .8; lv.speed *= 1.03; }
+    if (p.st === 'slice') { lv.mix.slice *= 2.2; lv.reach *= 1.05; }
+    if (p.st === 'all') { lv.tactic = Math.min(.8, lv.tactic + .1); lv.aim = Math.min(.85, lv.aim + .1); }
+    return lv;
+  }
+
+  const stars = r => { const n = clamp(Math.round((r - .3) / .15), 1, 5); return '★'.repeat(n) + '☆'.repeat(5 - n); };
+  const seedTag = p => p.seed ? `<span class="sd">${p.seed}</span> ` : '';
+  const pname = id => { const p = tour.players[id]; return id === 0 ? `${seedTag(p)}<b>あなた</b>` : `${seedTag(p)}${p.n} <small>${p.cc}</small>`; };
+
+  function showTour() {
+    const card = $('tourCard'), v = VENUES[tour.venue], r = tour.res.length, champ = champion();
+    let h = `<div class="tour"><h2>🏆 BUMPY OPEN</h2><p>${v.name}（${v.surf}）・ 128 ドロー ・ 1 セットマッチ</p><div class="path">`;
+    const lostAt = tour.out ? tour.res.findIndex(rr => rr.some(m => m.l === 0)) : -1;
+    ROUNDS.forEach((n, i) => {
+      const cls = tour.out ? (i < lostAt ? 'done' : i === lostAt ? 'lost' : '') : i < r ? 'done' : i === r ? 'now' : '';
+      h += `<span class="${cls}">${n}</span>`;
+    });
+    h += '</div>';
+    if (champ === 0) {
+      h += `<div class="big">🏆 優勝!</div><p>128 人の頂点！ あなたがチャンピオンです！</p>`;
+    } else if (tour.out) {
+      h += `<p>${ROUNDS[lostAt]} で敗退…</p>` + (champ > 0 ? `<div class="opp">優勝<div class="nm">${pname(champ)}</div>決勝 ${tour.res[6][0].s} で ${pname(tour.res[6][0].l)} に勝利</div>` : '');
+    } else {
+      const e = entrants(r), m = userMatch(r), opp = e[2 * m] === 0 ? e[2 * m + 1] : e[2 * m], p = tour.players[opp];
+      h += `<h3>${ROUNDS[r]} ・ 次の相手</h3><div class="opp"><div class="nm">${p.seed ? `<span class="sd">第${p.seed}シード</span> ` : ''}${p.n} <small>${p.cc}</small></div>
+        ${TSTYLE[p.st]} ・ 強さ <span class="st">${stars(p.r)}</span></div>`;
+    }
+    // your road so far
+    const mine = [];
+    tour.res.forEach((rr, i) => rr.forEach(mm => { if (mm.w === 0 || mm.l === 0) mine.push(`<li class="me"><span>${ROUNDS[i]}</span><span>${mm.w === 0 ? '○' : '●'} ${pname(mm.w === 0 ? mm.l : mm.w)}</span><span>${mm.w === 0 ? mm.s : mm.s.replace(/^(\d+)-(\d+)/, '$2-$1')}</span></li>`); }));
+    if (mine.length) h += `<h3>あなたの戦績</h3><ul>${mine.join('')}</ul>`;
+    // upsets in the last round played
+    if (r > 0) {
+      const ups = tour.res[r - 1].filter(mm => tour.players[mm.l].seed && mm.l !== 0 && (!tour.players[mm.w].seed || tour.players[mm.w].seed > tour.players[mm.l].seed));
+      h += `<h3>${ROUNDS[r - 1]}の番狂わせ</h3>` + (ups.length
+        ? `<ul>${ups.map(mm => `<li><span>${pname(mm.w)}</span><span>${mm.s}</span><span>${pname(mm.l)} 敗退</span></li>`).join('')}</ul>`
+        : '<p style="font-size:13px">シードは全員勝ち上がり</p>');
+    }
+    const alive = new Set(r >= 7 ? [champ] : entrants(r));
+    h += `<h3>シード選手</h3><div class="chips">${tour.players.filter(p => p.seed).map((p, i) => `<span class="${alive.has(i) ? '' : 'out'}">${p.seed} ${i === 0 ? 'あなた' : p.sur}</span>`).join('')}</div>`;
+    if (r < 7) {
+      const e = entrants(r);
+      h += `<details><summary>${ROUNDS[r]}の組み合わせ（${e.length} 人）</summary><ul>`;
+      for (let m = 0; m < e.length / 2; m++) h += `<li class="${e[2 * m] === 0 || e[2 * m + 1] === 0 ? 'me' : ''}"><span>${pname(e[2 * m])}</span><span>vs</span><span>${pname(e[2 * m + 1])}</span></li>`;
+      h += '</ul></details>';
+    }
+    h += '<div class="btns">' + (tour.out || champ >= 0 ? '<button data-t="new">新しいトーナメント</button>' : '<button data-t="play">▶ 試合開始</button>') +
+      '<button class="alt" data-t="menu">メニュー</button></div></div>';
+    card.innerHTML = h;
+    card.querySelectorAll('[data-t]').forEach(b => (b.onclick = () => {
+      const t = b.dataset.t;
+      if (t === 'play') playTourMatch();
+      else if (t === 'new') { tour = newTour(); saveTour(); showTour(); }
+      else { $('tour').classList.add('hidden'); $('menu').classList.remove('hidden'); refreshTourButtons(); }
+    }));
+    $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.add('hidden'); $('quit').classList.add('hidden');
+    $('tour').classList.remove('hidden'); card.scrollTop = 0; state = 'menu';
+  }
+  function playTourMatch() {
+    const r = tour.res.length, e = entrants(r), m = userMatch(r);
+    const id = e[2 * m] === 0 ? e[2 * m + 1] : e[2 * m];
+    venue = VENUES[tour.venue]; format = 'set';
+    pickOne('[data-venue]', 'venue', tour.venue); pickOne('[data-format]', 'format', 'set');
+    $('tour').classList.add('hidden');
+    startMatch('normal', { id, ...tour.players[id] });
+  }
+  // called when a tournament match ends
+  function tourResult(w) {
+    const opp = tourOpp.id, s = `${Math.max(...games)}-${Math.min(...games)}` + (tbScore ? `(${Math.min(...tbScore)})` : '');
+    const r = tour.res.length;
+    simRound(r, w === 'P' ? { w: 0, l: opp, s } : { w: opp, l: 0, s });
+    if (w !== 'P') { tour.out = true; while (tour.res.length < 7) simRound(tour.res.length); }
+    saveTour();
+    return r;
+  }
+  function refreshTourButtons() {
+    const t = loadTour();
+    $('tourCont').classList.toggle('hidden', !t);
+    if (t) $('tourCont').textContent = t.out || (t.res.length === 7) ? 'トーナメントの結果' : `つづきから（${ROUNDS[t.res.length]}）`;
   }
 
   function scoreText(a, b) {
@@ -1958,11 +2182,21 @@
   document.querySelectorAll('[data-level]').forEach(b => (b.onclick = () => startMatch(b.dataset.level)));
   document.querySelectorAll('[data-drill]').forEach(b => (b.onclick = () => startPractice(b.dataset.drill)));
   $('quit').onclick = () => {
-    practice = null; state = 'menu'; msg = null; ball.live = false;
+    practice = null; state = 'menu'; msg = null; ball.live = false; quietForPoint();
+    if (tourOpp) { tourOpp = null; $('board').classList.add('hidden'); $('quit').classList.add('hidden'); showTour(); return; }
+    refreshTourButtons();
     $('result').classList.add('hidden'); $('board').classList.add('hidden'); $('quit').classList.add('hidden'); $('menu').classList.remove('hidden');
   };
   $('again').onclick = () => startMatch(lvKey);
-  $('toMenu').onclick = () => {
+  $('toTour').onclick = () => showTour();
+  $('tourNew').onclick = () => {
+    const t = loadTour();
+    if (t && !t.out && t.res.length < 7 && t.res.length > 0 && !confirm('今のトーナメントを捨てて、新しく始めますか？')) return;
+    tour = newTour(); saveTour(); showTour();
+  };
+  $('tourCont').onclick = () => { tour = loadTour(); if (tour) { tour.venue in VENUES || (tour.venue = 'mel'); showTour(); } else refreshTourButtons(); };
+  refreshTourButtons();
+  $('toMenu').onclick = () => { refreshTourButtons();
     $('quit').classList.add('hidden'); $('result').classList.add('hidden'); $('menu').classList.remove('hidden'); $('board').classList.add('hidden'); state = 'menu'; };
   requestAnimationFrame(loop);
 })();
