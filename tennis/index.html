@@ -144,6 +144,7 @@
         <button class="alt" data-level="easy">やさしい</button>
         <button data-level="normal">ふつう</button>
         <button class="dark" data-level="hard">つよい</button>
+        <button class="dark" data-level="max" style="background:#7b2cbf;box-shadow:0 4px 0 #4a1a75">最強</button>
       </div>
       <p style="margin-top:12px"><b>🏆 トーナメント</b>（128 人のグランドスラム・あなたは第 1 シード）</p>
       <p style="font-size:12px;margin:2px 0">全 7 試合・1 セット（6-6 でタイブレーク）。会場は上で選んだもの。ほかの試合は AI がシミュレーション</p>
@@ -1114,7 +1115,7 @@
     $('resTitle').textContent = w === 'P' ? '🏆 勝利!' : '😢 まけちゃった…';
     $('resScore').textContent = `${games[0]} - ${games[1]}` + (tbScore ? ` (${Math.min(...tbScore)})` : '');
     $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
-      (w === 'P' ? (lvKey === 'hard' ? 'すごい！ もう世界レベル！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
+      (w === 'P' ? (lvKey === 'max' ? '最強を倒した！ 第 2 シード級に勝てる実力！' : lvKey === 'hard' ? 'すごい！ 次は「最強」に挑戦！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
     $('again').classList.toggle('hidden', !!tourOpp); $('toTour').classList.toggle('hidden', !tourOpp);
     if (tourOpp) {
       const r = tourResult(w);
@@ -2399,6 +2400,8 @@
     requestAnimationFrame(loop);
   }
 
+  // the strongest menu opponent: as strong as the tournament's No. 2 seed (no quirks, no big serve)
+  LEVELS.max = { ...levelFor({ n: '最強', r: seedRating(2), st: 'all' }), name: '最強' };
   const BOARD_HTML = $('board').innerHTML;
   const pickOne = (sel, attr, val) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('on', b.dataset[attr] === val));
   document.querySelectorAll('[data-venue]').forEach(b => (b.onclick = () => { venue = VENUES[b.dataset.venue]; pickOne('[data-venue]', 'venue', b.dataset.venue); }));
