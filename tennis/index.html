@@ -506,7 +506,7 @@
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
-    player.slide = cpu.slide = player.anim = cpu.anim = 0; ballGone = false;
+    player.slide = cpu.slide = player.anim = cpu.anim = 0; ballGone = false; quietForPoint();
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -990,8 +990,15 @@
     .map(([x, y]) => ({ x, y, hx: x, hy: y, task: null, phase: 0 }));
   let umpCall = null, cheer = 0, ballGone = false;
   const NAME = { P: 'Bumpy', C: 'C P U' };
+  let umpTimers = [];
   function umpire(text, delay = 0) {
-    setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay);
+    umpTimers.push(setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay));
+  }
+  // a new point: ball kids back in place, no leftover calls
+  function quietForPoint() {
+    kids.forEach(k => { k.task = null; k.x = k.hx; k.y = k.hy; });
+    umpTimers.forEach(clearTimeout); umpTimers = []; umpCall = null;
+    try { speechSynthesis.cancel(); } catch (e) {}
   }
   function lineCall(text) { // the nearest line judge shouts and points
     let best = judges[0];
@@ -1022,12 +1029,13 @@
   }
   function moveKids(dt) {
     kids.forEach(k => {
+      if (k.task === 'go' && ball.live) k.task = 'back'; // never touch a ball in play
       const tgt = k.task === 'go' ? ball : k.task === 'back' ? { x: k.hx, y: k.hy } : null;
       if (!tgt) return;
       const dx = tgt.x - k.x, dy = tgt.y - k.y, l = Math.hypot(dx, dy), v = 5.5 * dt;
       k.phase += dt * 14;
       if (l <= v + .25) {
-        if (k.task === 'go') { ballGone = true; k.task = 'back'; } else { k.x = k.hx; k.y = k.hy; k.task = null; }
+        if (k.task === 'go') { if (!ball.live && !ball.held) ballGone = true; k.task = 'back'; } else { k.x = k.hx; k.y = k.hy; k.task = null; }
       } else { k.x += dx / l * v; k.y += dy / l * v; }
     });
   }
