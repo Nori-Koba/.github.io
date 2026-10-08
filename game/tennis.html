@@ -249,46 +249,132 @@
   }
 
   // ---------- sound ----------
-  let audio = null, muted = false;
+  let audio = null, muted = false, bus = null, longBuf = null, clapBuf = null, murmur = null;
+  // one shared audio graph: everything goes through `bus`, which adds a little stadium reverb
+  function ac() {
+    if (!audio) {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      const sr = audio.sampleRate, ir = audio.createBuffer(2, sr * 1.6, sr);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.5); }
+      const conv = audio.createConvolver(), wet = audio.createGain();
+      conv.buffer = ir; wet.gain.value = .2;
+      bus = audio.createGain();
+      bus.connect(audio.destination); bus.connect(conv); conv.connect(wet).connect(audio.destination);
+      longBuf = audio.createBuffer(1, sr * 3, sr);
+      const d = longBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (audio.state === 'suspended') audio.resume();
+    return audio;
+  }
   function tone(freq, dur, type = 'triangle', vol = .12, delay = 0, slide = 0) {
     if (muted) return;
     try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      ac();
       const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + delay;
       o.type = type; o.frequency.setValueAtTime(freq, t);
       if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
       g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-      o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur + .02);
+      o.connect(g).connect(bus); o.start(t); o.stop(t + dur + .02);
     } catch (e) {}
   }
-  let noiseBuf = null;
   function noise(dur, filterType, freq, q, vol, delay = 0) {
     if (muted) return;
     try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      if (!noiseBuf) {
-        noiseBuf = audio.createBuffer(1, audio.sampleRate * .3, audio.sampleRate);
-        const d = noiseBuf.getChannelData(0);
-        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      }
+      ac();
       const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain(), t = audio.currentTime + delay;
-      src.buffer = noiseBuf; f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+      src.buffer = longBuf; f.type = filterType; f.frequency.value = freq; f.Q.value = q;
       g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-      src.connect(f).connect(g).connect(audio.destination); src.start(t); src.stop(t + dur + .02);
+      src.connect(f).connect(g).connect(bus); src.start(t, Math.random() * 2); src.stop(t + dur + .02);
     } catch (e) {}
   }
-  // "パコン!": a sharp string crack (pa) followed by the hollow ring of the ball and frame (kon)
+  // a struck ball rings at a few resonant modes: [frequency, decay, level]
+  function modes(list, vol, delay = 0) {
+    if (muted) return;
+    try {
+      ac();
+      const t0 = audio.currentTime + delay;
+      list.forEach(([f, d, a]) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(f, t0); o.frequency.exponentialRampToValueAtTime(f * .93, t0 + d);
+        g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(vol * a, t0 + .0015); g.gain.exponentialRampToValueAtTime(.0001, t0 + d);
+        o.connect(g).connect(bus); o.start(t0); o.stop(t0 + d + .02);
+      });
+    } catch (e) {}
+  }
+  // racket hit: a contact click, the ball's hollow ring and a short bright string ping; harder = lower and fuller
   const sHit = power => {
-    const v = .5 + power * .5;
-    noise(.035, 'bandpass', 2600 - power * 600, 1.2, .55 * v);
-    noise(.06, 'bandpass', 1100, 3, .25 * v, .004);
-    tone(760 - power * 140, .11, 'sine', .22 * v, .006, 420 - power * 80);
-    tone(1520 - power * 200, .07, 'triangle', .06 * v, .006, 900);
+    const v = .55 + power * .45, k = 1 - power * .12;
+    noise(.012, 'highpass', 2800, .7, .5 * v);
+    modes([[640 * k, .075, 1], [1320 * k, .045, .5], [2480 * k, .03, .25], [3600, .018, .16]], .32 * v);
+    noise(.05, 'bandpass', 900 * k, 1.5, .14 * v, .002);
   };
-  const sBounce = () => { noise(.05, 'lowpass', 500, .7, .35); tone(140, .07, 'sine', .14, 0, 80); };
+  // bounce: dry on hard courts, dull on clay, a soft thud on grass
+  const sBounce = impact => {
+    const c = venue.clay ? { f: 230, cut: 900, v: .5 } : venue.grass ? { f: 200, cut: 600, v: .3 } : { f: 320, cut: 2200, v: .8 };
+    const v = Math.min(1, impact / 12) * c.v;
+    noise(.03, 'lowpass', c.cut, .7, .45 * v);
+    modes([[c.f, .05, 1], [c.f * 2.9, .025, .35]], .25 * v);
+  };
+  const sSqueak = vol => { if (venue.clay || venue.grass) return; tone(2700, .09, 'sine', .05 * vol, 0, 1900); tone(3400, .06, 'sine', .025 * vol, .01, 2500); };
   const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
   const sLose = () => [392, 311].forEach((f, i) => tone(f, .18, 'triangle', .09, i * .12));
-  $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; };
+  // crowd: applause built from hundreds of short claps, a filtered roar for a cheer, a falling "ooh"
+  function crowdClap(intensity, dur = 2.2) {
+    if (muted) return;
+    try {
+      ac();
+      if (!clapBuf) {
+        const sr = audio.sampleRate, n = sr * 3; clapBuf = audio.createBuffer(2, n, sr);
+        for (let c = 0; c < 2; c++) {
+          const d = clapBuf.getChannelData(c);
+          for (let k = 0; k < 1100; k++) {
+            const at = Math.floor(Math.random() * n), len = Math.floor(sr * (.006 + Math.random() * .012)), a = .3 + Math.random() * .7;
+            for (let i = 0; i < len && at + i < n; i++) d[at + i] += (Math.random() * 2 - 1) * a * Math.exp(-i / (len * .3));
+          }
+        }
+      }
+      const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain(), t = audio.currentTime;
+      src.buffer = clapBuf; f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = .6;
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.3 * intensity, t + .15);
+      g.gain.setValueAtTime(.3 * intensity, t + dur * .45); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      src.connect(f).connect(g).connect(bus); src.start(t, Math.random() * .5); src.stop(t + dur + .05);
+    } catch (e) {}
+  }
+  function crowdVoice(kind, intensity) {
+    if (muted) return;
+    try {
+      ac();
+      const t = audio.currentTime, src = audio.createBufferSource(), f = audio.createBiquadFilter(), lp = audio.createBiquadFilter(), g = audio.createGain();
+      src.buffer = longBuf; f.type = 'bandpass'; lp.type = 'lowpass'; lp.frequency.value = 2400;
+      if (kind === 'cheer') {
+        f.frequency.setValueAtTime(480, t); f.frequency.linearRampToValueAtTime(900, t + .4); f.Q.value = .8;
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.45 * intensity, t + .25); g.gain.exponentialRampToValueAtTime(.0001, t + 2.4);
+      } else {
+        f.frequency.setValueAtTime(480, t); f.frequency.exponentialRampToValueAtTime(290, t + .9); f.Q.value = 3;
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.6 * intensity, t + .15); g.gain.exponentialRampToValueAtTime(.0001, t + 1.2);
+      }
+      src.connect(f).connect(lp).connect(g).connect(bus); src.start(t, Math.random()); src.stop(t + 2.5);
+    } catch (e) {}
+  }
+  // a soft stadium murmur that hushes during the rally
+  function setMurmur(level) {
+    if (muted) level = 0;
+    try {
+      ac();
+      if (!murmur) {
+        const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+        src.buffer = longBuf; src.loop = true; f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = .5; g.gain.value = 0;
+        src.connect(f).connect(g).connect(bus); src.start(); murmur = g;
+      }
+      murmur.gain.setTargetAtTime(level, audio.currentTime, .4);
+    } catch (e) {}
+  }
+  // chair umpire / line judge voices (speech synthesis, when the browser has it)
+  function say(text, pitch = .9, rate = 1) {
+    if (muted || !('speechSynthesis' in window)) return;
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.pitch = pitch; u.rate = rate; speechSynthesis.speak(u); } catch (e) {}
+  }
+  $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; if (muted) { setMurmur(0); try { speechSynthesis.cancel(); } catch (e) {} } };
 
   // ---------- input ----------
   const KEYMAP = { ' ': 'top', z: 'top', j: 'top', x: 'slice', k: 'slice', c: 'flat', l: 'flat', v: 'lob', i: 'lob', b: 'drop', o: 'drop' };
@@ -420,7 +506,7 @@
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
-    player.slide = cpu.slide = player.anim = cpu.anim = 0;
+    player.slide = cpu.slide = player.anim = cpu.anim = 0; ballGone = false;
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -875,7 +961,11 @@
       const ok = ball.serve ? inBox(serveBox(recv, deuce())) : inCourt(recv);
       marks.push({ x: ball.x, y: ball.y, life: venue.clay ? 5 : 1.2, ok }); // clay keeps the ball mark
       if (ok && ball.serve && ball.type === 'top') popupAt(ball.x, ball.y, 1.4, 'キック!', SHOTS.top.color);
-      if (!ok) ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
+      if (!ok) {
+        lineCall(ball.serve ? 'Fault' : 'Out');
+        if (outBy() < .5) crowdVoice('ooh', .8); // so close!
+        ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
+      }
     } else {
       const ace = ball.serve ? 'サービスエース!' : null;
       pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
@@ -888,8 +978,58 @@
 
   function fault(label) {
     ball.live = false;
-    if (faults === 0) { faults = 1; pause(label, 'セカンドサーブ', 1.2, setupServe); }
-    else pointTo(other(ball.last), 'ダブルフォールト');
+    if (faults === 0) { faults = 1; if (label === 'ネット') umpire('Fault'); pause(label, 'セカンドサーブ', 1.2, setupServe); }
+    else { umpire('Double fault'); pointTo(other(ball.last), 'ダブルフォールト'); }
+  }
+
+  // ---------- the stadium: chair umpire, line judges, ball kids, crowd ----------
+  const UMP = { x: CW + ALLEY + 2.3, y: NET_Y };
+  const judges = [[-1.8, -6], [CW + 1.8, -6], [-ALLEY - 2.6, 4], [-ALLEY - 2.6, L - 4], [CW + ALLEY + 2.6, L - 4], [CW + ALLEY + 2.6, 4]]
+    .map(([x, y]) => ({ x, y, call: 0 }));
+  const kids = [[-ALLEY - 1.7, NET_Y + .7], [CW + ALLEY + 1.4, NET_Y - 1.2], [CX - 3.2, -6.8], [CX + 3.2, -6.8]]
+    .map(([x, y]) => ({ x, y, hx: x, hy: y, task: null, phase: 0 }));
+  let umpCall = null, cheer = 0, ballGone = false;
+  const NAME = { P: 'Bumpy', C: 'C P U' };
+  function umpire(text, delay = 0) {
+    setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay);
+  }
+  function lineCall(text) { // the nearest line judge shouts and points
+    let best = judges[0];
+    judges.forEach(j => { if (d2(j, ball) < d2(best, ball)) best = j; });
+    best.call = 1.4;
+    popupAt(best.x, best.y, 2, text.toUpperCase(), '#fff');
+    say(text, 1.25, 1.15);
+  }
+  // how far outside the lines the ball landed (0 if in)
+  const outBy = () => Math.max(0, -ball.x, ball.x - CW, ball.y < NET_Y ? -ball.y : ball.y - L);
+  function scoreCall(w, gameWon, over, tiebreakNow) {
+    if (over) return `Game, set and match, ${NAME[w]}`;
+    if (tiebreakNow) return 'Six games all. Tiebreak';
+    if (gameWon) return `Game, ${NAME[w]}`;
+    const si = server() === 'P' ? 0 : 1, a = pts[si], b = pts[1 - si];
+    if (tb) return `${a}, ${b}`;
+    const N = ['love', 'fifteen', 'thirty', 'forty'];
+    if (a >= 3 && b >= 3) return a === b ? 'Deuce' : `Advantage, ${NAME[a > b ? server() : other(server())]}`;
+    return a === b ? `${N[a]} all` : `${N[a]}, ${N[b]}`;
+  }
+  // after a point a ball kid runs out, picks up the ball and runs back
+  function fetchBall() {
+    if (ball.live || ballGone || kids.some(k => k.task)) return;
+    if (ball.x < -7 || ball.x > CW + 7 || ball.y < -7.5 || ball.y > L + 7) return;
+    let best = kids[0];
+    kids.forEach(k => { if (d2(k, ball) < d2(best, ball)) best = k; });
+    best.task = 'go';
+  }
+  function moveKids(dt) {
+    kids.forEach(k => {
+      const tgt = k.task === 'go' ? ball : k.task === 'back' ? { x: k.hx, y: k.hy } : null;
+      if (!tgt) return;
+      const dx = tgt.x - k.x, dy = tgt.y - k.y, l = Math.hypot(dx, dy), v = 5.5 * dt;
+      k.phase += dt * 14;
+      if (l <= v + .25) {
+        if (k.task === 'go') { ballGone = true; k.task = 'back'; } else { k.x = k.hx; k.y = k.hy; k.task = null; }
+      } else { k.x += dx / l * v; k.y += dy / l * v; }
+    });
   }
 
   function pause(title, sub, sec, cb) { state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb; }
@@ -898,7 +1038,11 @@
     ball.live = false; faults = 0;
     const i = w === 'P' ? 0 : 1;
     pts[i]++;
-    w === 'P' ? sWin() : sLose();
+    const longRally = rally >= 8, ace = /エース/.test(label), error = /アウト|ネット|ダブル/.test(label);
+    let inten = (w === 'P' ? .8 : .55) * (error ? .6 : 1);
+    if (ace || longRally) inten = 1;
+    crowdClap(inten, 2.2); if (inten >= .9) crowdVoice('cheer', inten);
+    cheer = 1.4 * inten;
     if (navigator.vibrate && w === 'C') navigator.vibrate(60);
     let title = w === 'P' ? 'あなたのポイント!' : 'CPU のポイント';
     const gameWon = tb ? pts[i] >= 7 && pts[i] - pts[1 - i] >= 2 : pts[i] >= 4 && pts[i] - pts[1 - i] >= 2;
@@ -908,13 +1052,18 @@
       title = tb ? (w === 'P' ? '🎾 タイブレークを取った!' : 'CPU がタイブレークを取った')
                  : w === 'P' ? '🎾 あなたがゲームを取った!' : 'CPU がゲームを取った';
       tb = false;
-      if (setWon(i)) { updateBoard(); pause(title, label, 1.8, () => endMatch(w)); return; }
+      if (setWon(i)) {
+        crowdClap(1, 4); crowdVoice('cheer', 1); umpire(scoreCall(w, true, true), 600);
+        updateBoard(); pause(title, label, 1.8, () => endMatch(w)); return;
+      }
+      crowdClap(.9, 3);
       if (format === 'set' && games[0] === 6 && games[1] === 6) { // 6-6: tiebreak
-        tbStart = server(); tb = true;
+        tbStart = server(); tb = true; umpire(scoreCall(w, true, false, true), 600);
         updateBoard(); pause('6-6 タイブレーク!', '7 ポイント先取（2 点差）', 2, setupServe); return;
       }
     }
     updateBoard();
+    umpire(scoreCall(w, gameWon), 650);
     pause(title, label, 1.6, setupServe);
   }
 
@@ -1112,6 +1261,8 @@
     // lean into acceleration, back when braking
     const ax = (o.vx - (o.pvx || 0)) / dt, ay = (o.vy - (o.pvy || 0)) / dt;
     o.pvx = o.vx; o.pvy = o.vy;
+    o.squeak = Math.max(0, (o.squeak || 0) - dt);
+    if (Math.hypot(ax, ay) > 28 && sp > 2.5 && !o.squeak) { sSqueak(o === player ? 1 : .4); o.squeak = .6; }
     const k = Math.min(1, dt * 12);
     o.lx = (o.lx || 0) + (clamp(ax * .006, -.14, .14) - (o.lx || 0)) * k;
     o.ly = (o.ly || 0) + (clamp(ay * .006, -.14, .14) - (o.ly || 0)) * k;
@@ -1157,7 +1308,7 @@
     if (ball.rolling) { const f = Math.pow(.25, dt); ball.vx *= f; ball.vy *= f; }
     ball.spin *= Math.pow(.6, dt);
     if (tossing && ball.vz < 0 && ball.z < .8) { ball.held = true; tossing = false; return; } // missed toss: try again
-    if (impact) { if (impact > 2) sBounce(); onBounce(); }
+    if (impact) { if (impact > 2) sBounce(impact); onBounce(); }
     if ((py - NET_Y) * (ball.y - NET_Y) < 0 && ball.x > -2.3 && ball.x < CW + 2.3) {
       const nh = NET_H + Math.min(1, Math.abs(ball.x - CX) / (CX + 2.3)) * .155;
       if (ball.z < nh) {
@@ -1219,6 +1370,12 @@
     popups.forEach(p => { p.z += dt * 1.2; p.life -= dt; });
     popups = popups.filter(p => p.life > 0);
     marks.forEach(m => (m.life -= dt));
+    if (state === 'pause' && !practice) fetchBall();
+    moveKids(dt);
+    cheer = Math.max(0, cheer - dt);
+    judges.forEach(j => (j.call = Math.max(0, j.call - dt)));
+    if (umpCall && (umpCall.life -= dt) <= 0) umpCall = null;
+    setMurmur(state === 'rally' ? .012 + Math.min(rally, 12) * .003 : state === 'over' || state === 'menu' ? 0 : .04);
     dust.forEach(d => { d.life -= dt; d.r += dt * .6; });
     dust = dust.filter(d => d.life > 0);
     marks = marks.filter(m => m.life > 0);
@@ -1241,6 +1398,33 @@
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   }
 
+  // fictional sponsors on LED boards: the back wall panels change every few seconds
+  const SPONSORS = [['BUMPY SPORTS', '#ff5d73'], ['KOBA WATER', '#2ab7ca'], ['AERO AIR', '#3d5af1'], ['SPEED WATCH', '#222'],
+                    ['CLOUD BANK', '#0a9396'], ['NORI DRINK', '#f4a261'], ['TOPSPIN TV', '#8338ec'], ['GRAND SLAM SHOES', '#e63946']];
+  function adPanel(x0, x1, y0, y1, z0, z1, [name, col], vertical) {
+    const pts = vertical ? [[x0, y0, z1], [x1, y1, z1], [x1, y1, z0], [x0, y0, z0]] : null;
+    const q = pts.map(([x, y, z]) => P(x, y, z));
+    ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+    const c = P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), h = Math.abs(q[3].y - q[0].y), w = Math.abs(q[1].x - q[0].x);
+    const size = Math.min(h * .55, w * .9 / (name.length * .62));
+    if (size < 6) return; // too small to read: just the colour
+    ctx.save(); ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${size}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(name, c.x, c.y);
+    ctx.restore();
+  }
+  function drawAds(t) {
+    const shift = Math.floor(t / 5);
+    for (let k = 0, x = -15; x < CW + 15; x += 5.2, k++) {
+      if (x + 5 > CX - 3.2 && x < CX + 3.2) continue; // leave the middle for the event banner
+      adPanel(x, x + 5, -7.95, -7.95, .25, 1.9, SPONSORS[(k + shift) % SPONSORS.length], true);
+    }
+    for (let k = 0, y = -6; y < L + 3; y += 5.5, k++) { // side boards
+      adPanel(-ALLEY - 4, -ALLEY - 4, y, y + 5, 0, .9, SPONSORS[(k + 3) % SPONSORS.length], true);
+      adPanel(CW + ALLEY + 4, CW + ALLEY + 4, y, y + 5, 0, .9, SPONSORS[(k + 5) % SPONSORS.length], true);
+    }
+  }
   const stripes = (x0, x1, y0, y1, step, c1, c2) => {
     for (let y = y0, k = 0; y < y1; y += step, k++) poly([[x0, y], [x1, y], [x1, Math.min(y1, y + step)], [x0, Math.min(y1, y + step)]], k % 2 ? c1 : c2);
   };
@@ -1258,14 +1442,17 @@
     }
     const t = performance.now() / 1000;
     crowd.forEach((c, i) => {
-      const y = c.v * (wallTop - 6) + 3 + (rally > 4 ? Math.sin(t * 9 + i) * 1.5 : 0);
+      const y = c.v * (wallTop - 6) + 3 + (rally > 4 ? Math.sin(t * 9 + i) * 1.5 : 0) - Math.abs(Math.sin(t * 13 + i * 1.7)) * 5 * Math.min(1, cheer);
       ctx.fillStyle = c.c; ctx.beginPath(); ctx.arc(c.u * W, y, 2 + c.v * 2.5, 0, Math.PI * 2); ctx.fill();
     });
     ctx.fillStyle = V.wall; ctx.fillRect(0, wallTop, W, wallBot - wallTop);
     const mid = P(CX, -8, 1.1);
-    ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.font = `bold ${Math.max(10, mid.s * .75)}px system-ui, sans-serif`;
+    drawAds(t);
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.font = `bold ${Math.max(10, mid.s * .75)}px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(V.banner, mid.x, mid.y);
+    const bw = ctx.measureText(V.banner).width + 24;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(mid.x - bw / 2, P(CX, -8, 1.9).y, bw, P(CX, -8, .3).y - P(CX, -8, 1.9).y);
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fillText(V.banner, mid.x, mid.y);
     // the playing surface
     ctx.fillStyle = V.outer; ctx.fillRect(0, wallBot, W, H - wallBot);
     if (V.grass) { // mowing stripes and worn patches behind the baselines
@@ -1573,7 +1760,57 @@
   const KIT_P = { shirt: '#ff5d73', trim: '#fff', shorts: '#f4f4f4', skin: '#f0c8a0', hair: '#3a2a22', cap: '#c9384d', shoe: '#ffffff', racket: '#d7263d' };
   const KIT_C = { shirt: '#4a6fd1', trim: '#ffd166', shorts: '#1f2b55', skin: '#c68a5a', hair: '#1b1b1b', cap: '#1b1b1b', shoe: '#ffd166', racket: '#2b2f4a' };
 
+  // simple stand-in people for the officials and ball kids
+  function person(x, y, z0, shirt, h, opts = {}) {
+    const b = P(x, y, z0), s = b.s, zy = z => P(x, y, z0 + z).y;
+    if (!opts.noShadow) { ctx.fillStyle = 'rgba(0,0,0,.2)'; const g = P(x, y); ctx.beginPath(); ctx.ellipse(g.x, g.y, .35 * s, .12 * s, 0, 0, 7); ctx.fill(); }
+    ctx.lineCap = 'round';
+    if (!opts.seated) {
+      const run = opts.run ? Math.sin(opts.run) * .12 : 0;
+      ctx.strokeStyle = '#2b2f4a'; ctx.lineWidth = Math.max(1.5, .09 * s);
+      ctx.beginPath(); ctx.moveTo(b.x - .08 * s, zy(.5 * h)); ctx.lineTo(b.x - (.1 + run) * s, b.y);
+      ctx.moveTo(b.x + .08 * s, zy(.5 * h)); ctx.lineTo(b.x + (.1 - run) * s, b.y); ctx.stroke();
+    }
+    ctx.fillStyle = shirt;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(b.x - .2 * s, zy(.92 * h), .4 * s, .42 * h * s, .08 * s) : ctx.rect(b.x - .2 * s, zy(.92 * h), .4 * s, .42 * h * s); ctx.fill();
+    ctx.fillStyle = '#e8c09a'; ctx.beginPath(); ctx.arc(b.x, zy(1.04 * h), .11 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = opts.cap || '#1d2440'; ctx.beginPath(); ctx.arc(b.x, zy(1.07 * h), .115 * s, Math.PI, 0); ctx.fill();
+    if (opts.arm) { // raised arm pointing out
+      ctx.strokeStyle = shirt; ctx.lineWidth = Math.max(1.5, .08 * s);
+      ctx.beginPath(); ctx.moveTo(b.x + .18 * s, zy(.85 * h)); ctx.lineTo(b.x + .45 * s, zy(1.35 * h)); ctx.stroke();
+    }
+  }
+  function drawUmpire() {
+    const base = P(UMP.x, UMP.y), seat = P(UMP.x, UMP.y, 1.9), s = base.s;
+    ctx.strokeStyle = '#3a3f55'; ctx.lineWidth = Math.max(2, .07 * s);
+    [-.35, .35].forEach(o => { const a = P(UMP.x + o, UMP.y, 0), b = P(UMP.x + o * .6, UMP.y, 1.9); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+    ctx.fillStyle = '#2b3150'; ctx.fillRect(seat.x - .35 * s, seat.y - .1 * s, .7 * s, .14 * s);
+    person(UMP.x, UMP.y, 1.95, '#1f2b55', 1.25, { seated: true, noShadow: true, cap: '#cfd5e6' });
+    if (umpCall) {
+      const head = P(UMP.x, UMP.y, 3.6);
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      const w = ctx.measureText(umpCall.text).width + 16;
+      ctx.globalAlpha = Math.min(1, umpCall.life * 2);
+      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(head.x - w + 10, head.y - 26, w, 22, 8) : ctx.rect(head.x - w + 10, head.y - 26, w, 22); ctx.fill();
+      ctx.fillStyle = '#1f2340'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(umpCall.text, head.x - w / 2 + 10, head.y - 15);
+      ctx.globalAlpha = 1;
+    }
+  }
+  function drawJudge(j) {
+    const chair = P(j.x, j.y, .45), s = chair.s;
+    ctx.fillStyle = '#3a3f55'; ctx.fillRect(chair.x - .2 * s, chair.y, .4 * s, .45 * s);
+    person(j.x, j.y, .45, venue.clay ? '#2c4a7a' : '#1f2b55', 1.05, { seated: true, arm: j.call > 0 });
+  }
+  function drawKid(k) {
+    const crouch = k.task ? 0 : .25;
+    person(k.x, k.y, 0, '#7b2cbf', 1.25 - crouch, { run: k.task ? k.phase : 0, cap: '#7b2cbf' });
+    if (k.task === 'back') { const h = P(k.x + .2, k.y, .9); ctx.fillStyle = '#e8ff3a'; ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(2, .06 * h.s), 0, 7); ctx.fill(); }
+  }
+
   function drawBall() {
+    if (ballGone) return;
     const col = ball.live ? SHOTS[ball.type].color : '#e8ff3a';
     ball.trail.forEach((t, i) => {
       const p = P(t.x, t.y, t.z);
@@ -1682,6 +1919,9 @@
 
     const items = [
       { y: NET_Y, f: drawNet },
+      { y: UMP.y + .02, f: drawUmpire },
+      ...judges.map(j => ({ y: j.y, f: () => drawJudge(j) })),
+      ...kids.map(k => ({ y: k.y, f: () => drawKid(k) })),
       { y: cpu.y, f: () => figure(cpu, KIT_C) },
       { y: player.y, f: () => figure(player, KIT_P, charge) },
     ];
@@ -1731,6 +1971,7 @@
     const dt = Math.min(.04, (t - lastT) / 1000);
     lastT = t;
     if (state !== 'menu' && state !== 'over') update(dt);
+    else setMurmur(0);
     draw();
     requestAnimationFrame(loop);
   }
