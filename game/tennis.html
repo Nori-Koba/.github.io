@@ -99,7 +99,7 @@
         ・低く弾んだ球はスライスで返すと安全（フラットやトップは持ち上げにくい）<br>
         ・高く跳ねた球はトップスピンで。腰の高さの打ちごろの球はフラットで強打！<br>
         ・同じ球種ばかりだと CPU に<b>読まれる</b>。3 種類続けて打ち分けると CPU が<b>揺さぶられて</b>崩れる<br>
-        <b>コツ</b>：ショットのボタンを長押しすると、ボールの打ちやすい所（ボレー・スマッシュの位置やバウンド後の頂点）へ自動で走る。ノーバウンドの高い球はスマッシュ！ 練習モードで球出し練習もできる。
+        <b>コツ</b>：ショットのボタンを長押しすると、ボールの打ちやすい所（ボレー・スマッシュの位置やバウンド後の頂点）へ自動で走る。ノーバウンドの高い球はスマッシュ：地面の<b>赤い印</b>の所で待つと頭上の打ちやすい高さに落ちてくる。ボールが赤く光って「今!」が出たら打てる。練習モードで球出し練習もできる。
       </div>
       <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
       <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
@@ -947,8 +947,26 @@
   // Where to go to meet the incoming ball (while a shot is charged, the player is walked there):
   // volley it where you stand if it passes you at a playable height, get under a high ball that comes
   // down in front of you, otherwise go to where it peaks after the bounce (all the way in for a drop shot).
+  // Where an incoming high ball will come down through the ideal smash height (2.1-2.5 m) on your side.
+  function smashSpot() {
+    if (!ball.live || ball.last !== 'C' || ball.bounces !== 0 || ball.serve) return null;
+    const b = { ...ball, trail: null }, step = 1 / 120;
+    let high = ball.z > 2.6;
+    for (let i = 0; i < 500; i++) {
+      if (physStep(b, step)) return null;
+      if (b.z > 2.6) high = true;
+      if (high && b.vz < 0 && b.z <= 2.5 && b.y > NET_Y + .8) return b.z >= 2.1 ? { x: b.x, y: b.y } : null;
+    }
+    return null;
+  }
+
   function assistTarget() {
     if (!ball.live || ball.last !== 'C') return null;
+    const ss = smashSpot();
+    if (ss && player.y < NET_Y + 9) { // get under it so it drops onto the racket just above your head
+      const side = ss.x >= player.x - .1 ? 1 : -1;
+      return { x: ss.x - side * .25, y: clamp(ss.y + .25, NET_Y + .8, L + 3) };
+    }
     const b = { ...ball, trail: null }, step = 1 / 60;
     let bounces = ball.bounces, air = null, post = null, cross = null;
     for (let i = 0; i < 300; i++) {
@@ -1501,6 +1519,25 @@
       ctx.beginPath(); ctx.ellipse(p.x, p.y, .25 * p.s, .1 * p.s, 0, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     });
+    // smash guide: where the ball comes down to smash height, and a flash when it is in range right now
+    const ss = state === 'rally' ? smashSpot() : null;
+    if (ss) {
+      const g = P(ss.x, ss.y), top = P(ss.x, ss.y, 2.3), pulse = 1 + Math.sin(performance.now() / 100) * .12;
+      ctx.strokeStyle = '#ff5d73'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(g.x, g.y, .45 * g.s * pulse, .18 * g.s * pulse, 0, 0, 7); ctx.stroke();
+      ctx.setLineDash([4, 4]); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(top.x, top.y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#ff5d73'; ctx.beginPath(); ctx.arc(top.x, top.y, 4, 0, 7); ctx.fill();
+      ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('スマッシュ', top.x, top.y - 6);
+    }
+    if (state === 'rally' && canHit('P') && ball.bounces === 0 && ball.z > 2.1 && ball.z < 3.2 && d2(ball, player) < reachOf('smash')) {
+      const q = P(ball.x, ball.y, ball.z);
+      ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(10, .35 * q.s), 0, 7); ctx.stroke();
+      ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#ff2d55'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('今!', q.x, q.y - Math.max(12, .4 * q.s));
+    }
     if (ball.chance && ball.live && ball.last === 'C') { // highlight the sitter (and its shadow) so you go for it
       const q = P(ball.x, ball.y, ball.z), g = P(ball.x, ball.y), pulse = 1 + Math.sin(performance.now() / 70) * .25;
       ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 3;
