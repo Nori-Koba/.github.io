@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fuwamoko Puzzle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg1: #fff6e0;
+    --bg2: #ffe3ea;
+    --ink: #6b4a3a;
+    --accent: #ff8fa3;
+    --accent-dark: #e0687f;
+    --card: rgba(255, 255, 255, 0.92);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: linear-gradient(180deg, var(--bg1), var(--bg2));
+    color: var(--ink);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #wrap { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; }
+  #frame { position: relative; }
+  #stage { position: absolute; left: 0; top: 0; width: 400px; height: 700px; transform-origin: 0 0;
+           border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px rgba(180, 120, 100, 0.25); }
+  canvas#game { position: absolute; inset: 0; width: 400px; height: 700px; display: block; }
+  .hidden { display: none !important; }
+  button { font-family: inherit; color: var(--ink); cursor: pointer; }
+
+  /* HUD */
+  #hud { position: absolute; left: 0; right: 0; top: 0; height: 64px; display: flex; align-items: center;
+         justify-content: space-between; padding: 8px 10px; pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+  #faces { display: flex; gap: 6px; }
+  .face { width: 48px; height: 48px; border-radius: 50%; border: 3px solid rgba(255,255,255,.9);
+          background: rgba(255,255,255,.75); padding: 0; position: relative; }
+  .face canvas { width: 42px; height: 42px; display: block; border-radius: 50%; }
+  .face.on { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,143,163,.35); }
+  .face .k { position: absolute; right: -4px; bottom: -4px; font-size: 10px; font-weight: 800; background: #fff;
+             border-radius: 8px; padding: 0 4px; line-height: 14px; }
+  #hudRight { display: flex; gap: 6px; align-items: center; }
+  #stageLabel { font-size: 12px; font-weight: 800; background: rgba(255,255,255,.8); border-radius: 999px; padding: 4px 10px; }
+  .round { width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(255,255,255,.85);
+           font-size: 18px; font-weight: 800; }
+
+  /* パッド */
+  #pad { position: absolute; left: 0; right: 0; bottom: 0; height: 130px; background: rgba(255,255,255,.55);
+         backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+         display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+  .pbtn { border: none; border-radius: 50%; background: #fff; box-shadow: 0 4px 0 rgba(107,74,58,.18);
+          font-weight: 800; touch-action: none; display: flex; align-items: center; justify-content: center; }
+  .pbtn.down { transform: translateY(3px); box-shadow: 0 1px 0 rgba(107,74,58,.18); background: #ffe7ec; }
+  #leftBtn, #rightBtn { width: 72px; height: 72px; font-size: 26px; }
+  #moveBtns, #actBtns { display: flex; gap: 10px; align-items: center; }
+  #jumpBtn { width: 84px; height: 84px; font-size: 15px; background: var(--accent); color: #fff; box-shadow: 0 4px 0 var(--accent-dark); }
+  #jumpBtn.down { background: #ff7590; box-shadow: 0 1px 0 var(--accent-dark); }
+  #dashBtn { width: 64px; height: 64px; font-size: 13px; background: #f9b23a; color: #fff; box-shadow: 0 4px 0 #d98c12; }
+  #dashBtn.down { box-shadow: 0 1px 0 #d98c12; }
+  #ability { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); font-size: 11px; font-weight: 800;
+             white-space: nowrap; background: rgba(255,255,255,.85); border-radius: 999px; padding: 2px 10px; }
+
+  /* 画面 */
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; text-align: center; padding: 16px; }
+  .dim { background: rgba(255, 246, 236, .55); }
+  h1 { margin: 0 0 6px; font-size: 34px; font-weight: 800; color: #ff7f96; line-height: 1.15;
+       text-shadow: 3px 3px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff; }
+  .sub { margin: 0 0 14px; font-size: 14px; font-weight: 800; }
+  .langs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .langs button { font-size: 12px; font-weight: 800; background: var(--card); border: 2px solid transparent;
+                  border-radius: 999px; padding: 5px 11px; }
+  .langs button.on { border-color: var(--accent); color: var(--accent-dark); }
+  .card { background: var(--card); border-radius: 22px; padding: 18px 20px; max-width: 360px; width: 100%; }
+  .big { font-size: 22px; font-weight: 800; color: #fff; background: var(--accent); border: none; border-radius: 999px;
+         padding: 12px 40px; box-shadow: 0 5px 0 var(--accent-dark); margin-top: 8px; }
+  .big:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-dark); }
+  .big.small { font-size: 15px; padding: 8px 22px; }
+  .big.gray { background: #b9a08f; box-shadow: 0 5px 0 #8f7767; }
+  .team { display: flex; gap: 8px; justify-content: center; margin: 4px 0 6px; }
+  .member { width: 108px; background: var(--card); border-radius: 18px; padding: 4px 4px 8px; }
+  .member canvas { width: 96px; height: 100px; display: block; margin: 0 auto; }
+  .member .n { font-weight: 800; font-size: 14px; }
+  .member .a { font-size: 11px; min-height: 2.6em; line-height: 1.3; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+  .lv { background: #fff; border: 3px solid #ffd0da; border-radius: 16px; padding: 10px 4px; font-weight: 800; font-size: 22px; }
+  .lv small { display: block; font-size: 10px; min-height: 2.4em; line-height: 1.2; margin-top: 2px; }
+  .lv .m { font-size: 12px; min-height: 1.2em; display: block; }
+  .lv.locked { opacity: .45; }
+  .lv.done { border-color: var(--accent); }
+  .hint { font-size: 14px; line-height: 1.7; margin: 8px 0; }
+  .help { font-size: 11px; line-height: 1.6; margin-top: 12px; background: var(--card); border-radius: 14px; padding: 8px 12px; }
+  .ttl { font-size: 26px; font-weight: 800; color: #ff7f96; }
+  .toast { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); background: rgba(107,74,58,.88);
+           color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="frame"><div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="faces"></div>
+    <div id="hudRight">
+      <span id="stageLabel"></span>
+      <button class="round" id="retryBtn" aria-label="retry">↺</button>
+      <button class="round" id="menuBtn" aria-label="menu">☰</button>
+    </div>
+  </div>
+
+  <div id="pad" class="hidden">
+    <div id="ability"></div>
+    <div id="moveBtns">
+      <button class="pbtn" id="leftBtn" aria-label="left">◀</button>
+      <button class="pbtn" id="rightBtn" aria-label="right">▶</button>
+    </div>
+    <div id="actBtns">
+      <button class="pbtn" id="dashBtn" data-i18n="dash"></button>
+      <button class="pbtn" id="jumpBtn" data-i18n="jump"></button>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="title" class="screen">
+    <div class="langs" id="langs">
+      <button data-lang="ja">日本語</button>
+      <button data-lang="en">English</button>
+      <button data-lang="id">Bahasa Indonesia</button>
+    </div>
+    <h1 data-i18n="title"></h1>
+    <p class="sub" data-i18n="subtitle"></p>
+    <div class="team" id="team"></div>
+    <button class="big" id="startBtn" data-i18n="start"></button>
+    <div class="help"><span data-i18n="controls"></span><br><span data-i18n="keys"></span></div>
+  </div>
+
+  <div id="select" class="screen dim hidden">
+    <div class="card">
+      <div class="ttl" data-i18n="select"></div>
+      <div class="grid" id="grid"></div>
+      <button class="big small gray" id="toTitleBtn" data-i18n="toTitle"></button>
+    </div>
+  </div>
+
+  <div id="intro" class="screen dim hidden">
+    <div class="card">
+      <div style="font-size:13px;font-weight:800;" id="introNum"></div>
+      <div class="ttl" id="introName"></div>
+      <div class="hint" id="introHint"></div>
+      <button class="big" id="okBtn" data-i18n="ok"></button>
+    </div>
+  </div>
+
+  <div id="clear" class="screen dim hidden">
+    <div class="card">
+      <div class="ttl" id="clearTitle"></div>
+      <canvas id="clearCv" width="600" height="220" style="width:300px;height:110px;"></canvas>
+      <div id="clearBerry" style="font-weight:800;margin:4px 0;"></div>
+      <button class="big" id="nextBtn" data-i18n="next"></button><br>
+      <button class="big small gray" id="clearSelBtn" data-i18n="toSelect"></button>
+    </div>
+  </div>
+</div></div></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const COL = {
+    body: '#f6df86', bodyDark: '#e8c95e', belly: '#f4ece6',
+    eyeIris: '#3f9a63', claw: '#5a3b2b', blush: '#f08aa0',
+    pinkHat: '#e89aa5', pinkHatDark: '#d47e8b',
+    mokoFur: '#f7e8a4', mokoHood: '#fbe36d',
+    mane: '#f59a2a', maneDark: '#e07d14',
+  };
+
+  function ellipse(c, x, y, rx, ry, fill, rot = 0) {
+    c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+    c.fillStyle = fill; c.fill();
+  }
+
+  // mood: 'normal' | 'happy' | 'ouch' | 'fever'
+  function drawChar(c, type, x, y, s, t, mood = 'normal', armWave = 0) {
+    c.save();
+    c.translate(x, y);
+    c.scale(s, s);
+    const bob = Math.sin(t * 6) * 1.5;
+    const furry = type === 'moko';
+    const bodyCol = furry ? COL.mokoFur : COL.body;
+
+    // 影
+    ellipse(c, 0, 66, 34, 6, 'rgba(120,80,60,0.15)');
+
+    // 足
+    for (const sx of [-16, 16]) {
+      ellipse(c, sx, 58, 12, 8, bodyCol);
+      c.fillStyle = COL.claw;
+      for (let i = -1; i <= 1; i++) { c.beginPath(); c.arc(sx + i * 4.5, 64, 1.8, 0, Math.PI * 2); c.fill(); }
+    }
+
+    c.translate(0, bob);
+
+    // ライオンのたてがみ（後ろ）
+    if (type === 'lion') {
+      for (let i = 0; i < 11; i++) {
+        const a = Math.PI + (i / 10) * Math.PI * 1.15 - 0.08;
+        const r = 38;
+        ellipse(c, Math.cos(a) * r, -22 + Math.sin(a) * r * 0.95, 16, 11, i % 2 ? COL.mane : COL.maneDark, a);
+      }
+      for (const sx of [-1, 1]) ellipse(c, sx * 38, -10, 12, 16, COL.maneDark, sx * 0.3);
+    }
+
+    // 腕
+    const wave = Math.sin(t * 10) * 0.4 * armWave;
+    for (const sx of [-1, 1]) {
+      c.save();
+      c.translate(sx * 28, 16);
+      c.rotate(sx * (0.7 + (sx > 0 ? wave : -wave)) - (mood === 'happy' || mood === 'fever' ? sx * 0.9 : 0));
+      ellipse(c, 0, 12, 7, 14, bodyCol);
+      c.fillStyle = COL.claw;
+      for (let i = -1; i <= 1; i++) { c.beginPath(); c.arc(i * 3, 25, 1.5, 0, Math.PI * 2); c.fill(); }
+      c.restore();
+    }
+
+    // 体
+    if (furry) fluffyEllipse(c, 0, 25, 30, 30, bodyCol, 14, 3);
+    else ellipse(c, 0, 25, 30, 30, bodyCol);
+    ellipse(c, 0, 29, 18, 20, COL.belly);
+    if (furry) for (let i = 0; i < 14; i++) {
+      const a = i * 2.4, r = (i % 5) * 3.5;
+      ellipse(c, Math.cos(a) * r, 29 + Math.sin(a) * r * 1.1, 2.2, 2.2, '#fffaf5');
+    }
+
+    // ライオンのえり
+    if (type === 'lion') {
+      for (let i = 0; i < 6; i++) {
+        const xx = -22 + i * 8.8;
+        ellipse(c, xx, 4 + Math.abs(i - 2.5) * 1.2, 7, 7, i % 2 ? COL.mane : COL.maneDark);
+      }
+    }
+
+    // 頭
+    if (furry) fluffyEllipse(c, 0, -20, 38, 33, bodyCol, 22, 3.5);
+    else ellipse(c, 0, -20, 38, 33, bodyCol);
+    // 頭のハイライト
+    ellipse(c, -14, -38, 10, 5, 'rgba(255,255,255,0.35)', -0.3);
+
+    // ぼうし / フード
+    if (type === 'pink') {
+      c.beginPath();
+      c.moveTo(-39, -24);
+      c.bezierCurveTo(-42, -62, 42, -62, 39, -24);
+      c.bezierCurveTo(20, -32, -20, -32, -39, -24);
+      c.fillStyle = COL.pinkHat; c.fill();
+      c.beginPath();
+      c.moveTo(-39, -24); c.bezierCurveTo(-20, -32, 20, -32, 39, -24);
+      c.lineWidth = 4; c.strokeStyle = COL.pinkHatDark; c.stroke();
+      // ぼうしの小さなかお
+      c.fillStyle = '#5a3b2b';
+      c.beginPath(); c.arc(-6, -43, 1.8, 0, Math.PI * 2); c.arc(6, -43, 1.8, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.moveTo(-3, -39); c.quadraticCurveTo(0, -35, 3, -39); c.lineWidth = 1.4; c.strokeStyle = '#5a3b2b'; c.stroke();
+      ellipse(c, 0, -37.5, 1.6, 1.4, '#e05a70');
+    } else if (type === 'moko') {
+      for (let i = 0; i < 9; i++) {
+        const a = Math.PI + (i / 8) * Math.PI;
+        ellipse(c, Math.cos(a) * 34, -26 + Math.sin(a) * 28, 9, 8, COL.mokoHood);
+      }
+      // ちいさなおともだち（ねずみ風）
+      ellipse(c, 0, -60, 12, 8, '#fbe9a0');
+      ellipse(c, -9, -64, 5, 4, '#f3d77a', -0.5);
+      ellipse(c, 9, -64, 5, 4, '#f3d77a', 0.5);
+      c.fillStyle = '#5a3b2b';
+      c.beginPath(); c.arc(-3.5, -60, 1.1, 0, Math.PI * 2); c.arc(3.5, -60, 1.1, 0, Math.PI * 2); c.fill();
+    }
+
+    // 目
+    const eyeY = -16;
+    if (mood === 'ouch') {
+      c.strokeStyle = '#4a2f22'; c.lineWidth = 3; c.lineCap = 'round';
+      for (const sx of [-1, 1]) {
+        c.beginPath();
+        const k = -sx, ex = sx * 14;
+        c.moveTo(ex - 5 * k, eyeY - 5); c.lineTo(ex + 5 * k, eyeY); c.lineTo(ex - 5 * k, eyeY + 5);
+        c.stroke();
+      }
+    } else if (mood === 'happy') {
+      c.strokeStyle = '#4a2f22'; c.lineWidth = 3; c.lineCap = 'round';
+      for (const sx of [-1, 1]) {
+        c.beginPath(); c.arc(sx * 14, eyeY + 2, 6, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+      }
+    } else {
+      for (const sx of [-1, 1]) {
+        ellipse(c, sx * 14, eyeY, 8, 9.5, '#fff');
+        ellipse(c, sx * 14 + 1, eyeY + 0.5, 6.5, 7.5, COL.eyeIris);
+        ellipse(c, sx * 14 + 1, eyeY + 1, 4, 5, '#1c1410');
+        ellipse(c, sx * 14 + 3, eyeY - 3, 2.2, 2.6, '#fff');
+        if (mood === 'fever') {
+          c.fillStyle = '#fff6a0';
+          star(c, sx * 14 - 1, eyeY + 3, 2.2, 1);
+        }
+      }
+    }
+
+    // ほっぺ
+    c.strokeStyle = COL.blush; c.lineWidth = 1.6;
+    for (const sx of [-1, 1]) {
+      ellipse(c, sx * 25, -3, 6, 3.5, 'rgba(245,140,160,0.35)');
+      for (let i = 0; i < 3; i++) {
+        c.beginPath(); c.moveTo(sx * 25 - 4 + i * 3.5, -5); c.lineTo(sx * 25 - 6 + i * 3.5, -1); c.stroke();
+      }
+    }
+
+    // 口
+    c.lineCap = 'round';
+    if (mood === 'ouch' || (type === 'lion' && mood === 'normal')) {
+      ellipse(c, 0, 0, 4.5, 5.5, '#8a1f35');
+    } else if (type === 'pink' || mood === 'happy' || mood === 'fever') {
+      c.beginPath();
+      c.moveTo(-9, -3); c.quadraticCurveTo(0, -2, 9, -3);
+      c.quadraticCurveTo(6, 10, 0, 10); c.quadraticCurveTo(-6, 10, -9, -3);
+      c.fillStyle = '#c2405f'; c.fill();
+      ellipse(c, 0, 6, 4.5, 3, '#f08aa0');
+    } else {
+      c.beginPath(); c.moveTo(-6, -2); c.quadraticCurveTo(0, 4, 6, -2);
+      c.strokeStyle = '#d4566f'; c.lineWidth = 2.2; c.stroke();
+    }
+
+    c.restore();
+  }
+
+  function fluffyEllipse(c, x, y, rx, ry, fill, n, bump) {
+    ellipse(c, x, y, rx, ry, fill);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      ellipse(c, x + Math.cos(a) * rx, y + Math.sin(a) * ry, bump, bump, fill);
+    }
+  }
+
+  function star(c, x, y, r, inner = 0.45) {
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const rr = i % 2 ? r * inner : r;
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    c.closePath(); c.fill();
+  }
+
+
+  // ---------- ことば ----------
+  const NAMES = ['Dino', 'Onigiri', 'Himawari'];
+  const I18N = {
+    ja: {
+      title: 'ふわもこパズル', subtitle: '3人で きょうりょくして ゴールを めざそう！', start: 'スタート！',
+      select: 'ステージを えらんでね', toTitle: 'タイトルへ', stage: n => `ステージ ${n}`, ok: 'OK！',
+      clear: 'クリア！', next: 'つぎへ', toSelect: 'ステージせんたく', allClear: 'ぜんぶ クリア！おめでとう！',
+      heavy: 'おもい〜！', back: 'もどったよ', berryGot: '🍓 ゲット！', berryMiss: '🍓 は まだ…',
+      jump: 'ジャンプ', dash: 'ダッシュ', goal: n => `ゴール ${n}/3`,
+      controls: 'タッチ：◀ ▶ と ジャンプ ／ 顔を タップして こうたい',
+      keys: 'キー：← → ／ スペース ジャンプ ／ X ダッシュ ／ 1 2 3 こうたい ／ R やりなおし',
+      abilities: ['すばやい！ ダッシュできる', 'かるい！ 長押しで ふわふわ', 'ちからもち！ はこを おせる'],
+      levels: [
+        ['はこを おそう', 'ちからもちの Himawari は はこを おせるよ。はこを だんさの前まで おして、3人で のぼろう！'],
+        ['かたぐるまタワー', 'ちからもちの Himawari の上に 2人で のって、さらに その上へ！ 3人タワーで かべを こえて、むこうの レバーを さわろう。'],
+        ['ふわふわ わたり', 'Onigiri で 高いところから ジャンプして、そのまま 長押し！ ふわふわ わたって、レバーで はしを かけよう。'],
+        ['いそげ Dino', 'スイッチを ふむと すこしだけ とびらが ひらくよ。すばやい Dino の ダッシュで かけぬけて、レバーを さわろう！'],
+        ['みんなで ゴール', 'これまでの ちからを ぜんぶ つかおう！ ゴールの ボタンを だれかが ふんでいると、とびらが ひらくよ。'],
+      ],
+    },
+    en: {
+      title: 'Fuwamoko Puzzle', subtitle: 'Work together to reach the goal!', start: 'Start!',
+      select: 'Choose a stage', toTitle: 'Title', stage: n => `Stage ${n}`, ok: 'OK!',
+      clear: 'Clear!', next: 'Next', toSelect: 'Stages', allClear: 'All stages cleared! Congratulations!',
+      heavy: 'Too heavy~!', back: 'Back to start', berryGot: '🍓 collected!', berryMiss: '🍓 not yet…',
+      jump: 'Jump', dash: 'Dash', goal: n => `Goal ${n}/3`,
+      controls: 'Touch: ◀ ▶ and Jump / tap a face to switch',
+      keys: 'Keys: ← → / Space jump / X dash / 1 2 3 switch / R retry',
+      abilities: ['Quick! Can dash', 'Light! Hold jump to float', 'Strong! Can push boxes'],
+      levels: [
+        ['Push the Box', 'Strong Himawari can push boxes. Push the box up to the step, then climb up together!'],
+        ['Buddy Tower', 'Two buddies climb onto strong Himawari, then one climbs even higher! Make a 3-buddy tower to get over the wall and touch the lever.'],
+        ['Float Across', 'Jump from up high with Onigiri and keep holding jump to float across! Then touch the lever to make a bridge.'],
+        ['Hurry, Dino!', 'The switch opens the door for just a moment. Dash through with quick Dino and touch the lever!'],
+        ['All Together', 'Use everything you have learned! The door stays open while someone stands on the button at the goal.'],
+      ],
+    },
+    id: {
+      title: 'Fuwamoko Puzzle', subtitle: 'Kerja sama bertiga untuk sampai ke tujuan!', start: 'Mulai!',
+      select: 'Pilih tahap', toTitle: 'Ke judul', stage: n => `Tahap ${n}`, ok: 'Oke!',
+      clear: 'Berhasil!', next: 'Lanjut', toSelect: 'Pilih tahap', allClear: 'Semua tahap selesai! Selamat!',
+      heavy: 'Berat~!', back: 'Kembali ke awal', berryGot: '🍓 dapat!', berryMiss: '🍓 belum dapat…',
+      jump: 'Lompat', dash: 'Dash', goal: n => `Tujuan ${n}/3`,
+      controls: 'Sentuh: ◀ ▶ dan Lompat / ketuk wajah untuk ganti',
+      keys: 'Tombol: ← → / Spasi lompat / X dash / 1 2 3 ganti / R ulangi',
+      abilities: ['Gesit! Bisa dash', 'Ringan! Tahan lompat untuk melayang', 'Kuat! Bisa mendorong kotak'],
+      levels: [
+        ['Dorong Kotaknya', 'Himawari yang kuat bisa mendorong kotak. Dorong kotak sampai ke depan tangga, lalu naik bersama!'],
+        ['Menara Teman', 'Dua teman naik ke atas Himawari yang kuat, lalu satu naik lebih tinggi! Buat menara bertiga untuk melewati tembok dan sentuh tuasnya.'],
+        ['Melayang Menyeberang', 'Lompat dari tempat tinggi dengan Onigiri dan terus tahan tombol lompat untuk melayang! Lalu sentuh tuas untuk membuat jembatan.'],
+        ['Cepat, Dino!', 'Saklar membuka pintu hanya sebentar. Dash lewat dengan Dino yang gesit, lalu sentuh tuasnya!'],
+        ['Bersama-sama', 'Gunakan semua yang sudah kamu pelajari! Pintu tetap terbuka selama ada yang berdiri di tombol di tujuan.'],
+      ],
+    },
+  };
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  let lang = store.get('fuwamoko-lang');
+  if (!I18N[lang]) lang = 'id';   // はじめて開いたときはインドネシア語
+  const T = () => I18N[lang];
+
+  // ---------- ステージ ----------
+  // # かべ  1 2 3 キャラ  B はこ  * いちご  G ゴール
+  // 小文字 = しかけ（p ボタン / t タイマー / l レバー）、大文字 = とびら・はし
+  const LEVELS = [
+    { theme: 0, map: [
+      '...............',
+      '...............',
+      '...............',
+      '...............',
+      '...............',
+      '..........GGGG.',
+      '....*....######',
+      '.123..B..######',
+      '###############',
+    ], triggers: {}, doors: {}, bridges: {} },
+
+    { theme: 1, map: [
+      '...............',
+      '...............',
+      '...............',
+      '...............',
+      '...............',
+      '....*..#.......',
+      '.......#.......',
+      '.123...M..l.GGG',
+      '###############',
+    ], triggers: { l: { type: 'lever', ch: 1 } }, doors: { M: 1 }, bridges: {} },
+
+    { theme: 2, map: [
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '....................',
+      '.........*..........',
+      '.....#..............',
+      '.123##.........l.GGG',
+      '######XXXXXXX#######',
+    ], triggers: { l: { type: 'lever', ch: 1 } }, doors: {}, bridges: { X: 1 } },
+
+    { theme: 3, map: [
+      '.............#......',
+      '.............#......',
+      '.............#......',
+      '.............#......',
+      '.............#......',
+      '.........*...#......',
+      '.............#......',
+      '.............T......',
+      '.123.t.......T.l.GGG',
+      '####################',
+    ], triggers: { t: { type: 'timer', ch: 1 }, l: { type: 'lever', ch: 1 } }, doors: { T: 1 }, bridges: {} },
+
+    { theme: 4, map: [
+      '.............................#....',
+      '.............................#....',
+      '.............................#....',
+      '.............................#....',
+      '.............................#....',
+      '.............................#....',
+      '.............................#....',
+      '..............*..............#....',
+      '.........##..................D....',
+      '.123..B..##........l.t.......D.GpG',
+      '###########XXXXXXX################',
+    ], triggers: { l: { type: 'lever', ch: 2 }, t: { type: 'timer', ch: 1 }, p: { type: 'plate', ch: 1 } },
+       doors: { D: 1 }, bridges: { X: 2 } },
+  ];
+
+  const THEMES = [
+    { sky: ['#fff3d6', '#ffe0e8'], block: '#c9d3c4', dots: true },
+    { sky: ['#fff0f3', '#ffe6d6'], block: '#f1cdd5', dots: true },
+    { sky: ['#bfe4ff', '#eaf7ff'], block: '#d7e6f3', clouds: true },
+    { sky: ['#ffc2a8', '#ffe7bf'], block: '#f6e1b0', clouds: true },
+    { sky: ['#3a2f7a', '#8a6cc4'], block: '#e6dcf3', stars: true },
+  ];
+  const CH_COL = { 1: '#ff8fa3', 2: '#6cb8e6' };
+
+  // ---------- 物理 ----------
+  const TS = 40;                 // タイルの大きさ
+  const VIEW_W = 400, VIEW_H = 700, WORLD_H = 570;
+  const G = 1800, JUMP_V = 487, FLOAT_V = 70, TERM_V = 900, DASH_V = 420, DASH_T = 0.2;
+  const TIMER_T = 1.3;
+  const CW = 26, CHH = 36;       // キャラの当たり判定
+  const DEFS = [
+    { id: 'pink', speed: 200, ability: 'dash' },    // Dino：すばやい
+    { id: 'moko', speed: 140, ability: 'float' },   // Onigiri：かるい
+    { id: 'lion', speed: 150, ability: 'push' },    // Himawari：ちからもち
+  ];
+
+  let L = null;            // 今のステージ
+  let chars = [], boxes = [];
+  let active = 0;
+  let levelIdx = 0;
+  let state = 'title';     // title | select | intro | play | clear
+  const input = { left: false, right: false, jump: false, jumpPressed: false, dashPressed: false };
+  let particles = [], popups = [];
+  let camX = 0;
+  let simTime = 0;
+
+  const progress = (() => {
+    let p = null;
+    try { p = JSON.parse(store.get('fuwamoko-puzzle') || 'null'); } catch (e) {}
+    if (!p || !Array.isArray(p.cleared)) p = { cleared: [], berry: [] };
+    return p;
+  })();
+  const saveProgress = () => store.set('fuwamoko-puzzle', JSON.stringify(progress));
+
+  function loadLevel(i) {
+    levelIdx = i;
+    const def = LEVELS[i];
+    const rows = def.map.length, cols = def.map[0].length;
+    L = { def, rows, cols, grid: [], dyn: {}, trig: [], berries: [], goal: null, clearT: 0, theme: THEMES[def.theme],
+          chOn: {}, berryGot: false, time: 0 };
+    chars = []; boxes = [];
+    let gx0 = 1e9, gx1 = -1, gy0 = 1e9, gy1 = -1;
+    for (let y = 0; y < rows; y++) {
+      const row = [];
+      for (let x = 0; x < cols; x++) {
+        let c = def.map[y][x];
+        if (c >= '1' && c <= '3') {
+          const k = +c - 1;
+          chars[k] = makeChar(k, x * TS + (TS - CW) / 2, (y + 1) * TS - CHH);
+          c = '.';
+        } else if (c === 'B') {
+          boxes.push({ box: true, x: x * TS, y: y * TS, w: TS, h: TS, vy: 0, sx: x * TS, sy: y * TS, prevX: x * TS, prevY: y * TS });
+          c = '.';
+        } else if (c === '*') {
+          L.berries.push({ x: x * TS + TS / 2, y: y * TS + TS / 2, got: false });
+          c = '.';
+        } else if (c === 'G' || def.triggers[c]) {
+          if (c === 'G' || (def.triggers[c] && def.triggers[c].type === 'plate')) {
+            // ゴールのはんいは G と ゴールの中のボタンをふくむ
+          }
+          if (c === 'G') { gx0 = Math.min(gx0, x); gx1 = Math.max(gx1, x); gy0 = Math.min(gy0, y); gy1 = Math.max(gy1, y); }
+          if (def.triggers[c]) L.trig.push({ x, y, ...def.triggers[c], on: false, rem: 0, ch: def.triggers[c].ch });
+        }
+        if (def.doors[c] || def.bridges[c]) {
+          L.dyn[x + ',' + y] = { x, y, ch: def.doors[c] || def.bridges[c], bridge: !!def.bridges[c], solid: !def.bridges[c] };
+        }
+        row.push(c);
+      }
+      L.grid.push(row);
+    }
+    L.goal = { x0: gx0 * TS, x1: (gx1 + 1) * TS, y0: gy0 * TS, y1: (gy1 + 1) * TS };
+    L.w = cols * TS; L.h = rows * TS;
+    active = 0;
+    particles = []; popups = [];
+    camX = targetCamX();
+    updateFaces();
+  }
+
+  function makeChar(k, x, y) {
+    return { k, def: DEFS[k], x, y, w: CW, h: CHH, vy: 0, prevX: x, prevY: y, sx: x, sy: y,
+             face: 1, ground: false, on: null, coyote: 0, dashT: 0, dashCd: 0, canDash: true,
+             floating: false, pushing: false, mood: 'normal', moodT: 0, walkT: 0, squash: 0 };
+  }
+
+  // ---------- 当たり判定 ----------
+  function tileSolid(tx, ty) {
+    if (tx < 0 || tx >= L.cols || ty < 0) return true;
+    if (ty >= L.rows) return false;
+    const c = L.grid[ty][tx];
+    if (c === '#') return true;
+    const d = L.dyn[tx + ',' + ty];
+    return d ? d.solid : false;
+  }
+  function hitTiles(x, y, w, h) {
+    const x0 = Math.floor(x / TS), x1 = Math.floor((x + w - 0.01) / TS);
+    const y0 = Math.floor(y / TS), y1 = Math.floor((y + h - 0.01) / TS);
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (tileSolid(tx, ty)) return true;
+    return false;
+  }
+  const overlap = (a, ax, ay, b) => ax < b.x + b.w - 0.01 && ax + a.w > b.x + 0.01 && ay < b.y + b.h - 0.01 && ay + a.h > b.y + 0.01;
+  const overlapX = (a, b, m = 4) => a.x < b.x + b.w - m && a.x + a.w > b.x + m;
+
+  function boxAt(e, x, y) {
+    for (const b of boxes) if (b !== e && overlap(e, x, y, b)) return b;
+    return null;
+  }
+  function blocked(e, x, y, ignore) {
+    if (hitTiles(x, y, e.w, e.h)) return true;
+    if (boxAt(e, x, y)) return true;
+    if (e.box) for (const c of chars) if (c !== ignore && overlap(e, x, y, c)) return true;
+    return false;
+  }
+
+  function tryMoveBox(b, dx, pusher) {
+    const nx = b.x + dx;
+    if (blocked(b, nx, b.y, pusher)) return false;
+    // ほかのはこを おしたりはしない
+    b.x = nx;
+    return true;
+  }
+
+  // 1px ずつ動かす。ぶつかったら true
+  function moveX(e, dx) {
+    if (!dx) return false;
+    const n = Math.ceil(Math.abs(dx));
+    const s = dx / n;
+    for (let i = 0; i < n; i++) {
+      const nx = e.x + s;
+      if (blocked(e, nx, e.y)) {
+        if (!e.box && e.def.ability === 'push' && e.ground) {
+          const b = boxAt(e, nx, e.y);
+          if (b && !hitTiles(nx, e.y, e.w, e.h) && tryMoveBox(b, s, e)) {
+            if (!blocked(e, nx, e.y)) { e.x = nx; e.pushing = true; continue; }
+            b.x -= s;
+          }
+        }
+        return true;
+      }
+      e.x = nx;
+    }
+    return false;
+  }
+
+  function moveY(e, dy) {
+    if (!dy) return false;
+    const n = Math.ceil(Math.abs(dy));
+    const s = dy / n;
+    for (let i = 0; i < n; i++) {
+      const ny = e.y + s;
+      if (blocked(e, e.x, ny)) return true;
+      if (s > 0 && !e.box) {
+        // ほかのキャラの あたまの上に のる（上からだけ）
+        const bottom = e.y + e.h, nb = ny + e.h;
+        for (const o of chars) {
+          if (o === e) continue;
+          if (overlapX(e, o) && bottom <= o.y + 0.5 && nb > o.y) return true;
+        }
+      }
+      e.y = ny;
+    }
+    return false;
+  }
+
+  // 足もとに何があるか
+  function support(e) {
+    const probe = 1.5;
+    if (hitTiles(e.x, e.y + probe, e.w, e.h)) return { what: 'tile' };
+    const b = boxAt(e, e.x, e.y + probe);
+    if (b) return { what: 'box', obj: b };
+    if (!e.box) for (const o of chars) {
+      if (o !== e && overlapX(e, o) && Math.abs(e.y + e.h - o.y) < probe) return { what: 'char', obj: o };
+    }
+    return null;
+  }
+
+  // ---------- しかけ ----------
+  function updateTriggers(h) {
+    const ents = chars.concat(boxes);
+    const chOn = {};
+    for (const t of L.trig) {
+      const r = { x: t.x * TS, y: t.y * TS, w: TS, h: TS };
+      const touching = ents.some(e => overlap(e, e.x, e.y, r));
+      if (t.type === 'plate') {
+        const was = t.on;
+        t.on = ents.some(e => overlap(e, e.x, e.y, { x: r.x + 4, y: r.y + 24, w: TS - 8, h: 16 }));
+        if (t.on && !was) sfx.click();
+      } else if (t.type === 'timer') {
+        if (touching) { if (t.rem <= 0) sfx.tick(); t.rem = TIMER_T; }
+        else t.rem = Math.max(0, t.rem - h);
+        t.on = t.rem > 0;
+      } else if (t.type === 'lever') {
+        if (touching && !t.on) { t.on = true; sfx.lever(); burst(r.x + 20, r.y + 20, ['#ffe066', '#fff', CH_COL[t.ch]], 14); }
+      }
+      if (t.on) chOn[t.ch] = true;
+    }
+    L.chOn = chOn;
+    for (const k in L.dyn) {
+      const d = L.dyn[k];
+      const active = !!chOn[d.ch];
+      const want = d.bridge ? active : !active;
+      if (want && !d.solid) {
+        // だれかが 重なっているあいだは しめない
+        const r = { x: d.x * TS, y: d.y * TS, w: TS, h: TS };
+        if (!ents.some(e => overlap(e, e.x, e.y, r))) d.solid = true;
+      } else if (!want) d.solid = false;
+    }
+  }
+
+  // ---------- 1ステップ ----------
+  function step(h) {
+    L.time += h;
+    simTime += h;
+    const act = chars[active];
+    for (const e of chars) { e.prevX = e.x; e.prevY = e.y; }
+    for (const b of boxes) {
+      b.prevX = b.x; b.prevY = b.y;
+      b.vy = Math.min(b.vy + G * h, TERM_V);
+      if (moveY(b, b.vy * h)) b.vy = 0;
+      if (b.y > L.h + 200) { b.x = b.sx; b.y = b.sy; b.vy = 0; }
+    }
+
+    const order = chars.slice().sort((a, b) => b.y - a.y);   // 下にいるキャラから
+    for (const c of order) {
+      const isAct = c === act;
+      const hasRider = chars.some(o => o !== c && o.on === c);
+      let vx = 0;
+      c.dashCd = Math.max(0, c.dashCd - h);
+
+      if (isAct && input.dashPressed && c.def.ability === 'dash' && c.canDash && c.dashCd <= 0 && !hasRider) {
+        c.dashT = DASH_T; c.canDash = false; c.dashCd = 0.35; c.vy = 0;
+        sfx.dash();
+        for (let i = 0; i < 6; i++) particles.push({ x: c.x + c.w / 2, y: c.y + c.h - 6, vx: -c.face * (60 + Math.random() * 80), vy: -Math.random() * 60, life: 0.4, col: '#ffe0a0', r: 3 + Math.random() * 3 });
+      }
+
+      if (c.dashT > 0) {
+        c.dashT -= h;
+        vx = DASH_V * c.face;
+        c.vy = 0;
+      } else if (isAct) {
+        const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        vx = dir * c.def.speed * (c.pushing ? 0.6 : 1);
+        if (dir) c.face = dir;
+      }
+
+      if (isAct && input.jumpPressed) {
+        if (c.coyote > 0 && !hasRider) {
+          c.vy = -JUMP_V; c.coyote = 0; c.on = null; c.ground = false; c.squash = 1;
+          sfx.jump();
+        } else if (hasRider && c.ground) {
+          popup(c.x + c.w / 2, c.y - 20, T().heavy, '#c08060');
+          c.mood = 'ouch'; c.moodT = 0.5;
+          sfx.heavy();
+        }
+      }
+
+      c.floating = false;
+      if (c.dashT <= 0) {
+        c.vy += G * h;
+        let max = TERM_V;
+        if (c.def.ability === 'float' && isAct && input.jump && c.vy > 0) { max = FLOAT_V; c.floating = true; }
+        c.vy = Math.min(c.vy, max);
+      }
+
+      // 乗っているものと いっしょに動く
+      if (c.on) {
+        const s = c.on;
+        moveX(c, s.x - s.prevX);
+        if (s.y > s.prevY) moveY(c, s.y - s.prevY);
+      }
+
+      c.pushing = false;
+      moveX(c, vx * h);
+      if (moveY(c, c.vy * h)) {
+        if (c.vy > 300) { c.squash = 1; }
+        c.vy = 0;
+      }
+
+      const sup = support(c);
+      const wasGround = c.ground;
+      c.ground = !!sup && c.vy >= 0;
+      c.on = c.ground && sup.obj ? sup.obj : null;
+      if (c.ground) { c.coyote = 0.08; c.canDash = true; if (!wasGround && c.vy === 0) {} }
+      else c.coyote = Math.max(0, c.coyote - h);
+
+      if (vx && c.ground) c.walkT += h; else c.walkT = 0;
+      if (c.moodT > 0) { c.moodT -= h; if (c.moodT <= 0) c.mood = 'normal'; }
+      if (c.squash > 0) c.squash = Math.max(0, c.squash - h * 5);
+
+      // 落ちたら スタートへ
+      if (c.y > L.h + 160) {
+        c.x = c.sx; c.y = c.sy; c.vy = 0; c.dashT = 0; c.on = null;
+        c.mood = 'ouch'; c.moodT = 0.8;
+        popup(c.x + c.w / 2, c.y - 24, T().back, '#8a7a9a');
+        sfx.fall();
+      }
+    }
+    input.jumpPressed = false;
+    input.dashPressed = false;
+
+    updateTriggers(h);
+
+    // いちご
+    for (const b of L.berries) {
+      if (b.got) continue;
+      if (chars.some(c => Math.abs(c.x + c.w / 2 - b.x) < 24 && Math.abs(c.y + c.h / 2 - b.y) < 30)) {
+        b.got = true; L.berryGot = true;
+        burst(b.x, b.y, ['#ff6b81', '#ffe066', '#fff'], 14);
+        popup(b.x, b.y - 20, '🍓 +1', '#ff5c8a');
+        sfx.berry();
+      }
+    }
+
+    // ゴール
+    const inGoal = chars.filter(c => {
+      const cx = c.x + c.w / 2, by = c.y + c.h;
+      return cx > L.goal.x0 && cx < L.goal.x1 && by > L.goal.y0 && by <= L.goal.y1 + 1 && c.ground;
+    });
+    L.inGoal = inGoal.length;
+    for (const c of inGoal) if (c.mood === 'normal') { c.mood = 'happy'; c.moodT = 0.1; }
+    if (inGoal.length === 3) {
+      L.clearT += h;
+      if (L.clearT > 0.4 && state === 'play') levelClear();
+    } else L.clearT = 0;
+
+    // パーティクル
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.vy += 500 * h; p.x += p.vx * h; p.y += p.vy * h; p.life -= h;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (let i = popups.length - 1; i >= 0; i--) {
+      const p = popups[i];
+      p.y -= 40 * h; p.life -= h;
+      if (p.life <= 0) popups.splice(i, 1);
+    }
+  }
+
+  function burst(x, y, colors, n = 10, power = 160) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = power * (0.4 + Math.random() * 0.8);
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 0.6 + Math.random() * 0.4,
+                       col: colors[i % colors.length], r: 2.5 + Math.random() * 3, star: Math.random() < 0.4 });
+    }
+  }
+  function popup(x, y, text, col = '#ff7f96') { popups.push({ x, y, text, col, life: 1.1 }); }
+
+  // ---------- 音 ----------
+  let audio = null;
+  function beep(freq, dur = 0.1, type = 'sine', vol = 0.06, slide = 0) {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), gn = audio.createGain();
+      o.type = type; o.frequency.value = freq;
+      if (slide) o.frequency.linearRampToValueAtTime(freq + slide, audio.currentTime + dur);
+      gn.gain.setValueAtTime(vol, audio.currentTime);
+      gn.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+      o.connect(gn); gn.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+  const sfx = {
+    jump: () => beep(480, 0.1, 'triangle', 0.05, 240),
+    dash: () => beep(300, 0.18, 'sawtooth', 0.035, 500),
+    heavy: () => beep(160, 0.2, 'triangle', 0.06, -40),
+    click: () => beep(900, 0.06, 'square', 0.03),
+    tick: () => beep(1200, 0.05, 'square', 0.03),
+    lever: () => { [660, 880, 1100].forEach((f, i) => setTimeout(() => beep(f, 0.1, 'triangle'), i * 70)); },
+    berry: () => beep(1046, 0.1, 'triangle'),
+    fall: () => beep(400, 0.3, 'sine', 0.05, -250),
+    swap: () => beep(740, 0.06, 'triangle', 0.04),
+    clear: () => { [523, 659, 784, 1046, 1318].forEach((f, i) => setTimeout(() => beep(f, 0.16, 'triangle', 0.07), i * 100)); },
+  };
+
+  // ---------- 描画 ----------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  let scale = 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const frame = document.getElementById('frame'), stageEl = document.getElementById('stage');
+  function resize() {
+    scale = Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H) * 0.98;
+    frame.style.width = VIEW_W * scale + 'px';
+    frame.style.height = VIEW_H * scale + 'px';
+    stageEl.style.transform = `scale(${scale})`;
+    canvas.width = Math.round(VIEW_W * scale * dpr);
+    canvas.height = Math.round(VIEW_H * scale * dpr);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const f = v => Math.max(0, Math.min(255, v + amt));
+    return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  }
+
+  function targetCamX() {
+    if (!L) return 0;
+    if (L.w <= VIEW_W) return (L.w - VIEW_W) / 2;
+    const c = chars[active];
+    return Math.max(0, Math.min(L.w - VIEW_W, c.x + c.w / 2 - VIEW_W / 2));
+  }
+  const camY = () => L.h - WORLD_H;
+
+  const decoStars = Array.from({ length: 50 }, () => ({ x: Math.random() * VIEW_W, y: Math.random() * 500, r: Math.random() * 1.5 + 0.5, p: Math.random() * 6 }));
+  const decoClouds = Array.from({ length: 5 }, (_, i) => ({ x: i * 160 + Math.random() * 60, y: 60 + Math.random() * 220, s: 0.6 + Math.random() * 0.6 }));
+
+  function drawBackground(th, t) {
+    const grd = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    grd.addColorStop(0, th.sky[0]); grd.addColorStop(1, th.sky[1]);
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    if (th.dots) {
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      const off = (-camX * 0.3) % 50;
+      for (let yy = 0; yy < VIEW_H; yy += 50) for (let xx = ((yy / 50) % 2 ? 25 : 0) + off - 50; xx < VIEW_W + 50; xx += 50) {
+        ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    if (th.clouds) {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      for (const c of decoClouds) {
+        const x = ((c.x - camX * 0.3) % 800 + 800) % 800 - 100;
+        for (const [ox, oy, r] of [[0, 0, 18], [18, -8, 22], [38, 0, 18], [18, 6, 18]]) {
+          ctx.beginPath(); ctx.arc(x + ox * c.s, c.y + oy * c.s, r * c.s, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+    if (th.stars) {
+      ctx.fillStyle = '#fff';
+      for (const s of decoStars) {
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 2 + s.p);
+        const x = ((s.x - camX * 0.2) % VIEW_W + VIEW_W) % VIEW_W;
+        ctx.beginPath(); ctx.arc(x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      const mx = 320 - camX * 0.05;
+      ctx.fillStyle = 'rgba(255,246,200,0.18)';
+      ctx.beginPath(); ctx.arc(mx, 90, 38, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff6c8';
+      ctx.beginPath(); ctx.arc(mx, 90, 24, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawBlock(x, y, col, topOpen) {
+    ctx.fillStyle = shade(col, -22);
+    roundRect(ctx, x + 1, y + 3, TS - 2, TS - 3, 8); ctx.fill();
+    ctx.fillStyle = col;
+    roundRect(ctx, x + 1, y + 1, TS - 2, TS - 5, 8); ctx.fill();
+    if (topOpen) {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      roundRect(ctx, x + 5, y + 4, TS - 10, 5, 3); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 1.3; ctx.setLineDash([3, 3]);
+    roundRect(ctx, x + 5, y + 5, TS - 10, TS - 13, 5); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawTiles(t) {
+    const cy = camY();
+    const x0 = Math.max(0, Math.floor(camX / TS)), x1 = Math.min(L.cols - 1, Math.floor((camX + VIEW_W) / TS));
+    // 地面の下（穴は暗く）
+    for (let tx = x0; tx <= x1; tx++) {
+      const sx = tx * TS - camX, sy = L.h - cy;
+      if (tileSolid(tx, L.rows - 1) || L.grid[L.rows - 1][tx] === '#') {
+        ctx.fillStyle = shade(L.theme.block, -30); ctx.fillRect(sx, sy, TS, VIEW_H - sy);
+      } else {
+        const g2 = ctx.createLinearGradient(0, sy - 20, 0, VIEW_H);
+        g2.addColorStop(0, 'rgba(60,40,80,0)'); g2.addColorStop(1, 'rgba(60,40,80,0.35)');
+        ctx.fillStyle = g2; ctx.fillRect(sx, sy - 20, TS, VIEW_H - sy + 20);
+      }
+    }
+    for (let ty = 0; ty < L.rows; ty++) for (let tx = x0; tx <= x1; tx++) {
+      const c = L.grid[ty][tx];
+      const sx = tx * TS - camX, sy = ty * TS - cy;
+      if (c === '#') { drawBlock(sx, sy, L.theme.block, ty === 0 || L.grid[ty - 1][tx] !== '#'); continue; }
+      const d = L.dyn[tx + ',' + ty];
+      if (d) {
+        const col = CH_COL[d.ch];
+        if (d.bridge) {
+          if (d.solid) {
+            ctx.fillStyle = '#fff';
+            roundRect(ctx, sx, sy + 2, TS, 16, 8); ctx.fill();
+            ctx.fillStyle = col; ctx.globalAlpha = 0.35;
+            roundRect(ctx, sx, sy + 12, TS, 6, 3); ctx.fill(); ctx.globalAlpha = 1;
+          } else {
+            ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+            roundRect(ctx, sx + 2, sy + 2, TS - 4, 14, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+          }
+        } else {
+          if (d.solid) {
+            ctx.fillStyle = shade(col, -30); roundRect(ctx, sx + 4, sy + 1, TS - 8, TS - 1, 6); ctx.fill();
+            ctx.fillStyle = col; roundRect(ctx, sx + 4, sy, TS - 8, TS - 4, 6); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(sx + 20, sy + 4); ctx.lineTo(sx + 20, sy + TS - 8); ctx.stroke();
+            // ハートの とって
+            const below = L.dyn[tx + ',' + (ty + 1)];
+            if (!below || below.bridge) { ctx.fillStyle = '#fff'; heart(sx + 20, sy + 14, 5); }
+          } else {
+            ctx.strokeStyle = col; ctx.globalAlpha = 0.45; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+            roundRect(ctx, sx + 5, sy + 2, TS - 10, TS - 4, 6); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+          }
+        }
+      }
+    }
+    // しかけ
+    for (const tr of L.trig) {
+      const sx = tr.x * TS - camX, sy = tr.y * TS - cy;
+      const col = CH_COL[tr.ch];
+      if (tr.type === 'plate') {
+        const hgt = tr.on ? 4 : 9;
+        ctx.fillStyle = shade(col, -40); roundRect(ctx, sx + 3, sy + TS - 5, TS - 6, 5, 2); ctx.fill();
+        ctx.fillStyle = col; roundRect(ctx, sx + 7, sy + TS - 5 - hgt, TS - 14, hgt, 4); ctx.fill();
+      } else if (tr.type === 'timer') {
+        ctx.fillStyle = shade(col, -40); roundRect(ctx, sx + 3, sy + TS - 5, TS - 6, 5, 2); ctx.fill();
+        ctx.fillStyle = tr.on ? '#ffe066' : col; roundRect(ctx, sx + 8, sy + TS - 12, TS - 16, 8, 4); ctx.fill();
+        // とけい
+        const cx = sx + 20, ccy = sy + 12;
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, ccy, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+        if (tr.on) {
+          ctx.fillStyle = '#ffd34d';
+          ctx.beginPath(); ctx.moveTo(cx, ccy);
+          ctx.arc(cx, ccy, 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (tr.rem / TIMER_T)); ctx.closePath(); ctx.fill();
+        }
+        ctx.strokeStyle = '#6b4a3a'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(cx, ccy); ctx.lineTo(cx, ccy - 6); ctx.moveTo(cx, ccy); ctx.lineTo(cx + 4, ccy); ctx.stroke();
+        ctx.strokeStyle = 'rgba(107,74,58,.5)'; ctx.beginPath(); ctx.moveTo(cx, ccy + 10); ctx.lineTo(cx, sy + TS - 12); ctx.stroke();
+      } else if (tr.type === 'lever') {
+        ctx.save();
+        ctx.translate(sx + 20, sy + TS - 6);
+        ctx.strokeStyle = '#8a6a55'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.rotate(tr.on ? 0.7 : -0.7);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -24); ctx.stroke();
+        ctx.fillStyle = tr.on ? '#ffe066' : col; ctx.beginPath(); ctx.arc(0, -26, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = shade(col, -40); roundRect(ctx, sx + 8, sy + TS - 8, TS - 16, 8, 4); ctx.fill();
+        if (!tr.on) { // きらきら
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.5 + 0.5 * Math.sin(t * 5)) + ')';
+          star(ctx, sx + 32, sy + 6, 4);
+        }
+      }
+    }
+  }
+
+  function heart(x, y, s) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.9);
+    ctx.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.6, y - s * 1.3, x, y - s * 0.4);
+    ctx.bezierCurveTo(x + s * 0.6, y - s * 1.3, x + s * 1.6, y - s * 0.2, x, y + s * 0.9);
+    ctx.fill();
+  }
+
+  function drawGoal(t) {
+    const g = L.goal, cy = camY();
+    const x = g.x0 - camX, y = g.y1 - cy;
+    // ピクニックシート
+    const w = g.x1 - g.x0;
+    for (let i = 0; i < w / 10; i++) {
+      ctx.fillStyle = i % 2 ? '#fff' : '#ff9fb2';
+      ctx.fillRect(x + i * 10, y - 4, 10, 4);
+    }
+    // ゴールの はた
+    const fx = x + w / 2;
+    ctx.strokeStyle = '#b08a70'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(fx, y - 4); ctx.lineTo(fx, y - 92); ctx.stroke();
+    ctx.fillStyle = '#ff8fa3';
+    ctx.beginPath(); ctx.moveTo(fx, y - 92); ctx.lineTo(fx + 30 + Math.sin(t * 4) * 3, y - 82); ctx.lineTo(fx, y - 72); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '800 9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('GOAL', fx + 3, y - 82);
+    // きらきら
+    ctx.fillStyle = 'rgba(255,230,120,0.8)';
+    for (let i = 0; i < 3; i++) {
+      const a = t * 1.5 + i * 2.1;
+      star(ctx, x + w / 2 + Math.cos(a) * w * 0.4, y - 40 + Math.sin(a * 1.3) * 18, 3 + Math.sin(t * 4 + i) * 1.2);
+    }
+  }
+
+  function drawBox(b) {
+    const x = b.x - camX, y = b.y - camY();
+    ctx.fillStyle = '#e7b98a'; roundRect(ctx, x + 1, y + 1, b.w - 2, b.h - 2, 6); ctx.fill();
+    ctx.fillStyle = '#d9a374'; roundRect(ctx, x + 1, y + b.h - 8, b.w - 2, 7, 4); ctx.fill();
+    ctx.fillStyle = '#ff8fa3';
+    ctx.fillRect(x + b.w / 2 - 4, y + 1, 8, b.h - 2);
+    ctx.fillRect(x + 1, y + b.h / 2 - 4, b.w - 2, 8);
+    ctx.beginPath(); ctx.ellipse(x + b.w / 2 - 6, y + 3, 7, 4, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + b.w / 2 + 6, y + 3, 7, 4, 0.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawPlayer(c, t) {
+    const x = c.x + c.w / 2 - camX, y = c.y + c.h - camY();
+    ctx.save();
+    ctx.translate(x, y);
+    const sq = Math.sin(c.squash * Math.PI) * 0.15;
+    ctx.scale((1 + sq) * c.face, 1 - sq);
+    if (c.dashT > 0) ctx.rotate(0.15);
+    let mood = c.mood;
+    if (c.floating) mood = 'happy';
+    const wave = c.floating ? 1 : (c.walkT > 0 ? 0.6 : 0);
+    const bob = c.walkT > 0 ? -Math.abs(Math.sin(c.walkT * 14)) * 2 : 0;
+    drawChar(ctx, c.def.id, 0, -22 + bob, 0.33, t + c.k, mood, wave);
+    ctx.restore();
+    if (c === chars[active] && state === 'play') {
+      const ay = y - 62 + Math.sin(t * 6) * 3;
+      ctx.fillStyle = '#ff7f96';
+      ctx.beginPath(); ctx.moveTo(x - 7, ay - 8); ctx.lineTo(x + 7, ay - 8); ctx.lineTo(x, ay); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+
+  function render(t) {
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    if (!L || state === 'title') {
+      drawBackground(THEMES[0], t);
+      return;
+    }
+    drawBackground(L.theme, t);
+    drawTiles(t);
+    drawGoal(t);
+    const cy = camY();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '26px sans-serif';
+    for (const b of L.berries) if (!b.got) ctx.fillText('🍓', b.x - camX, b.y - cy + Math.sin(t * 3 + b.x) * 3);
+    for (const b of boxes) drawBox(b);
+    for (const c of chars) if (c !== chars[active]) drawPlayer(c, t);
+    drawPlayer(chars[active], t);
+
+    for (const p of particles) {
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.fillStyle = p.col;
+      if (p.star) star(ctx, p.x - camX, p.y - cy, p.r * 1.4);
+      else { ctx.beginPath(); ctx.arc(p.x - camX, p.y - cy, p.r, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = '800 15px "M PLUS Rounded 1c", sans-serif';
+    for (const p of popups) {
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.fillStyle = p.col;
+      ctx.strokeText(p.text, p.x - camX, p.y - cy); ctx.fillText(p.text, p.x - camX, p.y - cy);
+    }
+    ctx.globalAlpha = 1;
+
+    // ゴール人数
+    if (state === 'play' && L.inGoal > 0) {
+      ctx.font = '800 14px "M PLUS Rounded 1c", sans-serif';
+      ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#ff7f96';
+      ctx.strokeText(T().goal(L.inGoal), VIEW_W / 2, 80); ctx.fillText(T().goal(L.inGoal), VIEW_W / 2, 80);
+    }
+  }
+
+  // ---------- ループ ----------
+  let last = 0, acc = 0;
+  const H_STEP = 1 / 120;
+  const dbg = { manual: false };
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000 || 0);
+    last = now;
+    if (state === 'play' && !dbg.manual) {
+      acc += dt;
+      while (acc >= H_STEP) { step(H_STEP); acc -= H_STEP; }
+    }
+    if (L) camX += (targetCamX() - camX) * Math.min(1, dt * 8);
+    render(now / 1000);
+    drawUiCanvases(now / 1000);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- 画面 ----------
+  const $ = id => document.getElementById(id);
+  const show = (id, on) => $(id).classList.toggle('hidden', !on);
+
+  // タイトルの3人
+  const teamCvs = [];
+  NAMES.forEach((n, i) => {
+    const d = document.createElement('div');
+    d.className = 'member';
+    const cv = document.createElement('canvas'); cv.width = 192; cv.height = 200;
+    d.appendChild(cv);
+    d.insertAdjacentHTML('beforeend', `<div class="n">${n}</div><div class="a"></div>`);
+    $('team').appendChild(d);
+    teamCvs.push(cv);
+  });
+
+  // 顔ボタン
+  const faceCvs = [];
+  NAMES.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.className = 'face'; b.setAttribute('aria-label', n);
+    const cv = document.createElement('canvas'); cv.width = 84; cv.height = 84;
+    b.appendChild(cv);
+    b.insertAdjacentHTML('beforeend', `<span class="k">${i + 1}</span>`);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); selectChar(i); });
+    $('faces').appendChild(b);
+    faceCvs.push(cv);
+  });
+
+  function drawUiCanvases(t) {
+    if (state === 'title') teamCvs.forEach((cv, i) => {
+      const c = cv.getContext('2d');
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+      drawChar(c, DEFS[i].id, 96, 112 - Math.abs(Math.sin(t * 3 + i)) * 10, 1.25, t + i, 'happy', 1);
+    });
+    if (state === 'play' || state === 'intro') faceCvs.forEach((cv, i) => {
+      const c = cv.getContext('2d');
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+      drawChar(c, DEFS[i].id, 42, 66, 0.68, i === active ? t : 0, i === active ? 'happy' : 'normal', 0);
+    });
+    if (state === 'clear') {
+      const cv = $('clearCv'), c = cv.getContext('2d');
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+      for (let i = 0; i < 3; i++) drawChar(c, DEFS[i].id, 150 + i * 150, 132 - Math.abs(Math.sin(t * 5 + i)) * 18, 1.15, t + i, 'happy', 1);
+    }
+  }
+
+  function updateFaces() {
+    [...$('faces').children].forEach((b, i) => b.classList.toggle('on', i === active));
+    const ab = DEFS[active].ability;
+    show('dashBtn', ab === 'dash');
+    $('ability').textContent = NAMES[active] + (lang === 'ja' ? '：' : ': ') + T().abilities[active];
+  }
+
+  function selectChar(i) {
+    if (state !== 'play' || i === active) return;
+    active = i;
+    input.jumpPressed = false; input.dashPressed = false;
+    sfx.swap();
+    updateFaces();
+  }
+
+  function applyLang() {
+    const t = T();
+    document.documentElement.lang = lang;
+    document.title = t.title;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const v = t[el.dataset.i18n];
+      if (typeof v === 'string') el.textContent = v;
+    });
+    [...$('team').children].forEach((d, i) => { d.querySelector('.a').textContent = t.abilities[i]; });
+    document.querySelectorAll('#langs button').forEach(b => b.classList.toggle('on', b.dataset.lang === lang));
+    buildGrid();
+    if (L) { updateFaces(); $('stageLabel').textContent = t.stage(levelIdx + 1); }
+  }
+  document.querySelectorAll('#langs button').forEach(b => b.addEventListener('click', () => {
+    lang = b.dataset.lang; store.set('fuwamoko-lang', lang); applyLang(); beep(660, 0.08, 'triangle');
+  }));
+
+  function unlocked(i) { return i === 0 || !!progress.cleared[i - 1] || !!progress.cleared[i]; }
+
+  function buildGrid() {
+    const grid = $('grid');
+    grid.innerHTML = '';
+    LEVELS.forEach((lv, i) => {
+      const b = document.createElement('button');
+      const ok = unlocked(i);
+      b.className = 'lv' + (ok ? '' : ' locked') + (progress.cleared[i] ? ' done' : '');
+      const mark = (progress.cleared[i] ? '✔' : '') + (progress.berry[i] ? ' 🍓' : '');
+      b.innerHTML = `<span class="m">${ok ? mark : '🔒'}</span>${i + 1}<small></small>`;
+      b.querySelector('small').textContent = ok ? T().levels[i][0] : '';
+      b.disabled = !ok;
+      b.addEventListener('click', () => startLevel(i));
+      grid.appendChild(b);
+    });
+  }
+
+  function setScreen(s) {
+    state = s;
+    show('title', s === 'title');
+    show('select', s === 'select');
+    show('intro', s === 'intro');
+    show('clear', s === 'clear');
+    const inGame = s === 'play' || s === 'intro' || s === 'clear';
+    show('hud', inGame);
+    show('pad', s === 'play');
+    clearInput();
+  }
+
+  function startLevel(i) {
+    loadLevel(i);
+    $('stageLabel').textContent = T().stage(i + 1);
+    $('introNum').textContent = T().stage(i + 1);
+    $('introName').textContent = T().levels[i][0];
+    $('introHint').textContent = T().levels[i][1];
+    setScreen('intro');
+    beep(660, 0.08, 'triangle');
+  }
+
+  function levelClear() {
+    sfx.clear();
+    progress.cleared[levelIdx] = true;
+    if (L.berryGot) progress.berry[levelIdx] = true;
+    saveProgress();
+    const lastLv = levelIdx === LEVELS.length - 1;
+    $('clearTitle').textContent = lastLv ? T().allClear : T().clear;
+    $('clearBerry').textContent = L.berryGot ? T().berryGot : T().berryMiss;
+    show('nextBtn', !lastLv);
+    for (let i = 0; i < 4; i++) setTimeout(() => burst(camX + 60 + Math.random() * 280, camY() + 120 + Math.random() * 200, ['#ff8fa3', '#ffe066', '#9ad7ff', '#b6f0b0'], 24, 260), i * 200);
+    setScreen('clear');
+    buildGrid();
+  }
+
+  function restart() { if (L) { loadLevel(levelIdx); setScreen('play'); } }
+
+  $('startBtn').addEventListener('click', () => { buildGrid(); setScreen('select'); beep(660, 0.1, 'triangle'); });
+  $('toTitleBtn').addEventListener('click', () => setScreen('title'));
+  $('okBtn').addEventListener('click', () => setScreen('play'));
+  $('nextBtn').addEventListener('click', () => startLevel(levelIdx + 1));
+  $('clearSelBtn').addEventListener('click', () => { buildGrid(); setScreen('select'); });
+  $('retryBtn').addEventListener('click', () => { if (state === 'play') restart(); });
+  $('menuBtn').addEventListener('click', () => { buildGrid(); setScreen('select'); });
+
+  // ---------- 入力 ----------
+  function clearInput() {
+    input.left = input.right = input.jump = input.jumpPressed = input.dashPressed = false;
+    document.querySelectorAll('.pbtn.down').forEach(b => b.classList.remove('down'));
+  }
+  function holdButton(id, onDown, onUp) {
+    const el = $(id);
+    const ptrs = new Set();
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      if (!ptrs.size) onDown();
+      ptrs.add(e.pointerId); el.classList.add('down');
+    });
+    const up = e => {
+      if (!ptrs.has(e.pointerId)) return;
+      ptrs.delete(e.pointerId);
+      if (!ptrs.size) { onUp(); el.classList.remove('down'); }
+    };
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  holdButton('leftBtn', () => input.left = true, () => input.left = false);
+  holdButton('rightBtn', () => input.right = true, () => input.right = false);
+  holdButton('jumpBtn', () => { input.jump = true; input.jumpPressed = true; }, () => input.jump = false);
+  holdButton('dashBtn', () => { input.dashPressed = true; }, () => {});
+
+  window.addEventListener('keydown', e => {
+    const k = e.key;
+    if (state === 'play') {
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
+      if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
+      if ((k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W' || k === 'z' || k === 'Z') && !e.repeat) { input.jump = true; input.jumpPressed = true; }
+      if ((k === 'x' || k === 'X' || k === 'Shift') && !e.repeat) input.dashPressed = true;
+      if (k === '1' || k === '2' || k === '3') selectChar(+k - 1);
+      if (k === 'Tab' || k === 'c' || k === 'C') selectChar((active + 1) % 3);
+      if (k === 'r' || k === 'R') restart();
+      if (k === 'Escape') { buildGrid(); setScreen('select'); }
+      if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(k)) e.preventDefault();
+    } else if ((k === 'Enter' || k === ' ') && !e.repeat) {
+      if (state === 'intro') setScreen('play');
+      else if (state === 'clear' && levelIdx < LEVELS.length - 1) startLevel(levelIdx + 1);
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', e => {
+    const k = e.key;
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = false;
+    if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = false;
+    if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W' || k === 'z' || k === 'Z') input.jump = false;
+  });
+  window.addEventListener('blur', clearInput);
+
+  applyLang();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
