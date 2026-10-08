@@ -119,15 +119,15 @@
       </div>
       <p style="font-size:13px">あなた：<b>パワースピン型</b>（重いトップスピンが大きく落ちて跳ねる）<br>CPU：<b>スライス型</b>（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）</p>
       <div class="how">
-        <b>移動</b>：<span class="pc">マウス / 矢印キー・WASD</span><span class="sp">指でドラッグ</span><br>
+        <b>移動</b>：<span class="pc">マウス / 矢印キー</span><span class="sp">指でドラッグ</span><br>
         <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球（光る輪）は決めどころ！ 高ければ<b>スマッシュ</b>、腰〜肩の高さならコート後方から<b>ドライブボレー</b>（トップスピン / フラット）でノーバウンドで叩ける。<br>
         <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約210km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを高く越えて跳ね上がり、ぐっと前に伸びる。ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
         <div class="shotlist">
           <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、弾んでぐっと前に伸びる</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
           <span class="t" style="background:var(--flat)">フラット</span><span><span class="pc">C・L・ホイールクリック</span> <small>一番速い。でもミスしやすい</small></span>
-          <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">V・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
-          <span class="t" style="background:var(--drop)">ドロップ</span><span><span class="pc">B・O・Shift+右クリック</span> <small>ネット際にポトリ。後ろの相手に効く</small></span>
+          <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">S・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
+          <span class="t" style="background:var(--drop)">ドロップ</span><span><span class="pc">D・O・Shift+右クリック</span> <small>ネット際にポトリ。後ろの相手に効く</small></span>
         </div>
         <b>球種の使い分け</b>：<br>
         ・低く弾んだ球はスライスで返すと安全（フラットやトップは持ち上げにくい）<br>
@@ -207,7 +207,7 @@
     top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .62, bh: .96, margin: .35, speed: [29, 41], err: .8 },
     slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
     flat:  { name: 'フラット',     color: '#f1f1f1', mg: .006, bz: .7, bh: .82, margin: .12, speed: [31, 54], err: 1.1 },
-    lob:   { name: 'ロブ',         color: '#c77dff', mg: .006, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
+    lob:   { name: 'ロブ',         color: '#c77dff', mg: .012, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
     drop:  { name: 'ドロップ',     color: '#80ed99', mg: -.005, bz: .62, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
@@ -402,9 +402,9 @@
   $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; if (muted) { setMurmur(0); try { speechSynthesis.cancel(); } catch (e) {} } };
 
   // ---------- input ----------
-  const KEYMAP = { ' ': 'top', z: 'top', j: 'top', x: 'slice', k: 'slice', c: 'flat', l: 'flat', v: 'lob', i: 'lob', b: 'drop', o: 'drop' };
+  const KEYMAP = { ' ': 'top', z: 'top', j: 'top', x: 'slice', k: 'slice', c: 'flat', l: 'flat', s: 'lob', i: 'lob', d: 'drop', o: 'drop' };
   const keys = {};
-  const MOVE_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'];
+  const MOVE_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown']; // S and D are shot keys now: move with the arrows
   // switching windows can swallow keyup events: forget every held key and charge
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; charge = null; ptr = null; });
   let ptr = null, mouseShot = null;
@@ -413,7 +413,7 @@
     if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
     if (MOVE_KEYS.includes(k)) ptr = null; // keyboard takes over from the mouse until it moves again
     if (charge && !keys[k]) { // a quick tap while charging picks the aim right away
-      const dx = { arrowleft: -1, a: -1, arrowright: 1, d: 1 }[k], dy = { arrowup: 1, w: 1, arrowdown: -1, s: -1 }[k];
+      const dx = { arrowleft: -1, arrowright: 1 }[k], dy = { arrowup: 1, arrowdown: -1 }[k];
       if (dx) aimX = dx * AIM_X;
       if (dy) aimD = dy;
     }
@@ -763,7 +763,7 @@
     if (type === 'lob') {
       tx = goal.x + rand(-err * .6, err * .6);
       ty = goal.y + rand(-.6, .6) + rand(-err * .8, err * .3) - power * 1.2;
-      opts = { angle: .7 - power * .12 + rand(-.04, .04) };
+      opts = { angle: .57 - power * .1 + rand(-.03, .03) };
     } else if (type === 'drop') {
       ty = goal.y + rand(-.7, .7) + rand(-err * .6, err * .6);
       opts = { angle: .32 + rand(0, .06), noClear: q < .35 };
@@ -860,7 +860,7 @@
     let tx = openLeft ? edge : CW - edge;
     if (stretched) tx = CX + rand(-1.8, 1.8); // a lunging get floats back to the middle
     let ty, opts;
-    if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.6, .72) }; }
+    if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.5, .6) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
     else if (stretched) { ty = NET_Y + rand(5.5, 8); opts = { angle: rand(.68, .8) }; } // a high floater dropping around the service line
     else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
@@ -1415,10 +1415,10 @@
   // ---------- update ----------
   function movePlayer(dt) {
     let mx = 0, my = 0;
-    if (keys['arrowleft'] || keys['a']) mx--;
-    if (keys['arrowright'] || keys['d']) mx++;
-    if (keys['arrowup'] || keys['w']) my--;
-    if (keys['arrowdown'] || keys['s']) my++;
+    if (keys['arrowleft']) mx--;
+    if (keys['arrowright']) mx++;
+    if (keys['arrowup']) my--;
+    if (keys['arrowdown']) my++;
     const serving = state === 'serve' && server() === 'P';
     if (serving) my = 0;
     const max = PSPEED;
