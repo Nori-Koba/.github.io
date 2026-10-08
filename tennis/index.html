@@ -506,7 +506,7 @@
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
-    player.slide = cpu.slide = player.anim = cpu.anim = 0; ballGone = false; quietForPoint();
+    player.slide = cpu.slide = player.anim = cpu.anim = 0; quietForPoint();
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -982,21 +982,18 @@
     else { umpire('Double fault'); pointTo(other(ball.last), 'ダブルフォールト'); }
   }
 
-  // ---------- the stadium: chair umpire, line judges, ball kids, crowd ----------
+  // ---------- the stadium: chair umpire, line judges, crowd ----------
   const UMP = { x: CW + ALLEY + 2.3, y: NET_Y };
   const judges = [[-1.8, -6], [CW + 1.8, -6], [-ALLEY - 2.6, 4], [-ALLEY - 2.6, L - 4], [CW + ALLEY + 2.6, L - 4], [CW + ALLEY + 2.6, 4]]
     .map(([x, y]) => ({ x, y, call: 0 }));
-  const kids = [[-ALLEY - 1.7, NET_Y + .7], [CW + ALLEY + 1.4, NET_Y - 1.2], [CX - 3.2, -6.8], [CX + 3.2, -6.8]]
-    .map(([x, y]) => ({ x, y, hx: x, hy: y, task: null, phase: 0 }));
-  let umpCall = null, cheer = 0, ballGone = false;
+  let umpCall = null, cheer = 0;
   const NAME = { P: 'Bumpy', C: 'C P U' };
   let umpTimers = [];
   function umpire(text, delay = 0) {
     umpTimers.push(setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay));
   }
-  // a new point: ball kids back in place, no leftover calls
+  // a new point: no leftover calls
   function quietForPoint() {
-    kids.forEach(k => { k.task = null; k.x = k.hx; k.y = k.hy; });
     umpTimers.forEach(clearTimeout); umpTimers = []; umpCall = null;
     try { speechSynthesis.cancel(); } catch (e) {}
   }
@@ -1019,27 +1016,6 @@
     if (a >= 3 && b >= 3) return a === b ? 'Deuce' : `Advantage, ${NAME[a > b ? server() : other(server())]}`;
     return a === b ? `${N[a]} all` : `${N[a]}, ${N[b]}`;
   }
-  // after a point a ball kid runs out, picks up the ball and runs back
-  function fetchBall() {
-    if (ball.live || ballGone || kids.some(k => k.task)) return;
-    if (ball.x < -7 || ball.x > CW + 7 || ball.y < -7.5 || ball.y > L + 7) return;
-    let best = kids[0];
-    kids.forEach(k => { if (d2(k, ball) < d2(best, ball)) best = k; });
-    best.task = 'go';
-  }
-  function moveKids(dt) {
-    kids.forEach(k => {
-      if (k.task === 'go' && ball.live) k.task = 'back'; // never touch a ball in play
-      const tgt = k.task === 'go' ? ball : k.task === 'back' ? { x: k.hx, y: k.hy } : null;
-      if (!tgt) return;
-      const dx = tgt.x - k.x, dy = tgt.y - k.y, l = Math.hypot(dx, dy), v = 5.5 * dt;
-      k.phase += dt * 14;
-      if (l <= v + .25) {
-        if (k.task === 'go') { if (!ball.live && !ball.held) ballGone = true; k.task = 'back'; } else { k.x = k.hx; k.y = k.hy; k.task = null; }
-      } else { k.x += dx / l * v; k.y += dy / l * v; }
-    });
-  }
-
   function pause(title, sub, sec, cb) { state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb; }
 
   function pointTo(w, label) {
@@ -1378,8 +1354,6 @@
     popups.forEach(p => { p.z += dt * 1.2; p.life -= dt; });
     popups = popups.filter(p => p.life > 0);
     marks.forEach(m => (m.life -= dt));
-    if (state === 'pause' && !practice) fetchBall();
-    moveKids(dt);
     cheer = Math.max(0, cheer - dt);
     judges.forEach(j => (j.call = Math.max(0, j.call - dt)));
     if (umpCall && (umpCall.life -= dt) <= 0) umpCall = null;
@@ -1768,7 +1742,7 @@
   const KIT_P = { shirt: '#ff5d73', trim: '#fff', shorts: '#f4f4f4', skin: '#f0c8a0', hair: '#3a2a22', cap: '#c9384d', shoe: '#ffffff', racket: '#d7263d' };
   const KIT_C = { shirt: '#4a6fd1', trim: '#ffd166', shorts: '#1f2b55', skin: '#c68a5a', hair: '#1b1b1b', cap: '#1b1b1b', shoe: '#ffd166', racket: '#2b2f4a' };
 
-  // simple stand-in people for the officials and ball kids
+  // simple stand-in people for the officials
   function person(x, y, z0, shirt, h, opts = {}) {
     const b = P(x, y, z0), s = b.s, zy = z => P(x, y, z0 + z).y;
     if (!opts.noShadow) { ctx.fillStyle = 'rgba(0,0,0,.2)'; const g = P(x, y); ctx.beginPath(); ctx.ellipse(g.x, g.y, .35 * s, .12 * s, 0, 0, 7); ctx.fill(); }
@@ -1811,14 +1785,7 @@
     ctx.fillStyle = '#3a3f55'; ctx.fillRect(chair.x - .2 * s, chair.y, .4 * s, .45 * s);
     person(j.x, j.y, .45, venue.clay ? '#2c4a7a' : '#1f2b55', 1.05, { seated: true, arm: j.call > 0 });
   }
-  function drawKid(k) {
-    const crouch = k.task ? 0 : .25;
-    person(k.x, k.y, 0, '#7b2cbf', 1.25 - crouch, { run: k.task ? k.phase : 0, cap: '#7b2cbf' });
-    if (k.task === 'back') { const h = P(k.x + .2, k.y, .9); ctx.fillStyle = '#e8ff3a'; ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(2, .06 * h.s), 0, 7); ctx.fill(); }
-  }
-
   function drawBall() {
-    if (ballGone) return;
     const col = ball.live ? SHOTS[ball.type].color : '#e8ff3a';
     ball.trail.forEach((t, i) => {
       const p = P(t.x, t.y, t.z);
@@ -1929,7 +1896,6 @@
       { y: NET_Y, f: drawNet },
       { y: UMP.y + .02, f: drawUmpire },
       ...judges.map(j => ({ y: j.y, f: () => drawJudge(j) })),
-      ...kids.map(k => ({ y: k.y, f: () => drawKid(k) })),
       { y: cpu.y, f: () => figure(cpu, KIT_C) },
       { y: player.y, f: () => figure(player, KIT_P, charge) },
     ];
