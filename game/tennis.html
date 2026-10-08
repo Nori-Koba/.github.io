@@ -114,6 +114,7 @@
         <button class="alt" data-drill="volley">ボレー</button>
         <button class="alt" data-drill="smash">スマッシュ</button>
         <button class="alt" data-drill="drop">ドロップ拾い</button>
+        <button class="alt" data-drill="chance">チャンスボール</button>
         <button class="alt" data-drill="random">ランダム</button>
       </div>
       <p style="margin-top:12px"><a href="index.html">🎉 Bumpy Party! であそぶ</a></p>
@@ -756,6 +757,7 @@
     volley: { name: 'ボレー', spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, -.5] },
     smash:  { name: 'スマッシュ', spot: () => [CX + rand(-.4, .4), NET_Y + 3.5], feeder: [CX, 1] },
     drop:   { name: 'ドロップ拾い', spot: () => [CX, L + 1], feeder: [CX, 1.5] },
+    chance: { name: 'チャンスボール', spot: () => [CX + rand(-1, 1), L + .5], feeder: [CX, -.5] },
   };
   let drill = 'stroke';
   function startPractice(key) {
@@ -787,6 +789,10 @@
       kmh = shoot(player.x + rand(-1.6, 1.6), L + rand(.5, 2), 'flat', { speed: rand(19, 24), who: 'C' });
     } else if (drill === 'smash') { // a lob that comes down around you
       kmh = shoot(player.x + rand(-1.2, 1.2), player.y + rand(-.5, 1.5), 'lob', { angle: rand(.85, 1), who: 'C' });
+    } else if (drill === 'chance') { // the same floater the CPU sends up after a lunge
+      kmh = shoot(CX + rand(-1.8, 1.8), NET_Y + rand(5.5, 8), 'top', { angle: rand(.68, .8), who: 'C' });
+      ball.chance = true;
+      popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a');
     } else {
       kmh = shoot(rand(1.5, CW - 1.5), NET_Y + rand(1.5, 3), 'drop', { angle: rand(.32, .38), who: 'C' });
     }
@@ -963,7 +969,7 @@
   function assistTarget() {
     if (!ball.live || ball.last !== 'C') return null;
     const ss = smashSpot();
-    if (ss && player.y < NET_Y + 9) { // get under it so it drops onto the racket just above your head
+    if (ss && (player.y < NET_Y + 9 || ball.chance)) { // get under it (rush in for a sitter) so it drops onto the racket above your head
       const side = ss.x >= player.x - .1 ? 1 : -1;
       return { x: ss.x - side * .25, y: clamp(ss.y + .25, NET_Y + .8, L + 3) };
     }
