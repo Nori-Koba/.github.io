@@ -217,7 +217,7 @@
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { mg: .032, bz: .57, bh: 1.04, margin: .45, speed: [32, 45] } },
+    P: { name: 'パワースピン型', top: { mg: .018, bz: .57, bh: .98, margin: .45, speed: [32, 45] } },
     C: { name: 'スライス型',
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
          flat:  { speed: [31, 52] },
@@ -350,8 +350,6 @@
     noise(.03, 'lowpass', c.cut, .7, .45 * v);
     modes([[c.f, .05, 1], [c.f * 2.9, .025, .35]], .25 * v);
   };
-  // heavy topspin: the strings whip up the back of the ball with a rising whirr
-  const sSpin = power => { tone(520, .2, 'sine', .035 + .03 * power, .01, 1500); tone(900, .16, 'triangle', .02 + .015 * power, .03, 2400); };
   const sSqueak = vol => { if (venue.clay || venue.grass) return; tone(2700, .09, 'sine', .05 * vol, 0, 1900); tone(3400, .06, 'sine', .025 * vol, .01, 2500); };
   const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
   const sLose = () => [392, 311].forEach((f, i) => tone(f, .18, 'triangle', .09, i * .12));
@@ -582,7 +580,7 @@
     b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
     if (b.z <= 0 && b.vz < 0) {
       const impact = -b.vz;
-      const bh = Math.min(1.06, b.bh * venue.bh); // only your heavy topspin can jump forward off the court // the surface: clay grips and sits up, grass skids through low
+      const bh = Math.min(1, b.bh * venue.bh); // the surface: clay grips and sits up, grass skids through low
       b.z = 0; b.vz = impact * b.bz * venue.bz; b.vx *= bh; b.vy *= bh;
       if (b.kick) { b.vx += b.kick; b.kick = 0; } // kick serve jumps sideways
       // spin mostly wears off after the first bounce; court friction on later bounces
@@ -644,7 +642,7 @@
     }
     Object.assign(ball, {
       vx: S * Math.cos(th) * Math.cos(ang), vy: S * Math.cos(th) * Math.sin(ang), vz: S * Math.sin(th),
-      ax, mg: sh.mg, bz: sh.bz, bh: sh.bh, kick: 0, type, rolling: false, trail: [], heavy: false,
+      ax, mg: sh.mg, bz: sh.bz, bh: sh.bh, kick: 0, type, rolling: false, trail: [],
       spin: sh.mg * 1800 + (type === 'flat' ? 6 : 0),
     });
     return Math.round(S * 3.6);
@@ -807,13 +805,7 @@
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
     sHit(smash ? 1 : power);
     const label = smash ? 'スマッシュ!' : sh.name;
-    const heavy = type === 'top' && !smash && !mishit && !scramble;
-    ball.heavy = heavy;
-    if (heavy) { // ギュイン: a whirr, and how hard it is spinning
-      sSpin(power);
-      const rpm = Math.round((2800 + power * 1800 + (grade === 'nice' ? 400 : 0)) / 100) * 100;
-      popupAt(player.x, player.y, 2.5, `ギュイン! ${kmh}km/h ・ ${rpm}rpm`, sh.color);
-    } else popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
+    popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
     ball.chance = scramble && !mishit; // your floater is now a sitter for the CPU
     if (chance && (smash || drive)) popupAt(player.x, player.y, 3.6, smash ? '叩き込んだ!' : 'ドライブボレー!', '#ff5d73');
     else if (drive) popupAt(player.x, player.y, 3.6, 'ドライブボレー!', '#ff9f43');
@@ -2259,11 +2251,6 @@
       const a = performance.now() / 1000 * ball.spin;
       ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1, r * .25);
       ctx.beginPath(); ctx.ellipse(p.x, p.y, r * .75, r * Math.abs(Math.cos(a)) * .75 + .1, 0, 0, 7); ctx.stroke();
-    }
-    if (ball.heavy && ball.live && ball.bounces < 2) { // heavy topspin: whirling arcs around the ball
-      const a = performance.now() / 1000 * 30, R = r * 1.9;
-      ctx.strokeStyle = 'rgba(255,159,67,.85)'; ctx.lineWidth = Math.max(1.5, r * .35); ctx.lineCap = 'round';
-      for (const o of [0, Math.PI]) { ctx.beginPath(); ctx.arc(p.x, p.y, R, a + o, a + o + 1.4); ctx.stroke(); }
     }
   }
 
