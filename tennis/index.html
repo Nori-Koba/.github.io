@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Nori Tennis</title>
+<title>Mang Kobay Tennis</title>
 <style>
   :root { --ink: #1f2340; --accent: #ff5d73; --sub: #6b6f8f; --ball: #e8ff3a;
     --top: #ff9f43; --slice: #4cc9f0; --flat: #f1f1f1; --lob: #c77dff; --drop: #80ed99; }
@@ -111,7 +111,7 @@
 
   <div class="overlay" id="menu">
     <div class="card">
-      <h2>🎾 Nori Tennis</h2>
+      <h2>🎾 Mang Kobay Tennis</h2>
       <p>CPU と 1 対 1 のテニス勝負！</p>
       <p style="margin:8px 0 4px"><b>会場</b></p>
       <div class="btns venues" style="margin-top:0">
@@ -1139,7 +1139,7 @@
   const judges = [[-1.8, -6], [CW + 1.8, -6], [-ALLEY - 2.6, 4], [-ALLEY - 2.6, L - 4], [CW + ALLEY + 2.6, L - 4], [CW + ALLEY + 2.6, 4]]
     .map(([x, y]) => ({ x, y, call: 0 }));
   let umpCall = null, cheer = 0;
-  const NAME = { P: 'Nori', C: 'C P U' };
+  const NAME = { P: 'Mang Kobay', C: 'C P U' };
   let umpTimers = [];
   function umpire(text, delay = 0) {
     umpTimers.push(setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay));
@@ -1318,7 +1318,7 @@
     const names = [], used = new Set();
     for (const [cc, list] of Object.entries(NAMEPOOL)) for (const sur of list) names.push({ sur, cc });
     shuffle(names);
-    const players = [{ n: 'Nori', sur: 'Nori', cc: 'YOU', seed: 1, r: 1.1, st: 'top' }];
+    const players = [{ n: 'Mang Kobay', sur: 'Kobay', cc: 'YOU', seed: 1, r: 1.1, st: 'top' }];
     for (let i = 1; i < 128; i++) {
       const nm = names[i % names.length];
       let full; do full = INITIALS[Math.floor(Math.random() * INITIALS.length)] + '. ' + nm.sur; while (used.has(full)); used.add(full);
