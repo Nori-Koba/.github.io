@@ -633,10 +633,12 @@
       ? { ...(dc ? left : right), y0: NET_Y - SVC, y1: NET_Y }
       : { ...(dc ? right : left), y0: NET_Y, y1: NET_Y + SVC };
   }
-  const T = .04; // line tolerance: touching the line is in
+  // a ball touching any part of the line is in: the lines are drawn centred on the court edges (6 cm wide,
+  // baselines 8 cm), so the ball (3.3 cm radius) may land up to half a line plus its radius outside the edge
+  const BALL_RAD = .033, T = .03 + BALL_RAD, TB = .04 + BALL_RAD;
   const inBox = b => ball.x >= b.x0 - T && ball.x <= b.x1 + T && ball.y >= b.y0 - T && ball.y <= b.y1 + T;
   const inCourt = recv => ball.x >= -T && ball.x <= CW + T &&
-    (recv === 'C' ? ball.y >= -T && ball.y <= NET_Y : ball.y >= NET_Y && ball.y <= L + T);
+    (recv === 'C' ? ball.y >= -TB && ball.y <= NET_Y : ball.y >= NET_Y && ball.y <= L + TB);
 
   function startMatch(key, opp = null) {
     practice = null; $('quit').classList.remove('hidden');
@@ -2562,8 +2564,11 @@
     marks.forEach(m => {
       const p = P(m.x, m.y);
       ctx.globalAlpha = Math.min(1, m.life);
-      ctx.strokeStyle = m.ok ? '#e8ff3a' : '#ff4d4d'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(p.x, p.y, .25 * p.s, .1 * p.s, 0, 0, 7); ctx.stroke();
+      // a ball-sized mark, so you can see whether it touched the line
+      const rx = Math.max(3, .07 * p.s), ry = Math.max(1.6, .03 * p.s);
+      ctx.fillStyle = m.ok ? 'rgba(232,255,58,.45)' : 'rgba(255,77,77,.5)';
+      ctx.strokeStyle = m.ok ? '#e8ff3a' : '#ff4d4d'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, 7); ctx.fill(); ctx.stroke();
       ctx.globalAlpha = 1;
     });
     // smash guide: where the ball comes down to smash height, and a flash when it is in range right now
