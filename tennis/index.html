@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Bumpy Tennis</title>
+<title>Nori Tennis</title>
 <style>
   :root { --ink: #1f2340; --accent: #ff5d73; --sub: #6b6f8f; --ball: #e8ff3a;
     --top: #ff9f43; --slice: #4cc9f0; --flat: #f1f1f1; --lob: #c77dff; --drop: #80ed99; }
@@ -111,7 +111,7 @@
 
   <div class="overlay" id="menu">
     <div class="card">
-      <h2>🎾 Bumpy Tennis</h2>
+      <h2>🎾 Nori Tennis</h2>
       <p>CPU と 1 対 1 のテニス勝負！</p>
       <p style="margin:8px 0 4px"><b>会場</b></p>
       <div class="btns venues" style="margin-top:0">
@@ -244,13 +244,13 @@
 
   // Venues modelled on the four majors' surfaces. bz / bh scale how high / how fast the ball comes off the court.
   const VENUES = {
-    mel: { name: 'メルボルン', surf: 'ハード', banner: 'BUMPY OPEN · MELBOURNE', court: '#2f6fc4', outer: '#4f9ee2', wall: '#17407a',
+    mel: { name: 'メルボルン', surf: 'ハード', banner: 'NORI OPEN · MELBOURNE', court: '#2f6fc4', outer: '#4f9ee2', wall: '#17407a',
            sky: ['#0f2a55', '#3a6fb0'], line: '#ffffff', bz: 1, bh: 1, dust: '215,225,245', slide: 16 },
-    par: { name: 'パリ', surf: 'クレー', banner: 'BUMPY OPEN · PARIS', court: '#c8643a', outer: '#bf5d35', wall: '#1d5a3a',
+    par: { name: 'パリ', surf: 'クレー', banner: 'NORI OPEN · PARIS', court: '#c8643a', outer: '#bf5d35', wall: '#1d5a3a',
            sky: ['#4a7fb8', '#a9cbe8'], line: '#f6f0e4', bz: 1.12, bh: .86, dust: '205,115,65', slide: 9, clay: true },
-    lon: { name: 'ロンドン', surf: '芝', banner: 'BUMPY OPEN · LONDON', court: '#4f9a3e', outer: '#4a9339', wall: '#12422a',
+    lon: { name: 'ロンドン', surf: '芝', banner: 'NORI OPEN · LONDON', court: '#4f9a3e', outer: '#4a9339', wall: '#12422a',
            sky: ['#5d84b8', '#cfe0f0'], line: '#ffffff', bz: .8, bh: 1.08, dust: '140,180,100', slide: 14, grass: true },
-    ny:  { name: 'ニューヨーク', surf: 'ハード', banner: 'BUMPY OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
+    ny:  { name: 'ニューヨーク', surf: 'ハード', banner: 'NORI OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
            sky: ['#04060d', '#151d33'], line: '#ffffff', bz: .97, bh: 1.04, dust: '215,225,245', slide: 16, night: true },
   };
   for (const k in VENUES) VENUES[k].key = k;
@@ -1139,7 +1139,7 @@
   const judges = [[-1.8, -6], [CW + 1.8, -6], [-ALLEY - 2.6, 4], [-ALLEY - 2.6, L - 4], [CW + ALLEY + 2.6, L - 4], [CW + ALLEY + 2.6, 4]]
     .map(([x, y]) => ({ x, y, call: 0 }));
   let umpCall = null, cheer = 0;
-  const NAME = { P: 'Bumpy', C: 'C P U' };
+  const NAME = { P: 'Nori', C: 'C P U' };
   let umpTimers = [];
   function umpire(text, delay = 0) {
     umpTimers.push(setTimeout(() => { umpCall = { text, life: 2.4 }; say(text, .85, 1); }, delay));
@@ -1318,7 +1318,7 @@
     const names = [], used = new Set();
     for (const [cc, list] of Object.entries(NAMEPOOL)) for (const sur of list) names.push({ sur, cc });
     shuffle(names);
-    const players = [{ n: 'Bumpy', sur: 'Bumpy', cc: 'YOU', seed: 1, r: 1.1, st: 'top' }];
+    const players = [{ n: 'Nori', sur: 'Nori', cc: 'YOU', seed: 1, r: 1.1, st: 'top' }];
     for (let i = 1; i < 128; i++) {
       const nm = names[i % names.length];
       let full; do full = INITIALS[Math.floor(Math.random() * INITIALS.length)] + '. ' + nm.sur; while (used.has(full)); used.add(full);
@@ -1406,7 +1406,7 @@
 
   function showTour() {
     const card = $('tourCard'), v = VENUES[tour.venue], r = tour.res.length, champ = champion();
-    let h = `<div class="tour"><h2>🏆 BUMPY OPEN</h2><p>${v.name}（${v.surf}）・ 128 ドロー ・ 1 セットマッチ</p><div class="path">`;
+    let h = `<div class="tour"><h2>🏆 NORI OPEN</h2><p>${v.name}（${v.surf}）・ 128 ドロー ・ 1 セットマッチ</p><div class="path">`;
     const lostAt = tour.out ? tour.res.findIndex(rr => rr.some(m => m.l === 0)) : -1;
     ROUNDS.forEach((n, i) => {
       const cls = tour.out ? (i < lostAt ? 'done' : i === lostAt ? 'lost' : '') : i < r ? 'done' : i === r ? 'now' : '';
@@ -1512,7 +1512,7 @@
   function pageHead(g, title) {
     const v = VENUES[tour.venue];
     g.fillStyle = '#1d2240'; g.fillRect(0, 0, PW, 110);
-    g.fillStyle = '#fff'; g.font = `bold 44px ${PFONT}`; g.fillText('BUMPY OPEN', 50, 55);
+    g.fillStyle = '#fff'; g.font = `bold 44px ${PFONT}`; g.fillText('NORI OPEN', 50, 55);
     g.font = `24px ${PFONT}`; g.fillText(`${v.name}（${v.surf}）・ 128 ドロー`, 400, 55);
     g.textAlign = 'right'; g.font = `bold 30px ${PFONT}`; g.fillText(title, PW - 50, 55); g.textAlign = 'left';
     g.fillStyle = '#1d2240';
@@ -1584,7 +1584,7 @@
         bracketPage('準々決勝〜決勝', 4, 0, 8, '優勝')];
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
       pages.forEach((p, i) => { if (i) doc.addPage(); doc.addImage(p.toDataURL('image/jpeg', .9), 'JPEG', 0, 0, 210, 297); });
-      const blob = doc.output('blob'), filename = `bumpy-open-${tour.venue}.pdf`;
+      const blob = doc.output('blob'), filename = `nori-open-${tour.venue}.pdf`;
       const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
       if (dl) await dl.save({ filename, data: blob });
       else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
