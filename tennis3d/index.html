@@ -111,7 +111,7 @@
 
   <div class="overlay" id="menu">
     <div class="card">
-      <h2>🎾 Bumpy Tennis 3D <small style="font-size:13px;color:var(--sub)">開発中・段階 3</small></h2>
+      <h2>🎾 Bumpy Tennis 3D <small style="font-size:13px;color:var(--sub)">開発中・段階 4</small></h2>
       <p>CPU と 1 対 1 のテニス勝負！</p>
       <p style="margin:8px 0 4px"><b>会場</b></p>
       <div class="btns venues" style="margin-top:0">
@@ -144,6 +144,7 @@
         <b>コツ</b>：ショットのボタンを長押しすると、ボールの打ちやすい所（ボレー・スマッシュの位置やバウンド後の頂点）へ自動で走る。ノーバウンドの高い球はスマッシュ：地面の<b>赤い印</b>の所で待つと頭上の打ちやすい高さに落ちてくる。ボールが赤く光って「今!」が出たら打てる。練習モードで球出し練習もできる。
       </div>
       <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
+      <label id="liteRow" class="hidden"><input type="checkbox" id="lite3d"> 軽量モード（3D が重いとき。遅い端末では自動で ON）</label>
       <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
       <div class="btns">
         <button class="alt" data-level="easy">やさしい</button>
@@ -344,47 +345,53 @@
     } catch (e) {}
   }
   // ---- hit and bounce sounds, synthesised sample by sample ----
-  // A real hit is not a ringing tone: a sharp contact click, the ball's short "pock" that dies within a few cycles,
-  // a low "thock" from the frame, an airy tail, and on spin shots the strings brushing up the ball.
-  function hitBuffer(power, kind) {
-    const sr = audio.sampleRate, n = Math.floor(sr * .16), b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
-    const j = 1 + (Math.random() - .5) * .1; // no two hits sound exactly alike
-    const f1 = (kind === 'flat' || kind === 'smash' ? 1180 : kind === 'slice' || kind === 'drop' ? 880 : 1020) * (1 - power * .12) * j;
-    const thump = kind === 'slice' || kind === 'drop' ? .3 : .75 + power * .55;
-    const brush = kind === 'slice' || kind === 'drop' ? .55 : kind === 'top' || kind === 'lob' ? .25 + power * .1 : .06;
-    const click = kind === 'flat' || kind === 'smash' ? 1.1 : .8;
-    let lp = 0, lp2 = 0, peak = 0;
-    for (let i = 0; i < n; i++) {
-      const t = i / sr, w = Math.random() * 2 - 1;
-      lp += (w - lp) * .22; lp2 += (w - lp2) * .6;
-      let v = w * Math.exp(-t / .0011) * click;                                    // contact click
-      v += Math.sin(6.2832 * f1 * t) * Math.exp(-t / .0055) * (.85 + .35 * lp);    // the pock: 5-6 cycles, not a ring
-      v += Math.sin(6.2832 * f1 * 2.27 * t) * Math.exp(-t / .0022) * .28;
-      v += Math.sin(6.2832 * 150 * j * t) * Math.exp(-t / .017) * thump * .65;     // frame thock
-      v += lp * Math.exp(-t / .028) * .3;                                          // air
-      v += (w - lp2) * brush * Math.exp(-t / .03) * (1 - Math.exp(-t / .003));     // strings brushing the ball
-      d[i] = v; peak = Math.max(peak, Math.abs(v));
+  // No pitched tones at all (those sound like an instrument): a real hit is a burst of noise -- a sharp crack,
+  // a short hollow "pock" band around 1 kHz, a dull low body, a quick airy tail, and on spin shots the strings
+  // brushing the ball. Each band is a resonant filter on white noise, so there is no note to hear.
+  function biquad(x, type, f0, Q, sr) {
+    const w = 2 * Math.PI * f0 / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * Q);
+    let b0, b1, b2;
+    if (type === 'bp') { b0 = al; b1 = 0; b2 = -al; }
+    else if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; }
+    else { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; }
+    const a0 = 1 + al, a1 = -2 * cs, a2 = 1 - al, y = new Float32Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const v = (b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+      x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
     }
-    for (let i = 0; i < n; i++) d[i] /= peak;
+    return y;
+  }
+  const noiseArr = (n, env) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = (Math.random() * 2 - 1) * env(i); return a; };
+  function mixToBuffer(n, layers) {
+    const sr = audio.sampleRate, b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < n; i++) { let v = 0; layers.forEach(([arr, g]) => (v += arr[i] * g)); d[i] = v; peak = Math.max(peak, Math.abs(v)); }
+    for (let i = 0; i < n; i++) d[i] /= peak || 1;
     return b;
   }
+  function hitBuffer(power, kind) {
+    const sr = audio.sampleRate, n = Math.floor(sr * .12), j = 1 + (Math.random() - .5) * .12;
+    const crisp = kind === 'flat' || kind === 'smash', soft = kind === 'slice' || kind === 'drop';
+    // the impact: a fast rise and a ~4 ms fall, with a faint 25 ms tail
+    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0003)) * (Math.exp(-t / (soft ? .0045 : .0035)) + .1 * Math.exp(-t / .025)); });
+    const pock = biquad(imp, 'bp', (soft ? 820 : crisp ? 1150 : 1000) * (1 - power * .1) * j, 1.1, sr);
+    const ring = biquad(imp, 'bp', 2700 * j, 1.4, sr);
+    const body = biquad(imp, 'lp', 420, .7, sr);
+    const crack = biquad(noiseArr(n, i => Math.exp(-i / sr / .0007)), 'hp', 3500, .7, sr);
+    const brushAmt = soft ? .5 : kind === 'top' || kind === 'lob' ? .25 + power * .1 : .05;
+    const brush = biquad(noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .003)) * Math.exp(-t / .03); }), 'hp', 2800, .7, sr);
+    return mixToBuffer(n, [[pock, 1], [ring, .35], [body, .55 + power * .4 - (soft ? .25 : 0)], [crack, crisp ? .9 : .55], [brush, brushAmt]]);
+  }
   function bounceBuffer(impact) {
-    const sr = audio.sampleRate, n = Math.floor(sr * .1), b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
-    const c = venue.clay ? { f: 210, tau: .006, click: .25, dust: .6, cut: .08 } : venue.grass ? { f: 170, tau: .005, click: .1, dust: .25, cut: .05 }
-      : { f: 260, tau: .01, click: .7, dust: .2, cut: .3 };
-    const j = 1 + (Math.random() - .5) * .1;
-    let lp = 0, peak = 0;
-    for (let i = 0; i < n; i++) {
-      const t = i / sr, w = Math.random() * 2 - 1;
-      lp += (w - lp) * c.cut;
-      let v = w * Math.exp(-t / .0009) * c.click;                                  // ball meets the court
-      v += Math.sin(6.2832 * c.f * j * t) * Math.exp(-t / c.tau);                  // dull "thup"
-      v += Math.sin(6.2832 * c.f * 3.1 * j * t) * Math.exp(-t / (c.tau * .4)) * .3;
-      v += lp * Math.exp(-t / .02) * c.dust * 3;                                   // clay spray / grass
-      d[i] = v; peak = Math.max(peak, Math.abs(v));
-    }
-    for (let i = 0; i < n; i++) d[i] /= peak;
-    return b;
+    const sr = audio.sampleRate, n = Math.floor(sr * .09);
+    const c = venue.clay ? { f: 520, dec: .006, crack: .1, grit: .55 } : venue.grass ? { f: 380, dec: .005, crack: .05, grit: .2 } : { f: 700, dec: .0045, crack: .45, grit: .12 };
+    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0004)) * Math.exp(-t / c.dec); });
+    const thud = biquad(imp, 'bp', c.f * (1 + (Math.random() - .5) * .1), .9, sr);
+    const low = biquad(imp, 'lp', 300, .7, sr);
+    const crack = biquad(noiseArr(n, i => Math.exp(-i / sr / .0006)), 'hp', 3000, .7, sr);
+    const grit = biquad(noiseArr(n, i => { const t = i / sr; return Math.exp(-t / .02); }), 'bp', 2200, .8, sr);
+    return mixToBuffer(n, [[thud, 1], [low, .6], [crack, c.crack], [grit, c.grit]]);
   }
   function playBuf(buf, vol, delay = 0, cutoff = 0) {
     const src = audio.createBufferSource(), g = audio.createGain(), t = audio.currentTime + delay;
@@ -494,6 +501,7 @@
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; charge = null; ptr = null; });
   let ptr = null, mouseShot = null;
   addEventListener('keydown', e => {
+    if (GL && GL.replaying()) { pauseT = Math.max(.6, pauseT - GL.stopReplay()); return; } // any key skips a replay
     const k = e.key.toLowerCase();
     if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
     if (MOVE_KEYS.includes(k)) ptr = null; // keyboard takes over from the mouse until it moves again
@@ -517,6 +525,7 @@
   }
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
+    if (GL && GL.replaying()) { pauseT = Math.max(.6, pauseT - GL.stopReplay()); return; }
     setPtr(e);
     if (e.pointerType === 'mouse') {
       mouseShot = e.button === 1 ? 'flat' : e.button === 2 ? (e.shiftKey ? 'drop' : 'slice') : (e.shiftKey ? 'lob' : 'top');
@@ -532,7 +541,7 @@
   canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') ptr = null; });
   document.querySelectorAll('#shots button').forEach(b => {
     const s = b.dataset.shot;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.setPointerCapture(e.pointerId); b.classList.add('on'); press(s); });
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (GL && GL.replaying()) { pauseT = Math.max(.6, pauseT - GL.stopReplay()); return; } b.setPointerCapture(e.pointerId); b.classList.add('on'); press(s); });
     const up = () => { if (b.classList.contains('on')) { b.classList.remove('on'); release(s); } };
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
   });
@@ -1106,6 +1115,7 @@
       }
     } else {
       const ace = ball.serve ? 'サービスエース!' : null;
+      replayAsk = true;
       pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
     }
   }
@@ -1154,7 +1164,11 @@
     if (a >= 3 && b >= 3) return a === b ? 'Deuce' : `Advantage, ${NAME[a > b ? server() : other(server())]}`;
     return a === b ? `${N[a]} all` : `${N[a]}, ${N[b]}`;
   }
-  function pause(title, sub, sec, cb) { state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb; }
+  let replayAsk = false;
+  function pause(title, sub, sec, cb) {
+    state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb;
+    if (replayAsk) { replayAsk = false; if (GL && !practice) pauseT += GL.replay(); }
+  }
 
   function pointTo(w, label) {
     ball.live = false; faults = 0;
@@ -2427,6 +2441,9 @@
     [-.35, .35].forEach(o => { const a = P(UMP.x + o, UMP.y, 0), b = P(UMP.x + o * .6, UMP.y, 1.9); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
     ctx.fillStyle = '#2b3150'; ctx.fillRect(seat.x - .35 * s, seat.y - .1 * s, .7 * s, .14 * s);
     person(UMP.x, UMP.y, 1.95, '#1f2b55', 1.25, { seated: true, noShadow: true, cap: '#cfd5e6' });
+    drawUmpCall();
+  }
+  function drawUmpCall() {
     if (umpCall) {
       const head = P(UMP.x, UMP.y, 3.6);
       ctx.font = 'bold 13px system-ui, sans-serif';
@@ -2477,6 +2494,16 @@
     if (GL) { // stadium backdrop on the canvas behind the 3D scene
       const main = ctx; ctx = GL.bgCtx; ctx.clearRect(0, 0, W, H); drawCourt(); ctx = main;
       ctx.clearRect(0, 0, W, H);
+      if (GL.replaying()) {
+        GL.frame();
+        if (GL.replaying()) {
+          ctx.fillStyle = 'rgba(200,20,40,.9)'; ctx.fillRect(16, H - 64, 118, 34);
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+          ctx.fillText('▶ REPLAY', 26, H - 47);
+          ctx.font = '12px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(coarse ? 'タップでスキップ' : 'キーでスキップ', 16, H - 20);
+          return;
+        }
+      }
     } else {
       ctx.clearRect(0, 0, W, H);
       drawCourt();
@@ -2574,7 +2601,7 @@
       { y: player.y, f: () => figure(player, KIT_P, charge) },
     ];
     if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
-    if (GL) { GL.frame(); if (state !== 'menu') drawTrail(); chargeMeter(player, charge); }
+    if (GL) { GL.frame(frameDt); if (state !== 'menu') drawTrail(); chargeMeter(player, charge); drawUmpCall(); }
     else items.sort((a, b) => a.y - b.y).forEach(i => i.f());
 
     popups.forEach(p => {
@@ -2750,6 +2777,8 @@
         ['foreL', 'foreR'].forEach(k => (P2[k] = add(segGeo(.75), mats.skin)));
         ['sleeveL', 'sleeveR'].forEach(k => (P2[k] = add(segGeo(.9), mats.shirt)));
         P2.neck = add(segGeo(.9), mats.skin);
+        P2.collar = add(new T.TorusGeometry(1, .28, 6, 18), mats.trim);
+        P2.wrist = add(segGeo(1), mats.trim);
         P2.head = add(sph, mats.skin);
         P2.hair = add(new T.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * .55), mats.hair);
         P2.cap = add(new T.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI * .45), mats.cap);
@@ -2810,6 +2839,8 @@
             // neck and head
             const nk = V(k.neck), hd = V(k.head);
             seg(P2.neck, nk.clone().addScaledVector(Y, -.04 * F), hd, .045 * F);
+            basis(P2.collar, X, Z.clone().negate(), Y); P2.collar.position.copy(nk).addScaledVector(Y, -.035 * F); P2.collar.scale.setScalar(.06 * F * B);
+            { const el = V(k.armR.joint), wr = V(k.armR.end); seg(P2.wrist, wr.clone().lerp(el, .2), wr.clone().lerp(el, .06), .05 * F * B); }
             const r = .118 * F;
             [P2.head, P2.hair, P2.cap, P2.visor, P2.band].forEach(m => basis(m, X, Y, Z));
             P2.head.position.copy(hd); P2.head.scale.set(r * .92, r * 1.08, r);
@@ -2981,8 +3012,104 @@
         wallMat.color.set(V.wall);
         const seat = new T.Color(V.wall); seatMat.color.copy(seat).offsetHSL(0, -.1, .06); seatMat2.color.copy(seat).offsetHSL(0, -.1, .12);
         towers.visible = !!V.night;
+        scene.fog.color.set(V.night ? '#05070f' : '#c9dcf0'); scene.fog.near = V.night ? 22 : 70; scene.fog.far = V.night ? 75 : 230;
         sun.color.set(V.night ? '#e9efff' : '#fff1dc'); fill.intensity = V.night ? .25 : 0;
         ledShift = -1;
+      }
+      // ---- stage 4: officials in 3D, night atmosphere, replays, a lighter mode for slow devices ----
+      // seated officials: chair, body, head with a cap, one arm that rises to signal a call
+      function makeOfficial(x, y, seatZ, faceTo, shirt, scale, high) {
+        const g = new T.Group(); g.position.set(x, 0, y); g.rotation.y = Math.atan2(faceTo[0] - x, faceTo[1] - y); scene.add(g);
+        const m = (geo, color, px, py, pz, sx = 1, sy = 1, sz = 1) => { const o = new T.Mesh(geo, new T.MeshStandardMaterial({ color, roughness: .8 })); o.position.set(px, py, pz); o.scale.set(sx, sy, sz); o.castShadow = true; g.add(o); return o; };
+        const box = new T.BoxGeometry(1, 1, 1), cyl = new T.CylinderGeometry(1, 1, 1, 10), sph = new T.SphereGeometry(1, 14, 10);
+        if (high) { // the umpire's tall chair
+          [[-.32, -.25], [.32, -.25], [-.32, .25], [.32, .25]].forEach(([a, b]) => m(cyl, '#3a3f55', a, seatZ / 2, b, .035, seatZ, .035));
+          m(box, '#2b3150', 0, seatZ - .05, 0, .8, .1, .7); m(box, '#2b3150', 0, seatZ + .45, -.33, .8, .9, .08);
+          [.6, 1.2].forEach(z => m(box, '#3a3f55', 0, z, .3, .7, .04, .04));
+        } else { m(box, '#3a3f55', 0, seatZ / 2, 0, .42, seatZ, .42); }
+        const s = scale, skin = '#e0b48c';
+        m(box, shirt, 0, seatZ + .32 * s, -.04, .36 * s, .5 * s, .22 * s);                       // torso
+        m(box, '#2a2f45', 0, seatZ + .06 * s, .16 * s, .32 * s, .14 * s, .4 * s);                 // thighs
+        [-.09, .09].forEach(a => m(box, '#2a2f45', a * s, (seatZ - .02) / 2 + .05, .36 * s, .1 * s, seatZ - .02, .11 * s)); // shins
+        m(sph, skin, 0, seatZ + .7 * s, -.04, .11 * s, .13 * s, .11 * s);                         // head
+        m(sph, high ? '#cfd5e6' : '#f2f2f2', 0, seatZ + .76 * s, -.04, .115 * s, .07 * s, .115 * s); // cap
+        m(box, high ? '#cfd5e6' : '#f2f2f2', 0, seatZ + .74 * s, .08 * s, .14 * s, .02 * s, .12 * s); // visor
+        m(cyl, shirt, -.23 * s, seatZ + .3 * s, 0, .05 * s, .45 * s, .05 * s);                   // resting arm
+        const pivot = new T.Group(); pivot.position.set(.22 * s, seatZ + .52 * s, -.04); g.add(pivot);
+        const arm = new T.Mesh(cyl, new T.MeshStandardMaterial({ color: shirt, roughness: .8 })); arm.scale.set(.05 * s, .5 * s, .05 * s); arm.position.y = -.25 * s; arm.castShadow = true; pivot.add(arm);
+        return { group: g, pivot };
+      }
+      const umpire3 = makeOfficial(UMP.x, UMP.y, 1.9, [CX, NET_Y], '#1f2b55', 1.25, true);
+      const judges3 = judges.map(j => makeOfficial(j.x, j.y, .45, [CX, NET_Y], '#1f2b55', 1.05, false));
+      // night: a dark haze swallows the far stands while the court stays bright; by day a faint distance haze
+      scene.fog = new T.Fog(0xbfd6ee, 70, 230);
+      [backBoard.material, ...scene.children.filter(o => o.material && o.material.map === sideTex).map(o => o.material), lampMat].forEach(m => (m.fog = false));
+      // replays: remember the last couple of seconds of every body part and the ball, play them back slowly from the side
+      const recMeshes = [...bodies.player.group.children, ...bodies.cpu.group.children];
+      const REC_N = 200, STRIDE = 4 + recMeshes.length * 11, rec = new Float32Array(REC_N * STRIDE);
+      let recHead = 0, recCount = 0, replay = null;
+      const replayCam = new T.PerspectiveCamera(34, 1, .3, 300);
+      function record(now) {
+        let o = recHead * STRIDE;
+        rec[o++] = now; rec[o++] = ball.x; rec[o++] = ball.y; rec[o++] = ball.z;
+        for (const m of recMeshes) {
+          rec[o++] = m.position.x; rec[o++] = m.position.y; rec[o++] = m.position.z;
+          rec[o++] = m.quaternion.x; rec[o++] = m.quaternion.y; rec[o++] = m.quaternion.z; rec[o++] = m.quaternion.w;
+          rec[o++] = m.scale.x; rec[o++] = m.scale.y; rec[o++] = m.scale.z; rec[o++] = m.visible ? 1 : 0;
+        }
+        recHead = (recHead + 1) % REC_N; recCount = Math.min(recCount + 1, REC_N);
+      }
+      function applyRec(k) {
+        let o = k * STRIDE + 1;
+        const bx = rec[o++], by = rec[o++], bz = rec[o++];
+        for (const m of recMeshes) {
+          m.position.set(rec[o++], rec[o++], rec[o++]); m.quaternion.set(rec[o++], rec[o++], rec[o++], rec[o++]);
+          m.scale.set(rec[o++], rec[o++], rec[o++]); m.visible = rec[o++] > .5;
+        }
+        return [bx, by, bz];
+      }
+      const SLOW = .45;
+      function startReplay() {
+        if (recCount < 8) return 0;
+        const now = performance.now() / 1000, frames = [];
+        for (let i = recCount - 1; i >= 0; i--) { const k = (recHead - 1 - i + REC_N * 2) % REC_N; if (rec[k * STRIDE] >= now - 1.8) frames.push(k); }
+        if (frames.length < 5) return 0;
+        const t0 = rec[frames[0] * STRIDE], span = rec[frames[frames.length - 1] * STRIDE] - t0;
+        let my = 0; frames.forEach(k => (my += rec[k * STRIDE + 2])); my /= frames.length;
+        replay = { frames, t0, span, start: now, dur: span / SLOW, my, i: 0 };
+        return replay.dur + .2;
+      }
+      function replayFrame(now) {
+        const r = replay, e = now - r.start;
+        if (e >= r.dur) { replay = null; return false; }
+        const tr = r.t0 + e * SLOW;
+        while (r.i < r.frames.length - 1 && rec[r.frames[r.i + 1] * STRIDE] <= tr) r.i++;
+        const [bx, by, bz] = applyRec(r.frames[r.i]);
+        ballMesh.visible = true; ballMesh.scale.setScalar(1.6); ballMesh.position.set(bx, Math.max(.07, bz), by);
+        // a broadcast camera beside the court, drifting slowly along the play
+        const p = e / r.dur;
+        replayCam.aspect = W / H; replayCam.updateProjectionMatrix();
+        replayCam.fov = W < H ? 72 : 50; replayCam.position.set(-19 + p * 2, 9, NET_Y + 2 - p * 4); replayCam.lookAt(CX + 1, 0, NET_Y + (r.my - NET_Y) * .15); replayCam.updateProjectionMatrix();
+        renderer.render(scene, replayCam);
+        return true;
+      }
+      // lighter mode: lower resolution, no shadows from the people, half the crowd
+      let lite = false, fpsSamples = 0, fpsTime = 0;
+      try { lite = localStorage.getItem('bumpy3dLite') === '1'; } catch (e) {}
+      function applyLite() {
+        renderer.setPixelRatio(lite ? 1 : Math.min(devicePixelRatio || 1, 2)); renderer.setSize(W, H, false);
+        recMeshes.forEach(m => (m.castShadow = !lite));
+        fanBody.count = fanHead.count = lite ? Math.floor(fans.length / 2) : fans.length;
+        sun.shadow.mapSize.set(lite ? 512 : 1024, lite ? 512 : 1024); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+      }
+      applyLite();
+      function watchFps(dt) { // switch to the lighter mode by itself if the first seconds of play run slowly
+        if (lite || fpsSamples > 240 || !(state === 'rally' || state === 'serve')) return;
+        fpsSamples++; fpsTime += dt;
+        if (fpsSamples === 240 && fpsTime / 240 > 1 / 38) {
+          lite = true; applyLite(); popupAt(player.x, player.y, 3, '軽量モードに切り替えました', '#fff');
+          const box = $('lite3d'); if (box) box.checked = true;
+        }
       }
       let venueSet = null;
       function setVenue(V) {
@@ -3006,8 +3133,16 @@
       const bgCtx = bgCanvas.getContext('2d');
       return {
         bgCtx, resize: resizeGL,
-        frame() {
+        replaying: () => !!replay,
+        replay: startReplay,
+        stopReplay() { if (!replay) return 0; const left = replay.dur - (performance.now() / 1000 - replay.start); replay = null; return Math.max(0, left); },
+        setLite(v) { lite = v; try { localStorage.setItem('bumpy3dLite', v ? '1' : '0'); } catch (e) {} applyLite(); },
+        isLite: () => lite,
+        frame(dt = 1 / 60) {
           if (venueSet !== venue) setVenue(venue);
+          const nowR = performance.now() / 1000;
+          if (replay) { sprites.forEach(s => (s.mesh.visible = false)); moveFans(nowR); if (replayFrame(nowR)) return; }
+          watchFps(dt);
           // the ball: a little larger than life so it never shrinks below a few pixels
           ballMesh.visible = state !== 'menu';
           if (ballMesh.visible) {
@@ -3020,22 +3155,28 @@
           if (shift !== ledShift) { ledShift = shift; paintBoards(venue, shift); }
           moveFans(now);
           sprites.forEach(s => (s.mesh.visible = false));
-          sprite('ump', UMP.x, UMP.y + .02, 2.6, 3.4, drawUmpire);
-          judges.forEach((j, i) => sprite('j' + i, j.x, j.y, 1.6, 2.2, () => drawJudge(j)));
+          judges.forEach((j, i) => { judges3[i].pivot.rotation.x = j.call > 0 ? -2.4 : 0; });
           bodies.cpu.update(cpu, cpuKit, null);
           bodies.player.update(player, KIT_P, charge);
+          if (state !== 'menu') record(nowR);
           renderer.render(scene, camera);
         },
       };
     } catch (e) { console.warn('3D off:', e); return null; }
   }
   GL = initGL();
-  if (GL) { document.body.classList.add('gl3d'); GL.resize(); }
+  if (GL) {
+    document.body.classList.add('gl3d'); GL.resize();
+    $('liteRow').classList.remove('hidden'); $('lite3d').checked = GL.isLite();
+    $('lite3d').onchange = e => GL.setLite(e.target.checked);
+  }
 
+  let frameDt = 1 / 60;
   let lastT = performance.now();
   function loop(t) {
     const dt = Math.min(.04, (t - lastT) / 1000);
     lastT = t;
+    frameDt = dt;
     if (state !== 'menu' && state !== 'over') update(dt);
     else setMurmur(0);
     draw();

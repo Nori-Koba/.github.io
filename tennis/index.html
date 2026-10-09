@@ -337,47 +337,53 @@
     } catch (e) {}
   }
   // ---- hit and bounce sounds, synthesised sample by sample ----
-  // A real hit is not a ringing tone: a sharp contact click, the ball's short "pock" that dies within a few cycles,
-  // a low "thock" from the frame, an airy tail, and on spin shots the strings brushing up the ball.
-  function hitBuffer(power, kind) {
-    const sr = audio.sampleRate, n = Math.floor(sr * .16), b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
-    const j = 1 + (Math.random() - .5) * .1; // no two hits sound exactly alike
-    const f1 = (kind === 'flat' || kind === 'smash' ? 1180 : kind === 'slice' || kind === 'drop' ? 880 : 1020) * (1 - power * .12) * j;
-    const thump = kind === 'slice' || kind === 'drop' ? .3 : .75 + power * .55;
-    const brush = kind === 'slice' || kind === 'drop' ? .55 : kind === 'top' || kind === 'lob' ? .25 + power * .1 : .06;
-    const click = kind === 'flat' || kind === 'smash' ? 1.1 : .8;
-    let lp = 0, lp2 = 0, peak = 0;
-    for (let i = 0; i < n; i++) {
-      const t = i / sr, w = Math.random() * 2 - 1;
-      lp += (w - lp) * .22; lp2 += (w - lp2) * .6;
-      let v = w * Math.exp(-t / .0011) * click;                                    // contact click
-      v += Math.sin(6.2832 * f1 * t) * Math.exp(-t / .0055) * (.85 + .35 * lp);    // the pock: 5-6 cycles, not a ring
-      v += Math.sin(6.2832 * f1 * 2.27 * t) * Math.exp(-t / .0022) * .28;
-      v += Math.sin(6.2832 * 150 * j * t) * Math.exp(-t / .017) * thump * .65;     // frame thock
-      v += lp * Math.exp(-t / .028) * .3;                                          // air
-      v += (w - lp2) * brush * Math.exp(-t / .03) * (1 - Math.exp(-t / .003));     // strings brushing the ball
-      d[i] = v; peak = Math.max(peak, Math.abs(v));
+  // No pitched tones at all (those sound like an instrument): a real hit is a burst of noise -- a sharp crack,
+  // a short hollow "pock" band around 1 kHz, a dull low body, a quick airy tail, and on spin shots the strings
+  // brushing the ball. Each band is a resonant filter on white noise, so there is no note to hear.
+  function biquad(x, type, f0, Q, sr) {
+    const w = 2 * Math.PI * f0 / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * Q);
+    let b0, b1, b2;
+    if (type === 'bp') { b0 = al; b1 = 0; b2 = -al; }
+    else if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; }
+    else { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; }
+    const a0 = 1 + al, a1 = -2 * cs, a2 = 1 - al, y = new Float32Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const v = (b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+      x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
     }
-    for (let i = 0; i < n; i++) d[i] /= peak;
+    return y;
+  }
+  const noiseArr = (n, env) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = (Math.random() * 2 - 1) * env(i); return a; };
+  function mixToBuffer(n, layers) {
+    const sr = audio.sampleRate, b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < n; i++) { let v = 0; layers.forEach(([arr, g]) => (v += arr[i] * g)); d[i] = v; peak = Math.max(peak, Math.abs(v)); }
+    for (let i = 0; i < n; i++) d[i] /= peak || 1;
     return b;
   }
+  function hitBuffer(power, kind) {
+    const sr = audio.sampleRate, n = Math.floor(sr * .12), j = 1 + (Math.random() - .5) * .12;
+    const crisp = kind === 'flat' || kind === 'smash', soft = kind === 'slice' || kind === 'drop';
+    // the impact: a fast rise and a ~4 ms fall, with a faint 25 ms tail
+    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0003)) * (Math.exp(-t / (soft ? .0045 : .0035)) + .1 * Math.exp(-t / .025)); });
+    const pock = biquad(imp, 'bp', (soft ? 820 : crisp ? 1150 : 1000) * (1 - power * .1) * j, 1.1, sr);
+    const ring = biquad(imp, 'bp', 2700 * j, 1.4, sr);
+    const body = biquad(imp, 'lp', 420, .7, sr);
+    const crack = biquad(noiseArr(n, i => Math.exp(-i / sr / .0007)), 'hp', 3500, .7, sr);
+    const brushAmt = soft ? .5 : kind === 'top' || kind === 'lob' ? .25 + power * .1 : .05;
+    const brush = biquad(noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .003)) * Math.exp(-t / .03); }), 'hp', 2800, .7, sr);
+    return mixToBuffer(n, [[pock, 1], [ring, .35], [body, .55 + power * .4 - (soft ? .25 : 0)], [crack, crisp ? .9 : .55], [brush, brushAmt]]);
+  }
   function bounceBuffer(impact) {
-    const sr = audio.sampleRate, n = Math.floor(sr * .1), b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
-    const c = venue.clay ? { f: 210, tau: .006, click: .25, dust: .6, cut: .08 } : venue.grass ? { f: 170, tau: .005, click: .1, dust: .25, cut: .05 }
-      : { f: 260, tau: .01, click: .7, dust: .2, cut: .3 };
-    const j = 1 + (Math.random() - .5) * .1;
-    let lp = 0, peak = 0;
-    for (let i = 0; i < n; i++) {
-      const t = i / sr, w = Math.random() * 2 - 1;
-      lp += (w - lp) * c.cut;
-      let v = w * Math.exp(-t / .0009) * c.click;                                  // ball meets the court
-      v += Math.sin(6.2832 * c.f * j * t) * Math.exp(-t / c.tau);                  // dull "thup"
-      v += Math.sin(6.2832 * c.f * 3.1 * j * t) * Math.exp(-t / (c.tau * .4)) * .3;
-      v += lp * Math.exp(-t / .02) * c.dust * 3;                                   // clay spray / grass
-      d[i] = v; peak = Math.max(peak, Math.abs(v));
-    }
-    for (let i = 0; i < n; i++) d[i] /= peak;
-    return b;
+    const sr = audio.sampleRate, n = Math.floor(sr * .09);
+    const c = venue.clay ? { f: 520, dec: .006, crack: .1, grit: .55 } : venue.grass ? { f: 380, dec: .005, crack: .05, grit: .2 } : { f: 700, dec: .0045, crack: .45, grit: .12 };
+    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0004)) * Math.exp(-t / c.dec); });
+    const thud = biquad(imp, 'bp', c.f * (1 + (Math.random() - .5) * .1), .9, sr);
+    const low = biquad(imp, 'lp', 300, .7, sr);
+    const crack = biquad(noiseArr(n, i => Math.exp(-i / sr / .0006)), 'hp', 3000, .7, sr);
+    const grit = biquad(noiseArr(n, i => { const t = i / sr; return Math.exp(-t / .02); }), 'bp', 2200, .8, sr);
+    return mixToBuffer(n, [[thud, 1], [low, .6], [crack, c.crack], [grit, c.grit]]);
   }
   function playBuf(buf, vol, delay = 0, cutoff = 0) {
     const src = audio.createBufferSource(), g = audio.createGain(), t = audio.currentTime + delay;
