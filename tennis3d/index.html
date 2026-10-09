@@ -111,7 +111,7 @@
 
   <div class="overlay" id="menu">
     <div class="card">
-      <h2>🎾 Bumpy Tennis 3D <small style="font-size:13px;color:var(--sub)">開発中・段階 2</small></h2>
+      <h2>🎾 Bumpy Tennis 3D <small style="font-size:13px;color:var(--sub)">開発中・段階 3</small></h2>
       <p>CPU と 1 対 1 のテニス勝負！</p>
       <p style="margin:8px 0 4px"><b>会場</b></p>
       <div class="btns venues" style="margin-top:0">
@@ -1945,6 +1945,7 @@
         ctx.fillStyle = g; ctx.fillRect(u * W - 60, 0, 120, 70);
       });
     }
+    if (GL) return; // stands, walls and boards are 3D
     const t = performance.now() / 1000;
     crowd.forEach((c, i) => {
       if (i >= crowd.length * stage.fill) return;
@@ -2836,12 +2837,159 @@
         };
       }
       const bodies = { player: makeBody(), cpu: makeBody() };
+      // ---- stage 3: the stadium (walls, LED boards, stands full of fans, floodlights) and surface textures ----
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      const canvasTex = (w, h, paint, repeat) => {
+        const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
+        const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4;
+        if (repeat) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(...repeat); }
+        return t;
+      };
+      const speckle = (g, w, h, n, a, size = 2) => {
+        for (let i = 0; i < n; i++) { g.fillStyle = Math.random() < .5 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`; g.fillRect(Math.random() * w, Math.random() * h, size, size); }
+      };
+      // court surface, painted top-down over the doubles court (x across, y along the court)
+      const courtTex = {}, groundTex = {};
+      function surfaceFor(V) {
+        if (courtTex[V.key]) return;
+        const cw = CW + 2 * ALLEY;
+        courtTex[V.key] = canvasTex(512, 1024, (g, w, h) => {
+          if (V.grass) {
+            for (let y = 0; y < L; y += 1.6) { g.fillStyle = Math.floor(y / 1.6) % 2 ? '#469036' : '#4f9a3e'; g.fillRect(0, y / L * h, w, 1.6 / L * h + 1); }
+            [0, L].forEach(y => { // worn baselines
+              const gr = g.createRadialGradient(w / 2, y / L * h, 0, w / 2, y / L * h, 2.8 / cw * w);
+              gr.addColorStop(0, 'rgba(176,160,98,.85)'); gr.addColorStop(1, 'rgba(176,160,98,0)');
+              g.fillStyle = gr; g.fillRect(0, 0, w, h);
+            });
+            speckle(g, w, h, 9000, .05);
+          } else if (V.clay) {
+            g.fillStyle = V.court; g.fillRect(0, 0, w, h);
+            for (let i = 0; i < 1400; i++) { // brushed clay: long faint streaks across the court
+              g.strokeStyle = Math.random() < .5 ? 'rgba(255,220,190,.07)' : 'rgba(90,30,10,.07)'; g.lineWidth = rnd(1, 3);
+              const y = Math.random() * h; g.beginPath(); g.moveTo(rnd(-50, w), y); g.lineTo(rnd(0, w + 50), y + rnd(-2, 2)); g.stroke();
+            }
+            [0, L].forEach(y => { g.fillStyle = 'rgba(120,45,20,.12)'; g.beginPath(); g.ellipse(w / 2, y / L * h, w * .45, h * .05, 0, 0, 7); g.fill(); });
+            speckle(g, w, h, 14000, .08);
+          } else {
+            g.fillStyle = V.court; g.fillRect(0, 0, w, h);
+            speckle(g, w, h, 16000, .035, 1.5);
+            [0, L].forEach(y => { g.fillStyle = 'rgba(255,255,255,.05)'; g.beginPath(); g.ellipse(w / 2, y / L * h, w * .3, h * .045, 0, 0, 7); g.fill(); });
+          }
+        });
+        groundTex[V.key] = canvasTex(256, 256, (g, w, h) => {
+          if (V.grass) { g.fillStyle = '#4f9a3e'; g.fillRect(0, 0, w, h / 2); g.fillStyle = '#469036'; g.fillRect(0, h / 2, w, h / 2); speckle(g, w, h, 3000, .05); }
+          else { g.fillStyle = V.outer; g.fillRect(0, 0, w, h); speckle(g, w, h, V.clay ? 5000 : 3000, V.clay ? .08 : .035, 1.5); }
+        }, V.grass ? [1, gLen / 3.2] : [22, 22 * gLen / 90]);
+      }
+      // walls with LED boards: the back wall carries the event banner in the middle
+      const backX0 = -15, backX1 = CW + 15;
+      const ledCanvas = document.createElement('canvas'); ledCanvas.width = 4096; ledCanvas.height = 160;
+      const ledTex = new T.CanvasTexture(ledCanvas); ledTex.colorSpace = T.SRGBColorSpace; ledTex.anisotropy = 4;
+      const sideCanvas = document.createElement('canvas'); sideCanvas.width = 2048; sideCanvas.height = 64;
+      const sideTex = new T.CanvasTexture(sideCanvas); sideTex.colorSpace = T.SRGBColorSpace; sideTex.anisotropy = 4;
+      let ledShift = -1;
+      function paintBoards(V, shift) {
+        const g = ledCanvas.getContext('2d'), w = ledCanvas.width, h = ledCanvas.height, mx = x => (x - backX0) / (backX1 - backX0) * w;
+        g.fillStyle = V.wall; g.fillRect(0, 0, w, h);
+        for (let k = 0, x = -15; x < CW + 15; x += 5.2, k++) {
+          if (x + 5 > CX - 3.2 && x < CX + 3.2) continue;
+          const [name, col] = SPONSORS[(k + shift) % SPONSORS.length], a = mx(x), b = mx(x + 5);
+          g.fillStyle = col; g.fillRect(a, 8, b - a, h - 16);
+          g.fillStyle = '#fff'; g.font = `bold ${Math.min(70, (b - a) * .9 / (name.length * .6))}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillText(name, (a + b) / 2, h / 2 + 2);
+        }
+        g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(mx(CX - 3.2), 20, mx(CX + 3.2) - mx(CX - 3.2), h - 40);
+        g.fillStyle = 'rgba(255,255,255,.95)'; g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(V.banner, mx(CX), h / 2 + 2);
+        ledTex.needsUpdate = true;
+        const s = sideCanvas.getContext('2d'), sw = sideCanvas.width, sh = sideCanvas.height, n = 8;
+        for (let k = 0; k < n; k++) {
+          const [name, col] = SPONSORS[(k + 3 + shift) % SPONSORS.length];
+          s.fillStyle = col; s.fillRect(k * sw / n + 2, 2, sw / n - 4, sh - 4);
+          s.fillStyle = '#fff'; s.font = `bold ${Math.min(40, (sw / n) * .9 / (name.length * .6))}px system-ui, sans-serif`; s.textAlign = 'center'; s.textBaseline = 'middle';
+          s.fillText(name, (k + .5) * sw / n, sh / 2 + 1);
+        }
+        sideTex.needsUpdate = true;
+      }
+      const wallMat = new T.MeshLambertMaterial({ color: 0x17407a });
+      const backWall = new T.Mesh(new T.BoxGeometry(70, 2.2, .3), wallMat); backWall.position.set(CX, 1.1, -8.15); scene.add(backWall);
+      const backBoard = new T.Mesh(new T.PlaneGeometry(backX1 - backX0, 1.75), new T.MeshBasicMaterial({ map: ledTex, toneMapped: false }));
+      backBoard.position.set((backX0 + backX1) / 2, 1.07, -7.99); scene.add(backBoard);
+      [-ALLEY - 4, CW + ALLEY + 4].forEach((x, i) => {
+        const len = L + 9, m = new T.Mesh(new T.PlaneGeometry(len, .9), new T.MeshBasicMaterial({ map: sideTex, toneMapped: false, side: T.DoubleSide }));
+        m.rotation.y = i ? -Math.PI / 2 : Math.PI / 2; m.position.set(x, .45, -6 + len / 2); scene.add(m);
+        const wall = new T.Mesh(new T.BoxGeometry(.3, 1.2, len + 2), wallMat); wall.position.set(x + (i ? .2 : -.2), .6, -6 + len / 2); scene.add(wall);
+      });
+      // stands: stepped tiers behind the back wall and along both sides, seats in the venue colour, fans on them
+      const seatMat = new T.MeshLambertMaterial({ color: 0x23395d }), seatMat2 = new T.MeshLambertMaterial({ color: 0x2c4672 });
+      const fans = [];
+      const tier = (cx, cy, z, w, d, along, k) => {
+        const m = new T.Mesh(new T.BoxGeometry(along === 'x' ? w : d, z, along === 'x' ? d : w), k % 2 ? seatMat : seatMat2);
+        m.position.set(cx, z / 2, cy); scene.add(m);
+      };
+      for (let k = 0; k < 14; k++) { // back stand
+        const y = -8.75 - k * .9, z = 2.4 + k * .48;
+        tier(CX + 4, y, z, 64, .9, 'x', k);
+        for (let x = CX - 27.5; x < CX + 35.5; x += .58) fans.push([x + rnd(-.08, .08), y + .1, z, Math.PI]);
+      }
+      [-1, 1].forEach(side => { // side stands, rising away from the court
+        for (let k = 0; k < 9; k++) {
+          const x = side < 0 ? -ALLEY - 5.2 - k * .9 : CW + ALLEY + 5.2 + k * .9, z = 1.3 + k * .48;
+          tier(x, NET_Y + 2, z, L + 22, .9, 'y', k);
+          for (let y = -8.5; y < L + 12; y += .58) fans.push([x + rnd(-.08, .08), y + rnd(-.08, .08), z, side < 0 ? Math.PI / 2 : -Math.PI / 2]);
+        }
+      });
+      const bodyGeo = new T.BoxGeometry(.42, .55, .3), headGeo = new T.SphereGeometry(.12, 8, 6);
+      const fanBody = new T.InstancedMesh(bodyGeo, new T.MeshLambertMaterial(), fans.length);
+      const fanHead = new T.InstancedMesh(headGeo, new T.MeshLambertMaterial(), fans.length);
+      const shirtCols = ['#ff5d73', '#ffd166', '#06d6a0', '#118ab2', '#f4f1de', '#ef8354', '#a78bfa', '#ffffff', '#2b2d42', '#e63946'];
+      const skinCols = ['#f3d2b5', '#e8b98f', '#c68a5a', '#9a6340', '#6b4428'];
+      const col = new T.Color(), mtx = new T.Matrix4(), q = new T.Quaternion(), v = new T.Vector3(), one = new T.Vector3(1, 1, 1);
+      fans.forEach((f, i) => {
+        f.push(Math.random(), Math.random() * 6.28); // seat-taken threshold, phase
+        fanBody.setColorAt(i, col.set(shirtCols[Math.floor(Math.random() * shirtCols.length)]));
+        fanHead.setColorAt(i, col.set(skinCols[Math.floor(Math.random() * skinCols.length)]));
+      });
+      scene.add(fanBody, fanHead);
+      let fillSet = -1;
+      function moveFans(t) {
+        const cheerK = Math.min(1, cheer), waving = rally > 4;
+        fans.forEach((f, i) => {
+          const [x, y, z, rot, here, ph] = f;
+          if (here > stage.fill) { mtx.makeScale(0, 0, 0); fanBody.setMatrixAt(i, mtx); fanHead.setMatrixAt(i, mtx); return; }
+          const jump = cheerK ? Math.abs(Math.sin(t * 13 + ph)) * .35 * cheerK : waving ? Math.sin(t * 9 + ph) * .03 : 0;
+          q.setFromAxisAngle(UP, rot);
+          mtx.compose(v.set(x, z + .28 + jump, y), q, one); fanBody.setMatrixAt(i, mtx);
+          mtx.compose(v.set(x, z + .68 + jump, y), q, one); fanHead.setMatrixAt(i, mtx);
+        });
+        fanBody.instanceMatrix.needsUpdate = fanHead.instanceMatrix.needsUpdate = true;
+      }
+      // floodlight towers (lit at night)
+      const towers = new T.Group(); scene.add(towers);
+      const lampMat = new T.MeshBasicMaterial({ color: 0xffffee, toneMapped: false });
+      const glowTex = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(255,255,235,1)'); r.addColorStop(1, 'rgba(255,255,235,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+      [[-16, -14], [CW + 16, -14], [-16, L + 4], [CW + 16, L + 4]].forEach(([x, y]) => {
+        const pole = new T.Mesh(new T.CylinderGeometry(.25, .35, 26, 8), new T.MeshLambertMaterial({ color: 0x555b66 })); pole.position.set(x, 13, y); towers.add(pole);
+        const lamp = new T.Mesh(new T.BoxGeometry(4, 2.2, .5), lampMat); lamp.position.set(x, 26, y); lamp.lookAt(CX, 0, NET_Y); towers.add(lamp);
+        const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); glow.scale.set(14, 14, 1); glow.position.set(x, 26, y); towers.add(glow);
+      });
+      const fill = new T.AmbientLight(0xffffff, 0); scene.add(fill);
+      function stadiumFor(V) {
+        surfaceFor(V);
+        court.material.map = courtTex[V.key]; court.material.color.set('#ffffff'); court.material.needsUpdate = true; court.visible = true;
+        ground.material.map = groundTex[V.key]; ground.material.color.set('#ffffff'); ground.material.needsUpdate = true;
+        stripes.visible = false;
+        wallMat.color.set(V.wall);
+        const seat = new T.Color(V.wall); seatMat.color.copy(seat).offsetHSL(0, -.1, .06); seatMat2.color.copy(seat).offsetHSL(0, -.1, .12);
+        towers.visible = !!V.night;
+        sun.color.set(V.night ? '#e9efff' : '#fff1dc'); fill.intensity = V.night ? .25 : 0;
+        ledShift = -1;
+      }
       let venueSet = null;
       function setVenue(V) {
         venueSet = V;
         ground.material.color.set(V.outer); court.material.color.set(V.court); lineMat.color.set(V.line);
         court.visible = !V.grass; stripes.visible = !!V.grass;
-        if (V.grass) ground.material.color.set('#4f9a3e');
+        stadiumFor(V);
         hemi.intensity = V.night ? .75 : .95; sun.intensity = V.night ? .8 : 1.15;
         hemi.color.set(V.night ? '#dfe6ff' : '#ffffff');
       }
@@ -2868,6 +3016,9 @@
             ballMesh.position.set(ball.x, Math.max(.07, ball.z), ball.y);
             ballMesh.rotation.x += ball.spin * .002;
           }
+          const now = performance.now() / 1000, shift = Math.floor(now / 5);
+          if (shift !== ledShift) { ledShift = shift; paintBoards(venue, shift); }
+          moveFans(now);
           sprites.forEach(s => (s.mesh.visible = false));
           sprite('ump', UMP.x, UMP.y + .02, 2.6, 3.4, drawUmpire);
           judges.forEach((j, i) => sprite('j' + i, j.x, j.y, 1.6, 2.2, () => drawJudge(j)));
