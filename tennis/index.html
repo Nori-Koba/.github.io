@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -111,6 +111,7 @@
 
   <div class="overlay" id="menu">
     <div class="card">
+      <div class="btns" style="margin:0 0 6px"><button class="pick" data-lang="id">🇮🇩 Indonesia</button><button class="pick" data-lang="ja">🇯🇵 日本語</button></div>
       <h2>🎾 Mang Kobay Tennis</h2>
       <p>CPU と 1 対 1 のテニス勝負！</p>
       <p style="margin:8px 0 4px"><b>会場</b></p>
@@ -192,6 +193,24 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script>
 (() => {
+  // ---------- language: Indonesian by default, Japanese on request ----------
+  let LANG = 'id';
+  try { LANG = localStorage.getItem('bumpyLang') || 'id'; } catch (e) {}
+  const TL = (ja, id) => (LANG === 'id' ? id : ja);
+  const HTML_ID = {"あなた": "Kamu", "パワースピン": "Power spin", "スライス": "Slice", "ロブ": "Lob", "ドロップ": "Drop shot", "フラット": "Flat", "トップスピン": "Topspin", "CPU と 1 対 1 のテニス勝負！": "Tanding tenis satu lawan satu melawan CPU!", "会場": "Arena", "メルボルン": "Melbourne", "ハード": "Keras", "パリ": "Paris", "クレー": "Tanah liat", "ロンドン": "London", "芝": "Rumput", "ニューヨーク": "New York", "ハード・夜": "Keras · malam", "試合形式": "Format pertandingan", "1 セット": "1 set", "6 ゲーム先取・6-6 でタイブレーク": "Pertama ke 6 game · tie-break di 6-6", "ショート": "Singkat", "3 ゲーム先取": "Pertama ke 3 game", "あなた：": "Kamu: ", "パワースピン型": "tipe power spin", "（重いトップスピンが大きく落ちて跳ねる）": " (topspin berat yang menukik tajam lalu memantul tinggi)", "スライス型": "tipe slice", "（基本はトップスピン、速い球と低く滑るスライスを多めに混ぜる）": " (dasarnya topspin, dicampur banyak bola cepat dan slice rendah yang meluncur)", "移動": "Bergerak", "マウス / 矢印キー": "Mouse / tombol panah", "指でドラッグ": "Geser dengan jari", "パワーと狙い": "Tenaga & arah", "：ショットのボタンを": ": tekan dan ", "長押し": "tahan", "でためて、離して打つ（ボールが届けば自動で打つ）。": " tombol pukulan untuk mengisi tenaga, lalu lepaskan untuk memukul (otomatis memukul kalau bola terjangkau). ", "ためている間に狙いを決める": "Tentukan arah selagi mengisi tenaga", "：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。": ": dengan tombol, ke kotak arah yang ditekan (←→ kiri/kanan, ↑ dalam, ↓ sudut pendek); dengan mouse, tunjuk titik di lapangan lawan; dengan jari, usap ke arah tujuan. Sementara itu pemain otomatis mendekati bola. Makin keras pukulan, makin mudah out.", "打てる範囲": "Jangkauan pukulan", "：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝": ": hanya bola di dalam lingkaran di kakimu yang bisa dipukul. Topspin (oranye) sempit, slice (garis putus biru) lebar. Titik pukul ada 3 tingkat: bagian dalam = ", "ナイスショット": "pukulan bagus", "、真ん中＝普通、ふちギリギリ＝": ", tengah = biasa, paling pinggir = ", "ミスヒットか、ふわっと浮いたチャンスボール": "mishit atau bola melambung yang jadi peluang lawan", "（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球（光る輪）は決めどころ！ 高ければ": " (dan kamu tergelincir sehingga telat kembali). Bola melambung dari CPU yang kepepet (cincin bercahaya) adalah kesempatanmu! Kalau tinggi, ", "スマッシュ": "smash", "、腰〜肩の高さならコート後方から": "; kalau setinggi pinggang–bahu, dari belakang lapangan bisa ", "ドライブボレー": "drive volley", "（トップスピン / フラット）でノーバウンドで叩ける。": " (topspin / flat) sebelum memantul.", "サーブ": "Servis", "：1 回押してトス → 球種のボタンを": ": tekan sekali untuk melambungkan bola → lalu ", "でパワーをためて、ボールが": " tombol jenis pukulan untuk mengisi tenaga, dan lepaskan saat bola ", "一番高いところで離す": "di titik tertinggi", "。ためすぎるとボールが落ちてタイミングがずれる。": ". Kalau terlalu lama, bola turun dan timing meleset. ", "ファースト": "Servis pertama", "はフラット（最速 約210km/h）かスライス（約170km/h、左へ曲がって滑る）。": ": flat (tercepat ±210 km/h) atau slice (±170 km/h, melengkung ke kiri dan meluncur). ", "セカンド": "Servis kedua", "は必ずスピン（キック）サーブ：ネットを安全に越えて沈み、跳ね上がってぐっと前に伸びる。ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！": " selalu servis spin (kick): melewati net dengan aman, menukik, lalu memantul naik dan melaju ke depan. Hampir pasti masuk. Makin cepat servis, makin telat reaksi lawan — masuk ke pojok, ace!", "Z・J・スペース・左クリック": "Z · J · Spasi · klik kiri", "ネットを安全に越えて急に落ち、肩の高さまで跳ね上がる": "Melewati net dengan aman, menukik tajam, memantul setinggi bahu", "X・K・右クリック": "X · K · klik kanan", "まっすぐ低く滑る。サーブなら左に曲がる": "Meluncur lurus dan rendah. Saat servis melengkung ke kiri", "C・L・ホイールクリック": "C · L · klik roda", "一番速い。でもミスしやすい": "Paling cepat, tapi mudah salah", "S・I・Shift+左クリック": "S · I · Shift+klik kiri", "高く上げて前に出た相手の頭を越す": "Melambung tinggi melewati lawan yang maju ke net", "D・O・Shift+右クリック": "D · O · Shift+klik kanan", "ネット際にポトリ。後ろの相手に効く": "Jatuh pelan dekat net. Ampuh untuk lawan yang di belakang", "球種の使い分け": "Memilih jenis pukulan", "・低く弾んだ球はスライスで返すと安全（フラットやトップは持ち上げにくい）": "• Bola yang memantul rendah lebih aman dikembalikan dengan slice (flat dan topspin sulit diangkat)", "・高く跳ねた球はトップスピンで。腰の高さの打ちごろの球はフラットで強打！": "• Bola yang memantul tinggi pakai topspin. Bola setinggi pinggang yang enak dipukul, hajar dengan flat!", "・同じ球種ばかりだと CPU に": "• Kalau terus memakai pukulan yang sama, CPU akan ", "読まれる": "membacanya", "。3 種類続けて打ち分けると CPU が": ". Kalau berganti 3 jenis pukulan berturut-turut, CPU jadi ", "揺さぶられて": "goyah", "崩れる": " dan berantakan", "コツ": "Tips", "：ショットのボタンを長押しすると、ボールの打ちやすい所（ボレー・スマッシュの位置やバウンド後の頂点）へ自動で走る。ノーバウンドの高い球はスマッシュ：地面の": ": tahan tombol pukulan dan pemain otomatis lari ke titik yang enak (posisi voli/smash atau puncak pantulan). Bola tinggi yang belum memantul bisa di-smash: tunggu di ", "赤い印": "tanda merah", "の所で待つと頭上の打ちやすい高さに落ちてくる。ボールが赤く光って「今!」が出たら打てる。練習モードで球出し練習もできる。": " di tanah, bola akan turun ke ketinggian yang pas di atas kepala. Pukul saat bola menyala merah dan muncul \"Sekarang!\". Ada juga mode latihan dengan bola umpan.", "オートスイング（ボタンを押していなくても自動で打つ）": "Ayunan otomatis (memukul sendiri meski tombol tidak ditekan)", "軽量モード（3D が重いとき。遅い端末では自動で ON）": "Mode ringan (kalau 3D berat; aktif otomatis di perangkat lambat)", "名場面リプレイ（長いラリー・大事なポイント・豪快なエースのときだけ）": "Replay momen terbaik (hanya reli panjang, poin penting, atau ace dahsyat)", "2D 表示にする（いちばん軽い。古い端末向け）": "Tampilan 2D (paling ringan, untuk perangkat lama)", "相手の強さを選んでスタート": "Pilih tingkat lawan lalu mulai", "やさしい": "Mudah", "ふつう": "Normal", "つよい": "Sulit", "最強": "Terkuat", "🏆 トーナメント": "🏆 Turnamen", "（128 人のグランドスラム・あなたは第 1 シード）": " (Grand Slam 128 pemain · kamu unggulan 1)", "全 7 試合・1 セット（6-6 でタイブレーク）。会場は上で選んだもの。ほかの試合は AI がシミュレーション": "7 pertandingan · 1 set (tie-break di 6-6). Arena sesuai pilihan di atas. Pertandingan lain disimulasikan AI", "新しく始める": "Mulai baru", "つづきから": "Lanjutkan", "練習モード": "Mode latihan", "（CPU が球出し）": " (CPU mengumpan bola)", "ストローク": "Groundstroke", "ボレー": "Voli", "ドロップ拾い": "Kejar drop shot", "チャンスボール": "Bola peluang", "ランダム": "Acak", "🎉 Bumpy Party! であそぶ": "🎉 Main Bumpy Party!", "もう一回": "Main lagi", "トーナメント表へ": "Ke bagan turnamen", "メニュー": "Menu", "@title:メニューへ": "Ke menu", "@title:サウンド": "Suara", "@title:ホームへ": "Beranda"};
+  document.documentElement.lang = LANG;
+  if (LANG === 'id') { // translate the page's own text in place (keeping the elements and their handlers)
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) {
+      const n = w.currentNode, t = n.nodeValue.trim(), tr = HTML_ID[t];
+      if (tr !== undefined) n.nodeValue = n.nodeValue.replace(t, tr);
+    }
+    document.querySelectorAll('[title]').forEach(e => { const tr = HTML_ID['@title:' + e.title]; if (tr) e.title = tr; });
+  }
+  document.querySelectorAll('[data-lang]').forEach(b => {
+    b.classList.toggle('on', b.dataset.lang === LANG);
+    b.onclick = () => { try { localStorage.setItem('bumpyLang', b.dataset.lang); } catch (e) {} location.reload(); };
+  });
   // ---------- court (meters) ----------
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16;
@@ -218,42 +237,42 @@
   // bz / bh: how much height / forward speed survives the bounce
   // margin: how far above the net tape the shot aims to pass
   const SHOTS = {
-    top:   { name: 'トップスピン', color: '#ff9f43', mg: .011, bz: .62, bh: .96, margin: .35, speed: [29, 41], err: .8 },
-    slice: { name: 'スライス',     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
-    flat:  { name: 'フラット',     color: '#f1f1f1', mg: .006, bz: .7, bh: .82, margin: .12, speed: [31, 54], err: 1.1 },
-    lob:   { name: 'ロブ',         color: '#c77dff', mg: .012, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
-    drop:  { name: 'ドロップ',     color: '#80ed99', mg: -.005, bz: .62, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
+    top:   { name: TL('トップスピン', 'Topspin'), color: '#ff9f43', mg: .011, bz: .62, bh: .96, margin: .35, speed: [29, 41], err: .8 },
+    slice: { name: TL('スライス', 'Slice'),     color: '#4cc9f0', mg: -.0045, bz: .55, bh: .8, margin: .3,  speed: [21, 29], err: .7, curve: 3 },
+    flat:  { name: TL('フラット', 'Flat'),     color: '#f1f1f1', mg: .006, bz: .7, bh: .82, margin: .12, speed: [31, 54], err: 1.1 },
+    lob:   { name: TL('ロブ', 'Lob'),         color: '#c77dff', mg: .012, bz: .75, bh: .7,  margin: 1.5, speed: [0, 0],   err: .6 },
+    drop:  { name: TL('ドロップ', 'Drop shot'),     color: '#80ed99', mg: -.005, bz: .62, bh: .45, margin: .25, speed: [0, 0],  err: .9 },
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { mg: .018, bz: .70, bh: .86, margin: .35, speed: [32, 45] } },
-    C: { name: 'スライス型',
+    P: { name: TL('パワースピン型', 'tipe power spin'), top: { mg: .018, bz: .70, bh: .86, margin: .35, speed: [32, 45] } },
+    C: { name: TL('スライス型', 'tipe slice'),
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
          flat:  { speed: [31, 52] },
          top:   { speed: [30, 44] } },
   };
   const styled = (type, who) => ({ ...SHOTS[type], ...((who && STYLE[who][type]) || {}) });
   const LEVELS = {
-    easy:   { name: 'やさしい', speed: 4,   react: .32, reach: 1,    err: .15, power: [.3, .65], noise: .8,  serve: [.45, .9],
+    easy:   { name: TL('やさしい', 'Mudah'), speed: 4,   react: .32, reach: 1,    err: .15, power: [.3, .65], noise: .8,  serve: [.45, .9],
               mix: { top: 6, slice: 3, flat: 1 }, tactic: .2, aim: .15 },
-    normal: { name: 'ふつう',   speed: 5.1, react: .22, reach: 1.1,  err: .06, power: [.45, .8], noise: .5,  serve: [.55, 1],
+    normal: { name: TL('ふつう', 'Normal'),   speed: 5.1, react: .22, reach: 1.1,  err: .06, power: [.45, .8], noise: .5,  serve: [.55, 1],
               mix: { top: 8, slice: 2.5, flat: 1.5 }, tactic: .4, aim: .4 },
-    hard:   { name: 'つよい',   speed: 6.1, react: .13, reach: 1.25, err: .03, power: [.65, 1],  noise: .25, serve: [.7, 1],
+    hard:   { name: TL('つよい', 'Sulit'),   speed: 6.1, react: .13, reach: 1.25, err: .03, power: [.65, 1],  noise: .25, serve: [.7, 1],
               mix: { top: 8, slice: 2, flat: 2 }, tactic: .6, aim: .7 },
   };
 
   // Venues modelled on the four majors' surfaces. bz / bh scale how high / how fast the ball comes off the court.
   const VENUES = {
-    mel: { name: 'メルボルン', surf: 'ハード', banner: 'NORI OPEN · MELBOURNE', court: '#2f6fc4', outer: '#4f9ee2', wall: '#17407a',
+    mel: { name: 'Melbourne', surf: TL('ハード', 'Keras'), nameJa: 'メルボルン', banner: 'NORI OPEN · MELBOURNE', court: '#2f6fc4', outer: '#4f9ee2', wall: '#17407a',
            sky: ['#0f2a55', '#3a6fb0'], line: '#ffffff', bz: 1, bh: 1, dust: '215,225,245', slide: 16 },
-    par: { name: 'パリ', surf: 'クレー', banner: 'NORI OPEN · PARIS', court: '#c8643a', outer: '#bf5d35', wall: '#1d5a3a',
+    par: { name: 'Paris', surf: TL('クレー', 'Tanah liat'), nameJa: 'パリ', banner: 'NORI OPEN · PARIS', court: '#c8643a', outer: '#bf5d35', wall: '#1d5a3a',
            sky: ['#4a7fb8', '#a9cbe8'], line: '#f6f0e4', bz: 1.12, bh: .86, dust: '205,115,65', slide: 9, clay: true },
-    lon: { name: 'ロンドン', surf: '芝', banner: 'NORI OPEN · LONDON', court: '#4f9a3e', outer: '#4a9339', wall: '#12422a',
+    lon: { name: 'London', surf: TL('芝', 'Rumput'), nameJa: 'ロンドン', banner: 'NORI OPEN · LONDON', court: '#4f9a3e', outer: '#4a9339', wall: '#12422a',
            sky: ['#5d84b8', '#cfe0f0'], line: '#ffffff', bz: .8, bh: 1.08, dust: '140,180,100', slide: 14, grass: true },
-    ny:  { name: 'ニューヨーク', surf: 'ハード', banner: 'NORI OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
+    ny:  { name: 'New York', surf: TL('ハード', 'Keras'), nameJa: 'ニューヨーク', banner: 'NORI OPEN · NEW YORK', court: '#3d63b8', outer: '#3f7f56', wall: '#0e1f36',
            sky: ['#04060d', '#151d33'], line: '#ffffff', bz: .97, bh: 1.04, dust: '215,225,245', slide: 16, night: true },
   };
-  for (const k in VENUES) VENUES[k].key = k;
+  for (const k in VENUES) { VENUES[k].key = k; if (LANG === 'ja') VENUES[k].name = VENUES[k].nameJa; }
   let venue = VENUES.mel, format = 'set';
   // the match setting: how full the stands are (the tournament's early rounds are on outside courts)
   let stage = { fill: 1 };
@@ -585,9 +604,9 @@
   const winsSetNext = i => { if (!winsGameNext(i)) return false; if (tb) return true; games[i]++; const w = setWon(i); games[i]--; return w; };
   // the label for the next point (match point / break point), or ''
   function bigPoint() {
-    for (const i of [0, 1]) if (winsSetNext(i)) return i === 0 ? 'マッチポイント（あなた）' : 'マッチポイント（CPU）';
+    for (const i of [0, 1]) if (winsSetNext(i)) return i === 0 ? TL('マッチポイント（あなた）', 'Match point (kamu)') : TL('マッチポイント（CPU）', 'Match point (CPU)');
     const recv = other(server()), ri = recv === 'P' ? 0 : 1;
-    if (!tb && winsGameNext(ri)) return recv === 'P' ? 'ブレークポイント!' : 'ブレークポイント（CPU）';
+    if (!tb && winsGameNext(ri)) return recv === 'P' ? TL('ブレークポイント!', 'Break point!') : TL('ブレークポイント（CPU）', 'Break point (CPU)');
     return '';
   }
   const deuce = () => (pts[0] + pts[1]) % 2 === 0;
@@ -779,10 +798,10 @@
     startAnim(s, 'serve', type, .32);
     (who === 'P' ? cpu : player).hop = HOP;
     sHit(power, type === 'top' ? 'top' : 'flat', who === 'C');
-    popupAt(s.x, s.y, 2.6, `${sh.name}サーブ ${kmh}km/h`, sh.color);
+    popupAt(s.x, s.y, 2.6, TL(`${sh.name}サーブ ${kmh}km/h`, `Servis ${sh.name.toLowerCase()} ${kmh}km/h`), sh.color);
     if (who === 'P') {
       maxSpeed = Math.max(maxSpeed, kmh);
-      const t = q > .85 ? (power >= 1 ? 'ジャスト! MAX!' : 'ジャスト!') : q < .35 ? 'タイミングずれ…' : '';
+      const t = q > .85 ? (power >= 1 ? TL('ジャスト! MAX!', 'Pas! MAX!') : TL('ジャスト!', 'Pas!')) : q < .35 ? TL('タイミングずれ…', 'Timing meleset…') : '';
       popupAt(player.x, player.y, 3.2, t, q > .85 ? '#e8ff3a' : '#fff');
       cpu.plan = null; cpu.react = lv.react + SERVE_RETURN.react() * (Q('ret') ? .4 : 1);
     }
@@ -855,9 +874,9 @@
     let err = (1 - q) * 1.6 + power * power * sh.err * .9 + .3 * Math.abs(player.aimX) + .25 * Math.max(0, player.aimD), speedMul = 1, note = '';
     // the height you meet the ball at decides which shot is safe
     if (!smash && ball.bounces === 1) {
-      if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += type === 'top' ? .3 : .6; speedMul = .85; note = type === 'top' ? '' : '低い球はスライスで!'; }
-      else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = '高い球はトップスピンで!'; }
-      else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = '打ちごろ! 強打!'; }
+      if (ball.z < .45 && (type === 'flat' || type === 'top')) { err += type === 'top' ? .3 : .6; speedMul = .85; note = type === 'top' ? '' : TL('低い球はスライスで!', 'Bola rendah pakai slice!'); }
+      else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = TL('高い球はトップスピンで!', 'Bola tinggi pakai topspin!'); }
+      else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = TL('打ちごろ! 強打!', 'Bola empuk! Hajar!'); }
     }
     // returning a big serve you can only block it back: shorter, slower, through the middle
     const block = ball.serve && !smash ? clamp(.2 + serveHurry() + (ball.type === 'top' ? .15 : 0), 0, 1) : 0; // fast, or kicking up high
@@ -873,7 +892,7 @@
       opts = { angle: .32 + rand(0, .06), noClear: q < .35 };
     } else {
       ty = (smash ? goal.y + rand(-1, 2.5) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
-      if (block) { tx = lerp(tx, CX, .45 * block); ty += block * rand(1.5, 4.5); if (block > .5) note = note || 'ブロックリターン'; }
+      if (block) { tx = lerp(tx, CX, .45 * block); ty += block * rand(1.5, 4.5); if (block > .5) note = note || TL('ブロックリターン', 'Return blok'); }
       if (drive) speedMul *= 1.12;
       const speed = smash ? 37 + power * 9 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
@@ -892,14 +911,14 @@
     ball.shotKmh = kmh;
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
     sHit(smash ? 1 : power, smash ? 'smash' : type);
-    const label = smash ? 'スマッシュ!' : sh.name;
+    const label = smash ? TL('スマッシュ!', 'Smash!') : sh.name;
     popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
     ball.chance = scramble && !mishit; // your floater is now a sitter for the CPU
-    if (chance && (smash || drive)) popupAt(player.x, player.y, 3.6, smash ? '叩き込んだ!' : 'ドライブボレー!', '#ff5d73');
-    else if (drive) popupAt(player.x, player.y, 3.6, 'ドライブボレー!', '#ff9f43');
-    if (grade === 'nice' && !smash) popupAt(player.x, player.y, 3.1, 'ナイスショット!', '#e8ff3a');
-    else if (mishit) popupAt(player.x, player.y, 3.1, 'ミスヒット…', '#fff');
-    else if (scramble) popupAt(player.x, player.y, 3.1, 'なんとか返球…', '#9ad');
+    if (chance && (smash || drive)) popupAt(player.x, player.y, 3.6, smash ? TL('叩き込んだ!', 'Dihantam!') : TL('ドライブボレー!', 'Drive volley!'), '#ff5d73');
+    else if (drive) popupAt(player.x, player.y, 3.6, TL('ドライブボレー!', 'Drive volley!'), '#ff9f43');
+    if (grade === 'nice' && !smash) popupAt(player.x, player.y, 3.1, TL('ナイスショット!', 'Pukulan bagus!'), '#e8ff3a');
+    else if (mishit) popupAt(player.x, player.y, 3.1, TL('ミスヒット…', 'Mishit…'), '#fff');
+    else if (scramble) popupAt(player.x, player.y, 3.1, TL('なんとか返球…', 'Nyaris terkejar…'), '#9ad');
     if (note) popupAt(player.x, player.y, 3.6, note, '#fff');
     if (smash) player.stroke = { kind: 'smash', spin: 'flat', side: 'smash' };
     cpu.hop = HOP;
@@ -914,10 +933,10 @@
     cpuMod = { err: 0, react: 0, noise: 1 };
     if (last3.length === 3 && kinds === 1) {
       cpuMod = { err: -.6, react: -.4, noise: .4 };
-      popupAt(cpu.x, cpu.y, 2.6, '読まれてる…', '#ff8080');
+      popupAt(cpu.x, cpu.y, 2.6, TL('読まれてる…', 'Terbaca lawan…'), '#ff8080');
     } else if (last3.length === 3 && kinds === 3) {
       cpuMod = { err: .1, react: .45, noise: 1.6 };
-      popupAt(cpu.x, cpu.y, 2.6, '揺さぶり!', '#e8ff3a');
+      popupAt(cpu.x, cpu.y, 2.6, TL('揺さぶり!', 'Lawan goyah!'), '#e8ff3a');
     } else if (prev && prev !== type) {
       cpuMod = { err: .04, react: .2, noise: 1.2 };
     }
@@ -942,7 +961,7 @@
     rally++; maxRally = Math.max(maxRally, rally);
     startAnim(cpu, smash ? 'smash' : air ? 'volley' : sideKind(cpu), 'flat', .3);
     cpu.swing = SWING * .6; cpu.defend = false; player.hop = HOP; sHit(1, smash ? 'smash' : 'flat', true);
-    popupAt(cpu.x, cpu.y, 2.8, `${smash ? 'スマッシュ' : air ? 'ボレー' : '強打'}! ${kmh}km/h`, '#ff5d73');
+    popupAt(cpu.x, cpu.y, 2.8, `${smash ? TL('スマッシュ', 'Smash') : air ? TL('ボレー', 'Voli') : TL('強打', 'Pukulan keras')}! ${kmh}km/h`, '#ff5d73');
   }
 
   function cpuHit(d) {
@@ -994,7 +1013,7 @@
     cpu.defend = stretched;
     // a net rusher follows an attacking ball in
     cpu.rush = Q('net') && !stretched && type !== 'lob' && type !== 'drop' && (power > .5 || player.x < 1 || player.x > CW - 1) && Math.random() < .6;
-    if (stretched) { startSlide(cpu); ball.chance = true; popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a'); }
+    if (stretched) { startSlide(cpu); ball.chance = true; popupAt(player.x, player.y, 2.8, TL('チャンスボール!', 'Bola peluang!'), '#e8ff3a'); }
     else if (type !== 'top' && type !== 'flat' || kmh > 95) popupAt(cpu.x, cpu.y, 2.6, `${SHOTS[type].name} ${kmh}km/h`, SHOTS[type].color);
   }
 
@@ -1036,11 +1055,11 @@
   // ---------- rules ----------
   // ---------- practice: the CPU feeds balls, nothing is scored ----------
   const DRILLS = {
-    stroke: { name: 'ストローク', spot: () => [CX, L + .6], feeder: [CX, -.5] },
-    volley: { name: 'ボレー', spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, NET_Y - 6] },
-    smash:  { name: 'スマッシュ', spot: () => [CX + rand(-.4, .4), NET_Y + 3.5], feeder: [CX, 1] },
-    drop:   { name: 'ドロップ拾い', spot: () => [CX, L + 1], feeder: [CX, 1.5] },
-    chance: { name: 'チャンスボール', spot: () => [CX + rand(-1, 1), L + .5], feeder: [CX, -.5] },
+    stroke: { name: TL('ストローク', 'Groundstroke'), spot: () => [CX, L + .6], feeder: [CX, -.5] },
+    volley: { name: TL('ボレー', 'Voli'), spot: () => [CX + rand(-.4, .4), NET_Y + 3], feeder: [CX, NET_Y - 6] },
+    smash:  { name: TL('スマッシュ', 'Smash'), spot: () => [CX + rand(-.4, .4), NET_Y + 3.5], feeder: [CX, 1] },
+    drop:   { name: TL('ドロップ拾い', 'Kejar drop shot'), spot: () => [CX, L + 1], feeder: [CX, 1.5] },
+    chance: { name: TL('チャンスボール', 'Bola peluang'), spot: () => [CX + rand(-1, 1), L + .5], feeder: [CX, -.5] },
   };
   let drill = 'stroke';
   function startPractice(key) {
@@ -1052,9 +1071,9 @@
     feedNext();
   }
   function practiceBoard() {
-    const d = practice === 'random' ? 'ランダム' : DRILLS[practice].name;
-    $('board').innerHTML = `<div class="r"><span class="n">練習：${d}</span></div>` +
-      `<div class="r"><span class="n" style="font-size:13px">成功 ${pstats.ok} / ${pstats.n} ・ ナイス ${pstats.nice} ・ 連続 ${pstats.streak}（最高 ${pstats.best}）</span></div>`;
+    const d = practice === 'random' ? TL('ランダム', 'Acak') : DRILLS[practice].name;
+    $('board').innerHTML = `<div class="r"><span class="n">${TL('練習', 'Latihan')}: ${d}</span></div>` +
+      `<div class="r"><span class="n" style="font-size:13px">${TL('成功', 'Berhasil')} ${pstats.ok} / ${pstats.n} ・ ${TL('ナイス', 'Bagus')} ${pstats.nice} ・ ${TL('連続', 'Beruntun')} ${pstats.streak} (${TL('最高', 'terbaik')} ${pstats.best})</span></div>`;
   }
   function feedNext() {
     drill = practice === 'random' ? pick(Object.keys(DRILLS)) : practice;
@@ -1075,7 +1094,7 @@
     } else if (drill === 'chance') { // the same floater the CPU sends up after a lunge
       kmh = shoot(CX + rand(-1.8, 1.8), NET_Y + rand(5.5, 8), 'top', { angle: rand(.5, .6), who: 'C' });
       ball.chance = true;
-      popupAt(player.x, player.y, 2.8, 'チャンスボール!', '#e8ff3a');
+      popupAt(player.x, player.y, 2.8, TL('チャンスボール!', 'Bola peluang!'), '#e8ff3a');
     } else {
       kmh = shoot(rand(1.5, CW - 1.5), NET_Y + rand(1.5, 3), 'drop', { angle: rand(.32, .38), who: 'C' });
     }
@@ -1098,9 +1117,9 @@
     if (practice) {
       if (!ball.live) return;
       ball.bounces++;
-      if (ball.last === 'P') practiceDone(ball.bounces === 1 && inCourt('C'), ball.bounces === 1 && inCourt('C') ? 'イン!' : 'アウト');
-      else if ((drill === 'volley' || drill === 'smash') && ball.bounces === 1) practiceDone(false, 'ノーバウンドで打とう');
-      else if (ball.bounces >= 2) practiceDone(false, '取れなかった…');
+      if (ball.last === 'P') practiceDone(ball.bounces === 1 && inCourt('C'), ball.bounces === 1 && inCourt('C') ? TL('イン!', 'Masuk!') : TL('アウト', 'Out'));
+      else if ((drill === 'volley' || drill === 'smash') && ball.bounces === 1) practiceDone(false, TL('ノーバウンドで打とう', 'Pukul sebelum memantul'));
+      else if (ball.bounces >= 2) practiceDone(false, TL('取れなかった…', 'Tidak terkejar…'));
       return;
     }
     if (!ball.live) return;
@@ -1109,29 +1128,29 @@
     if (ball.bounces === 1) {
       const ok = ball.serve ? inBox(serveBox(recv, deuce())) : inCourt(recv);
       marks.push({ x: ball.x, y: ball.y, life: venue.clay ? 5 : 1.2, ok }); // clay keeps the ball mark
-      if (ok && ball.serve && ball.type === 'top') popupAt(ball.x, ball.y, 1.4, 'キック!', SHOTS.top.color);
+      if (ok && ball.serve && ball.type === 'top') popupAt(ball.x, ball.y, 1.4, TL('キック!', 'Kick!'), SHOTS.top.color);
       if (!ok) {
         lineCall(ball.serve ? 'Fault' : 'Out');
         if (outBy() < .5) crowdVoice('ooh', .8); // so close!
-        ball.serve ? fault('フォールト') : pointTo(recv, 'アウト!');
+        ball.serve ? fault(TL('フォールト', 'Fault')) : pointTo(recv, TL('アウト!', 'Out!'));
       }
     } else {
-      const ace = ball.serve ? 'サービスエース!' : null;
+      const ace = ball.serve ? TL('サービスエース!', 'Ace!') : null;
       // replays are for highlights only: a long rally, a big ace, or a winner on a break / set / match point
       const highlight = rally >= 7 || (ace && (ball.serveKmh || 0) >= 195) || bigPoint() !== '';
       replayAsk = replaysOn && highlight && pointsSinceReplay >= 4;
-      pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
+      pointTo(ball.last, ace || (ball.last === 'P' ? TL('ナイスショット!', 'Winner!') : TL('取れなかった…', 'Tidak terkejar…')));
     }
   }
   function onNet() {
-    if (practice) return practiceDone(false, 'ネット');
-    ball.serve ? fault('ネット') : pointTo(other(ball.last), 'ネット!');
+    if (practice) return practiceDone(false, TL('ネット', 'Net'));
+    ball.serve ? fault(TL('ネット', 'Net')) : pointTo(other(ball.last), TL('ネット!', 'Net!'));
   }
 
   function fault(label) {
     ball.live = false;
-    if (faults === 0) { faults = 1; if (label === 'ネット') umpire('Fault'); pause(label, 'セカンドサーブ', 1.2, setupServe); }
-    else { umpire('Double fault'); pointTo(other(ball.last), 'ダブルフォールト'); }
+    if (faults === 0) { faults = 1; if (label === TL('ネット', 'Net')) umpire('Fault'); pause(label, TL('セカンドサーブ', 'Servis kedua'), 1.2, setupServe); }
+    else { umpire('Double fault'); pointTo(other(ball.last), TL('ダブルフォールト', 'Double fault')); }
   }
 
   // ---------- the stadium: chair umpire, line judges, crowd ----------
@@ -1180,19 +1199,19 @@
     ball.live = false; faults = 0;
     const i = w === 'P' ? 0 : 1;
     pts[i]++;
-    const longRally = rally >= 8, ace = /エース/.test(label), error = /アウト|ネット|ダブル/.test(label);
+    const longRally = rally >= 8, ace = /エース|Ace/.test(label), error = /アウト|ネット|ダブル|Out|Net|Double/.test(label);
     let inten = (w === 'P' ? .8 : .55) * (error ? .6 : 1);
     if (ace || longRally) inten = 1;
     crowdClap(inten, 2.2); if (inten >= .9) crowdVoice('cheer', inten);
     cheer = 1.4 * inten;
     if (navigator.vibrate && w === 'C') navigator.vibrate(60);
-    let title = w === 'P' ? 'あなたのポイント!' : 'CPU のポイント';
+    let title = w === 'P' ? TL('あなたのポイント!', 'Poin untukmu!') : TL('CPU のポイント', 'Poin untuk CPU');
     const gameWon = tb ? pts[i] >= 7 && pts[i] - pts[1 - i] >= 2 : pts[i] >= 4 && pts[i] - pts[1 - i] >= 2;
     if (gameWon) {
       if (tb) tbScore = [...pts];
       games[i]++; pts = [0, 0];
-      title = tb ? (w === 'P' ? '🎾 タイブレークを取った!' : 'CPU がタイブレークを取った')
-                 : w === 'P' ? '🎾 あなたがゲームを取った!' : 'CPU がゲームを取った';
+      title = tb ? (w === 'P' ? TL('🎾 タイブレークを取った!', '🎾 Kamu menang tie-break!') : TL('CPU がタイブレークを取った', 'CPU menang tie-break'))
+                 : w === 'P' ? TL('🎾 あなたがゲームを取った!', '🎾 Game untukmu!') : TL('CPU がゲームを取った', 'Game untuk CPU');
       tb = false;
       if (setWon(i)) {
         crowdClap(1, 4); crowdVoice('cheer', 1); umpire(scoreCall(w, true, true), 600);
@@ -1201,7 +1220,7 @@
       crowdClap(.9, 3);
       if (format === 'set' && games[0] === 6 && games[1] === 6) { // 6-6: tiebreak
         tbStart = server(); tb = true; umpire(scoreCall(w, true, false, true), 600);
-        updateBoard(); pause('6-6 タイブレーク!', '7 ポイント先取（2 点差）', 2, setupServe); return;
+        updateBoard(); pause(TL('6-6 タイブレーク!', '6-6 Tie-break!'), TL('7 ポイント先取（2 点差）', 'Pertama ke 7 poin (selisih 2)'), 2, setupServe); return;
       }
     }
     updateBoard();
@@ -1211,24 +1230,24 @@
 
   function endMatch(w) {
     state = 'over'; msg = null;
-    $('resTitle').textContent = w === 'P' ? '🏆 勝利!' : '😢 まけちゃった…';
+    $('resTitle').textContent = w === 'P' ? TL('🏆 勝利!', '🏆 Menang!') : TL('😢 まけちゃった…', '😢 Kalah…');
     $('resScore').textContent = `${games[0]} - ${games[1]}` + (tbScore ? ` (${Math.min(...tbScore)})` : '');
-    $('resDetail').innerHTML = `相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
-      (w === 'P' ? (lvKey === 'max' ? '最強を倒した！ 第 2 シード級に勝てる実力！' : lvKey === 'hard' ? 'すごい！ 次は「最強」に挑戦！' : '次はもっと強い相手に挑戦してみよう！') : 'スピンやロブを使い分けてもう一回！');
+    $('resDetail').innerHTML = TL(`相手：${lv.name} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>`, `Lawan: ${lv.name} · reli terpanjang <b>${maxRally}</b> · pukulan tercepat <b>${maxSpeed}</b> km/h<br>`) +
+      (w === 'P' ? (lvKey === 'max' ? TL('最強を倒した！ 第 2 シード級に勝てる実力！', 'Kamu mengalahkan yang terkuat! Selevel unggulan 2!') : lvKey === 'hard' ? TL('すごい！ 次は「最強」に挑戦！', 'Hebat! Sekarang coba "Terkuat"!') : TL('次はもっと強い相手に挑戦してみよう！', 'Coba lawan yang lebih kuat!')) : TL('スピンやロブを使い分けてもう一回！', 'Variasikan spin dan lob, lalu coba lagi!'));
     $('again').classList.toggle('hidden', !!tourOpp); $('toTour').classList.toggle('hidden', !tourOpp);
     if (tourOpp) {
       const r = tourResult(w);
-      $('resTitle').textContent = w === 'P' ? (r === 6 ? '🏆 優勝!' : `🎾 ${ROUNDS[r]} 突破!`) : `😢 ${ROUNDS[r]} で敗退…`;
-      $('resDetail').innerHTML = `相手：${tourOpp.seed ? `第${tourOpp.seed}シード ` : ''}${tourOpp.n} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>` +
-        (w === 'P' ? (r === 6 ? '128 人の頂点に立った！ おめでとう！' : `次は ${ROUNDS[r + 1]}！`) : 'トーナメント表で優勝者を見てみよう');
+      $('resTitle').textContent = w === 'P' ? (r === 6 ? TL('🏆 優勝!', '🏆 Juara!') : TL(`🎾 ${ROUNDS[r]} 突破!`, `🎾 Lolos ${ROUNDS[r]}!`)) : TL(`😢 ${ROUNDS[r]} で敗退…`, `😢 Kalah di ${ROUNDS[r]}…`);
+      $('resDetail').innerHTML = TL(`相手：${tourOpp.seed ? `第${tourOpp.seed}シード ` : ''}${tourOpp.n} ・ 最長ラリー <b>${maxRally}</b> 回 ・ 最速ショット <b>${maxSpeed}</b> km/h<br>`, `Lawan: ${tourOpp.seed ? `unggulan ${tourOpp.seed} ` : ''}${tourOpp.n} · reli terpanjang <b>${maxRally}</b> · pukulan tercepat <b>${maxSpeed}</b> km/h<br>`) +
+        (w === 'P' ? (r === 6 ? TL('128 人の頂点に立った！ おめでとう！', 'Juara dari 128 pemain! Selamat!') : TL(`次は ${ROUNDS[r + 1]}！`, `Berikutnya: ${ROUNDS[r + 1]}!`)) : TL('トーナメント表で優勝者を見てみよう', 'Lihat siapa juaranya di bagan turnamen'));
       tourOpp = null;
     }
     $('result').classList.remove('hidden');
   }
 
   // ---------- tournament: a 128-player grand slam draw, you are the top seed ----------
-  const ROUNDS = ['1回戦', '2回戦', '3回戦', '4回戦', '準々決勝', '準決勝', '決勝'];
-  const TSTYLE = { big: 'ビッグサーバー', base: 'ベースライナー', slice: 'スライス職人', all: 'オールラウンド' };
+  const ROUNDS = TL(['1回戦', '2回戦', '3回戦', '4回戦', '準々決勝', '準決勝', '決勝'], ['Babak 1', 'Babak 2', 'Babak 3', 'Babak 4', 'Perempat final', 'Semifinal', 'Final']);
+  const TSTYLE = TL({ big: 'ビッグサーバー', base: 'ベースライナー', slice: 'スライス職人', all: 'オールラウンド' }, { big: 'Big server', base: 'Baseliner', slice: 'Spesialis slice', all: 'All-rounder' });
   const NAMEPOOL = { // made-up players
     ESP: ['Moreno', 'Castell', 'Ibarra', 'Soler', 'Varela', 'Ruiz', 'Olmedo', 'Prado'],
     FRA: ['Lemaire', 'Duval', 'Garnier', 'Roussel', 'Bertin', 'Mallet', 'Fabre', 'Vidal'],
@@ -1252,17 +1271,17 @@
   const INITIALS = 'ABCDEFGHJKLMNOPRSTVW';
   // quirks: what the scouting memo says about each player
   const TRAITS = {
-    net:     { good: true,  name: 'ネットダッシュ',     memo: '攻めたあとはネットに詰めてくる。ロブか足元へのパスで抜こう' },
-    drop:    { good: true,  name: 'ドロップの名手',     memo: '後ろに下がるとドロップが来る。ベースラインから離れすぎない' },
-    ret:     { good: true,  name: 'リターンの名手',     memo: '速いサーブにも反応が早い。エースは取りにくい' },
-    clutch:  { good: true,  name: '勝負強い',           memo: 'ブレークポイントやマッチポイントでミスが減る' },
-    counter: { good: true,  name: 'カウンター上手',     memo: '速い球ほど上手く返してくる。緩急をつけよう' },
-    speed:   { good: true,  name: '俊足',               memo: 'コートカバーが広い。オープンコートでも追いつかれる' },
-    bh:      { good: false, name: 'バックハンドが苦手', memo: 'バック側に集めるとミスが増える' },
-    low:     { good: false, name: '低い球が苦手',       memo: '低く滑るスライスでミスを誘える' },
-    high:    { good: false, name: '高い球が苦手',       memo: '高く弾むトップスピンで押し込める' },
-    nerve:   { good: false, name: 'プレッシャーに弱い', memo: '大事なポイントでミスやダブルフォールトが増える' },
-    slow:    { good: false, name: 'フットワークが重い', memo: '左右に振ると追いつけないことが多い' },
+    net:     { good: true,  name: TL('ネットダッシュ', 'Serbu net'), memo: TL('攻めたあとはネットに詰めてくる。ロブか足元へのパスで抜こう', 'Maju ke net setelah menyerang. Lewati dengan lob atau passing ke kaki') },
+    drop:    { good: true,  name: TL('ドロップの名手', 'Ahli drop shot'), memo: TL('後ろに下がるとドロップが来る。ベースラインから離れすぎない', 'Kalau kamu mundur, datang drop shot. Jangan terlalu jauh dari baseline') },
+    ret:     { good: true,  name: TL('リターンの名手', 'Ahli return'), memo: TL('速いサーブにも反応が早い。エースは取りにくい', 'Cepat bereaksi bahkan pada servis kencang. Sulit dapat ace') },
+    clutch:  { good: true,  name: TL('勝負強い', 'Mental juara'), memo: TL('ブレークポイントやマッチポイントでミスが減る', 'Jarang salah di break point dan match point') },
+    counter: { good: true,  name: TL('カウンター上手', 'Jago counter'), memo: TL('速い球ほど上手く返してくる。緩急をつけよう', 'Makin cepat bolanya, makin bagus balasannya. Variasikan tempo') },
+    speed:   { good: true,  name: TL('俊足', 'Kaki cepat'), memo: TL('コートカバーが広い。オープンコートでも追いつかれる', 'Jangkauan luas. Bola ke lapangan kosong pun bisa terkejar') },
+    bh:      { good: false, name: TL('バックハンドが苦手', 'Backhand lemah'), memo: TL('バック側に集めるとミスが増える', 'Arahkan ke backhand-nya, kesalahannya bertambah') },
+    low:     { good: false, name: TL('低い球が苦手', 'Lemah di bola rendah'), memo: TL('低く滑るスライスでミスを誘える', 'Slice rendah yang meluncur memancing kesalahan') },
+    high:    { good: false, name: TL('高い球が苦手', 'Lemah di bola tinggi'), memo: TL('高く弾むトップスピンで押し込める', 'Topspin yang memantul tinggi bisa menekannya') },
+    nerve:   { good: false, name: TL('プレッシャーに弱い', 'Mudah tertekan'), memo: TL('大事なポイントでミスやダブルフォールトが増える', 'Lebih banyak salah dan double fault di poin penting') },
+    slow:    { good: false, name: TL('フットワークが重い', 'Kaki lambat'), memo: TL('左右に振ると追いつけないことが多い', 'Sering tidak terkejar kalau diarahkan ke kiri-kanan') },
   };
   const GOOD = Object.keys(TRAITS).filter(k => TRAITS[k].good), BAD = Object.keys(TRAITS).filter(k => !TRAITS[k].good);
   const pickOf = a => a[Math.floor(Math.random() * a.length)];
@@ -1288,8 +1307,8 @@
   const heightCm = p => Math.round(184 * (p.look ? p.look.size : 1));
   // the court and crowd for each round of the tournament
   const STAGES = [
-    { court: 'コート 14', fill: .25 }, { court: 'コート 7', fill: .35 }, { court: 'ショーコート 2', fill: .55 }, { court: 'ショーコート 1', fill: .7 },
-    { court: 'センターコート', fill: .9 }, { court: 'センターコート', fill: 1 }, { court: 'センターコート（ナイター）', fill: 1, night: true },
+    { court: TL('コート 14', 'Lapangan 14'), fill: .25 }, { court: TL('コート 7', 'Lapangan 7'), fill: .35 }, { court: TL('ショーコート 2', 'Show Court 2'), fill: .55 }, { court: TL('ショーコート 1', 'Show Court 1'), fill: .7 },
+    { court: TL('センターコート', 'Center Court'), fill: .9 }, { court: TL('センターコート', 'Center Court'), fill: 1 }, { court: TL('センターコート（ナイター）', 'Center Court (malam)'), fill: 1, night: true },
   ];
   const ROUNDS_EN = ['First round', 'Second round', 'Third round', 'Fourth round', 'Quarterfinal', 'Semifinal', 'Final'];
   const TKEY = 'bumpyTennisTour1';
@@ -1402,11 +1421,11 @@
 
   const stars = r => { const n = clamp(Math.round((r - .4) / .18), 1, 5); return '★'.repeat(n) + '☆'.repeat(5 - n); };
   const seedTag = p => p.seed ? `<span class="sd">${p.seed}</span> ` : '';
-  const pname = id => { const p = tour.players[id]; return id === 0 ? `${seedTag(p)}<b>あなた</b>` : `${seedTag(p)}${p.n} <small>${p.cc}</small>`; };
+  const pname = id => { const p = tour.players[id]; return id === 0 ? `${seedTag(p)}<b>${TL('あなた', 'Kamu')}</b>` : `${seedTag(p)}${p.n} <small>${p.cc}</small>`; };
 
   function showTour() {
     const card = $('tourCard'), v = VENUES[tour.venue], r = tour.res.length, champ = champion();
-    let h = `<div class="tour"><h2>🏆 NORI OPEN</h2><p>${v.name}（${v.surf}）・ 128 ドロー ・ 1 セットマッチ</p><div class="path">`;
+    let h = `<div class="tour"><h2>🏆 NORI OPEN</h2><p>${v.name} (${v.surf}) · ${TL('128 ドロー ・ 1 セットマッチ', 'Bagan 128 · 1 set')}</p><div class="path">`;
     const lostAt = tour.out ? tour.res.findIndex(rr => rr.some(m => m.l === 0)) : -1;
     ROUNDS.forEach((n, i) => {
       const cls = tour.out ? (i < lostAt ? 'done' : i === lostAt ? 'lost' : '') : i < r ? 'done' : i === r ? 'now' : '';
@@ -1414,39 +1433,39 @@
     });
     h += '</div>';
     if (champ === 0) {
-      h += `<div class="big">🏆 優勝!</div><p>128 人の頂点！ あなたがチャンピオンです！</p>`;
+      h += TL(`<div class="big">🏆 優勝!</div><p>128 人の頂点！ あなたがチャンピオンです！</p>`, `<div class="big">🏆 Juara!</div><p>Terbaik dari 128 pemain! Kamulah sang juara!</p>`);
     } else if (tour.out) {
-      h += `<p>${ROUNDS[lostAt]} で敗退…</p>` + (champ > 0 ? `<div class="opp">優勝<div class="nm">${pname(champ)}</div>決勝 ${tour.res[6][0].s} で ${pname(tour.res[6][0].l)} に勝利</div>` : '');
+      h += TL(`<p>${ROUNDS[lostAt]} で敗退…</p>`, `<p>Kalah di ${ROUNDS[lostAt]}…</p>`) + (champ > 0 ? TL(`<div class="opp">優勝<div class="nm">${pname(champ)}</div>決勝 ${tour.res[6][0].s} で ${pname(tour.res[6][0].l)} に勝利</div>`, `<div class="opp">Juara<div class="nm">${pname(champ)}</div>Menang ${tour.res[6][0].s} atas ${pname(tour.res[6][0].l)} di final</div>`) : '');
     } else {
       const e = entrants(r), m = userMatch(r), opp = e[2 * m] === 0 ? e[2 * m + 1] : e[2 * m], p = tour.players[opp];
-      h += `<h3>${ROUNDS[r]} ・ 次の相手</h3><div class="opp"><div class="nm">${p.seed ? `<span class="sd">第${p.seed}シード</span> ` : ''}${p.n} <small>${p.cc}</small></div>
-        ${TSTYLE[p.st]} ・ 身長 ${heightCm(p)}cm ・ 強さ <span class="st">${stars(p.r)}</span>
+      h += `<h3>${ROUNDS[r]} · ${TL('次の相手', 'Lawan berikutnya')}</h3><div class="opp"><div class="nm">${p.seed ? `<span class="sd">${TL(`第${p.seed}シード`, `Unggulan ${p.seed}`)}</span> ` : ''}${p.n} <small>${p.cc}</small></div>
+        ${TSTYLE[p.st]} · ${TL('身長', 'Tinggi')} ${heightCm(p)}cm · ${TL('強さ', 'Kekuatan')} <span class="st">${stars(p.r)}</span>
         ${p.look ? `<div style="margin:6px 0"><span class="kit" style="background:${p.look.shirt};border-color:${p.look.trim}"></span><span class="kit" style="background:${p.look.shorts}"></span></div>` : ''}
-        <div class="memo"><b>📋 スカウティングメモ</b>${(p.traits || []).map(k => `<div class="${TRAITS[k].good ? 'g' : 'b'}">${TRAITS[k].good ? '◎' : '△'} <b>${TRAITS[k].name}</b>：${TRAITS[k].memo}</div>`).join('')}</div>
-        <div style="font-size:12px;color:var(--sub);margin-top:4px">会場：${STAGES[r].court}</div></div>`;
+        <div class="memo"><b>📋 ${TL('スカウティングメモ', 'Catatan scouting')}</b>${(p.traits || []).map(k => `<div class="${TRAITS[k].good ? 'g' : 'b'}">${TRAITS[k].good ? '◎' : '△'} <b>${TRAITS[k].name}</b>：${TRAITS[k].memo}</div>`).join('')}</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:4px">${TL('会場', 'Lapangan')}: ${STAGES[r].court}</div></div>`;
     }
     // your road so far
     const mine = [];
     tour.res.forEach((rr, i) => rr.forEach(mm => { if (mm.w === 0 || mm.l === 0) mine.push(`<li class="me"><span>${ROUNDS[i]}</span><span>${mm.w === 0 ? '○' : '●'} ${pname(mm.w === 0 ? mm.l : mm.w)}</span><span>${mm.w === 0 ? mm.s : mm.s.replace(/^(\d+)-(\d+)/, '$2-$1')}</span></li>`); }));
-    if (mine.length) h += `<h3>あなたの戦績</h3><ul>${mine.join('')}</ul>`;
+    if (mine.length) h += `<h3>${TL('あなたの戦績', 'Hasilmu')}</h3><ul>${mine.join('')}</ul>`;
     // upsets in the last round played
     if (r > 0) {
       const ups = tour.res[r - 1].filter(mm => tour.players[mm.l].seed && mm.l !== 0 && (!tour.players[mm.w].seed || tour.players[mm.w].seed > tour.players[mm.l].seed));
-      h += `<h3>${ROUNDS[r - 1]}の番狂わせ</h3>` + (ups.length
-        ? `<ul>${ups.map(mm => `<li><span>${pname(mm.w)}</span><span>${mm.s}</span><span>${pname(mm.l)} 敗退</span></li>`).join('')}</ul>`
-        : '<p style="font-size:13px">シードは全員勝ち上がり</p>');
+      h += TL(`<h3>${ROUNDS[r - 1]}の番狂わせ</h3>`, `<h3>Kejutan di ${ROUNDS[r - 1]}</h3>`) + (ups.length
+        ? `<ul>${ups.map(mm => `<li><span>${pname(mm.w)}</span><span>${mm.s}</span><span>${pname(mm.l)} ${TL('敗退', 'tersingkir')}</span></li>`).join('')}</ul>`
+        : TL('<p style="font-size:13px">シードは全員勝ち上がり</p>', '<p style="font-size:13px">Semua unggulan lolos</p>'));
     }
     const alive = new Set(r >= 7 ? [champ] : entrants(r));
-    h += `<h3>シード選手</h3><div class="chips">${tour.players.filter(p => p.seed).map((p, i) => `<span class="${alive.has(i) ? '' : 'out'}">${p.seed} ${i === 0 ? 'あなた' : p.sur}</span>`).join('')}</div>`;
+    h += `<h3>${TL('シード選手', 'Pemain unggulan')}</h3><div class="chips">${tour.players.filter(p => p.seed).map((p, i) => `<span class="${alive.has(i) ? '' : 'out'}">${p.seed} ${i === 0 ? TL('あなた', 'Kamu') : p.sur}</span>`).join('')}</div>`;
     if (r < 7) {
       const e = entrants(r);
-      h += `<details><summary>${ROUNDS[r]}の組み合わせ（${e.length} 人）</summary><ul>`;
+      h += TL(`<details><summary>${ROUNDS[r]}の組み合わせ（${e.length} 人）</summary><ul>`, `<details><summary>Undian ${ROUNDS[r]} (${e.length} pemain)</summary><ul>`);
       for (let m = 0; m < e.length / 2; m++) h += `<li class="${e[2 * m] === 0 || e[2 * m + 1] === 0 ? 'me' : ''}"><span>${pname(e[2 * m])}</span><span>vs</span><span>${pname(e[2 * m + 1])}</span></li>`;
       h += '</ul></details>';
     }
-    h += '<div class="btns">' + (tour.out || champ >= 0 ? '<button data-t="new">新しいトーナメント</button>' : '<button data-t="play">▶ 試合開始</button>') +
-      '<button class="alt" data-t="menu">メニュー</button></div>' +
-      '<div class="btns"><button class="dark" data-t="pdf">📄 勝ち上がりを PDF で保存</button></div></div>';
+    h += '<div class="btns">' + (tour.out || champ >= 0 ? `<button data-t="new">${TL('新しいトーナメント', 'Turnamen baru')}</button>` : `<button data-t="play">▶ ${TL('試合開始', 'Mulai tanding')}</button>`) +
+      `<button class="alt" data-t="menu">${TL('メニュー', 'Menu')}</button></div>` +
+      `<div class="btns"><button class="dark" data-t="pdf">📄 ${TL('勝ち上がりを PDF で保存', 'Simpan bagan sebagai PDF')}</button></div></div>`;
     card.innerHTML = h;
     card.querySelectorAll('[data-t]').forEach(b => (b.onclick = () => {
       const t = b.dataset.t;
@@ -1470,7 +1489,7 @@
     startMatch('normal', { id, ...tour.players[id] });
     // walk-on: the round and court, the umpire introduces the players, the crowd greets them
     const opp = tour.players[id];
-    pause(`${ROUNDS[r]} ・ ${st.court}`, `あなた vs ${opp.seed ? `[${opp.seed}] ` : ''}${opp.n}`, r >= 4 ? 3.2 : 2.2, () => { state = 'serve'; msg = null; });
+    pause(`${ROUNDS[r]} ・ ${st.court}`, `${TL('あなた', 'Kamu')} vs ${opp.seed ? `[${opp.seed}] ` : ''}${opp.n}`, r >= 4 ? 3.2 : 2.2, () => { state = 'serve'; msg = null; });
     umpire(`${r === 6 ? 'Ladies and gentlemen, the final. ' : ROUNDS_EN[r] + '. '}${NAME.P}, versus, ${NAME.C}.`, 300);
     crowdClap(r >= 4 ? 1 : .5, r >= 4 ? 3.5 : 2); if (r >= 5) crowdVoice('cheer', .8);
   }
@@ -1493,12 +1512,12 @@
   }));
   const PW = 1240, PH = 1754, PFONT = 'system-ui, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif';
   const entAt = r => r === 0 ? tour.draw : r <= tour.res.length ? tour.res[r - 1].map(m => m.w) : null;
-  const plain = (id, cc = true) => { const p = tour.players[id]; return (p.seed ? `[${p.seed}] ` : '') + (id === 0 ? 'あなた' : cc ? `${p.n}  ${p.cc}` : p.n); };
+  const plain = (id, cc = true) => { const p = tour.players[id]; return (p.seed ? `[${p.seed}] ` : '') + (id === 0 ? TL('あなた', 'Kamu') : cc ? `${p.n}  ${p.cc}` : p.n); };
   function finish(id) {
-    if (champion() === id) return '優勝';
+    if (champion() === id) return TL('優勝', 'Juara');
     const r = tour.res.findIndex(rr => rr.some(m => m.l === id));
-    if (r < 0) return '勝ち残り';
-    return r === 6 ? '準優勝' : r === 5 ? 'ベスト4' : r === 4 ? 'ベスト8' : `${ROUNDS[r]}敗退`;
+    if (r < 0) return TL('勝ち残り', 'Masih bertahan');
+    return r === 6 ? TL('準優勝', 'Runner-up') : r === 5 ? TL('ベスト4', 'Semifinalis') : r === 4 ? TL('ベスト8', 'Perempat finalis') : TL(`${ROUNDS[r]}敗退`, `Kalah ${ROUNDS[r]}`);
   }
   function pdfPage() {
     const c = document.createElement('canvas'); c.width = PW; c.height = PH;
@@ -1513,7 +1532,7 @@
     const v = VENUES[tour.venue];
     g.fillStyle = '#1d2240'; g.fillRect(0, 0, PW, 110);
     g.fillStyle = '#fff'; g.font = `bold 44px ${PFONT}`; g.fillText('NORI OPEN', 50, 55);
-    g.font = `24px ${PFONT}`; g.fillText(`${v.name}（${v.surf}）・ 128 ドロー`, 400, 55);
+    g.font = `24px ${PFONT}`; g.fillText(`${v.name} (${v.surf}) · ${TL('128 ドロー', 'bagan 128')}`, 400, 55);
     g.textAlign = 'right'; g.font = `bold 30px ${PFONT}`; g.fillText(title, PW - 50, 55); g.textAlign = 'left';
     g.fillStyle = '#1d2240';
   }
@@ -1548,14 +1567,14 @@
     return c;
   }
   function coverPage() {
-    const [c, g] = pdfPage(); pageHead(g, '大会記録');
+    const [c, g] = pdfPage(); pageHead(g, TL('大会記録', 'Catatan turnamen'));
     const champ = champion(), r = tour.res.length;
     let y = 190;
     g.font = `bold 40px ${PFONT}`;
-    const status = champ === 0 ? '🏆 あなたが優勝!' : tour.out ? `あなた：${finish(0)}` : `${ROUNDS[r]} へ進出中`;
+    const status = champ === 0 ? TL('🏆 あなたが優勝!', '🏆 Kamu juara!') : tour.out ? `${TL('あなた', 'Kamu')}: ${finish(0)}` : TL(`${ROUNDS[r]} へ進出中`, `Lolos ke ${ROUNDS[r]}`);
     g.fillText(status, 50, y); y += 60;
-    if (champ >= 0) { g.font = `28px ${PFONT}`; g.fillText(`優勝：${plain(champ)}　決勝 ${tour.res[6][0].s}（相手 ${plain(tour.res[6][0].l)}）`, 50, y); y += 50; }
-    g.font = `bold 30px ${PFONT}`; g.fillText('あなたの勝ち上がり', 50, y += 30); y += 50;
+    if (champ >= 0) { g.font = `28px ${PFONT}`; g.fillText(TL(`優勝：${plain(champ)}　決勝 ${tour.res[6][0].s}（相手 ${plain(tour.res[6][0].l)}）`, `Juara: ${plain(champ)}   final ${tour.res[6][0].s} (lawan ${plain(tour.res[6][0].l)})`), 50, y); y += 50; }
+    g.font = `bold 30px ${PFONT}`; g.fillText(TL('あなたの勝ち上がり', 'Perjalananmu'), 50, y += 30); y += 50;
     tour.res.forEach((rr, i) => rr.forEach(m => {
       if (m.w !== 0 && m.l !== 0) return;
       const win = m.w === 0, s = win ? m.s : m.s.replace(/^(\d+)-(\d+)/, '$2-$1');
@@ -1563,25 +1582,25 @@
       g.fillText(ROUNDS[i], 70, y); g.fillText(win ? '○' : '●', 260, y); fitText(g, plain(win ? m.l : m.w), 310, y, 600, 24); g.fillText(s, 960, y);
       g.fillStyle = '#1d2240'; y += 42;
     }));
-    if (!tour.res.length) { g.font = `24px ${PFONT}`; g.fillText('まだ試合がありません', 70, y); y += 42; }
-    y += 30; g.font = `bold 30px ${PFONT}`; g.fillText('シード選手の成績', 50, y); y += 50;
+    if (!tour.res.length) { g.font = `24px ${PFONT}`; g.fillText(TL('まだ試合がありません', 'Belum ada pertandingan'), 70, y); y += 42; }
+    y += 30; g.font = `bold 30px ${PFONT}`; g.fillText(TL('シード選手の成績', 'Hasil pemain unggulan'), 50, y); y += 50;
     const seeds = tour.players.map((p, i) => i).filter(i => tour.players[i].seed);
     seeds.forEach((id, k) => {
       const x = k < 16 ? 70 : 650, yy = y + (k % 16) * 40, f = finish(id);
-      g.fillStyle = f === '優勝' ? '#e0475c' : '#1d2240'; fitText(g, plain(id), x, yy, 380, 20);
-      g.fillStyle = f === '勝ち残り' ? '#3a8f3a' : '#5a6080'; g.font = `bold 20px ${PFONT}`; g.fillText(f, x + 400, yy);
+      g.fillStyle = f === TL('優勝', 'Juara') ? '#e0475c' : '#1d2240'; fitText(g, plain(id), x, yy, 380, 20);
+      g.fillStyle = f === TL('勝ち残り', 'Masih bertahan') ? '#3a8f3a' : '#5a6080'; g.font = `bold 20px ${PFONT}`; g.fillText(f, x + 400, yy);
     });
     g.fillStyle = '#8a8fa6'; g.font = `18px ${PFONT}`;
-    g.fillText('2〜5 ページ：ドロー（1/4 ずつ）　6 ページ：準々決勝から決勝', 50, PH - 50);
+    g.fillText(TL('2〜5 ページ：ドロー（1/4 ずつ）　6 ページ：準々決勝から決勝', 'Hal. 2–5: bagan (per 1/4)   hal. 6: perempat final sampai final'), 50, PH - 50);
     return c;
   }
   async function saveTourPDF(btn) {
-    const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
+    const label = btn.textContent; btn.disabled = true; btn.textContent = TL('作成中…', 'Membuat…');
     try {
       const jsPDF = await loadJsPDF();
       const pages = [coverPage(),
-        ...[0, 1, 2, 3].map(q => bracketPage(`ドロー ${q + 1}/4`, 0, q * 32, 32, '準決勝へ')),
-        bracketPage('準々決勝〜決勝', 4, 0, 8, '優勝')];
+        ...[0, 1, 2, 3].map(q => bracketPage(TL(`ドロー ${q + 1}/4`, `Bagan ${q + 1}/4`), 0, q * 32, 32, TL('準決勝へ', 'Ke semifinal'))),
+        bracketPage(TL('準々決勝〜決勝', 'Perempat final–final'), 4, 0, 8, TL('優勝', 'Juara'))];
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
       pages.forEach((p, i) => { if (i) doc.addPage(); doc.addImage(p.toDataURL('image/jpeg', .9), 'JPEG', 0, 0, 210, 297); });
       const blob = doc.output('blob'), filename = `nori-open-${tour.venue}.pdf`;
@@ -1590,14 +1609,14 @@
       else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
       btn.textContent = label;
     } catch (e) {
-      btn.textContent = e && e.code === 'declined' ? label : 'PDF を作れませんでした';
+      btn.textContent = e && e.code === 'declined' ? label : TL('PDF を作れませんでした', 'Gagal membuat PDF');
     }
     btn.disabled = false;
   }
   function refreshTourButtons() {
     const t = loadTour();
     $('tourCont').classList.toggle('hidden', !t);
-    if (t) $('tourCont').textContent = t.out || (t.res.length === 7) ? 'トーナメントの結果' : `つづきから（${ROUNDS[t.res.length]}）`;
+    if (t) $('tourCont').textContent = t.out || (t.res.length === 7) ? TL('トーナメントの結果', 'Hasil turnamen') : TL(`つづきから（${ROUNDS[t.res.length]}）`, `Lanjutkan (${ROUNDS[t.res.length]})`);
   }
 
   function scoreText(a, b) {
@@ -1610,7 +1629,7 @@
     $('pP').textContent = scoreText(pts[0], pts[1]); $('pC').textContent = scoreText(pts[1], pts[0]);
     $('srvP').style.visibility = server() === 'P' ? 'visible' : 'hidden';
     $('srvC').style.visibility = server() === 'C' ? 'visible' : 'hidden';
-    $('lvName').textContent = (tb ? 'タイブレーク ・ ' : '') + (tourOpp ? '' : venue.name + ' ・ ') + lv.name;
+    $('lvName').textContent = (tb ? TL('タイブレーク ・ ', 'Tie-break · ') : '') + (tourOpp ? '' : venue.name + ' ・ ') + lv.name;
   }
 
   function popupAt(x, y, z, text, color) { if (text) popups.push({ x, y, z, text, color, life: 1.1 }); }
@@ -2506,7 +2525,7 @@
           ctx.fillStyle = 'rgba(200,20,40,.9)'; ctx.fillRect(16, H - 64, 118, 34);
           ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
           ctx.fillText('▶ REPLAY', 26, H - 47);
-          ctx.font = '12px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(coarse ? 'タップでスキップ' : 'キーでスキップ', 16, H - 20);
+          ctx.font = '12px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(coarse ? TL('タップでスキップ', 'Ketuk untuk lewati') : TL('キーでスキップ', 'Tekan tombol untuk lewati'), 16, H - 20);
           ctx.textAlign = 'center'; drawMsg();
           return;
         }
@@ -2538,14 +2557,14 @@
       ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(top.x, top.y); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = '#ff5d73'; ctx.beginPath(); ctx.arc(top.x, top.y, 4, 0, 7); ctx.fill();
       ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillText('スマッシュ', top.x, top.y - 6);
+      ctx.fillText(TL('スマッシュ', 'Smash'), top.x, top.y - 6);
     }
     if (state === 'rally' && canHit('P') && ball.bounces === 0 && ball.z > 2.1 && ball.z < 3.2 && d2(ball, player) < reachOf('smash')) {
       const q = P(ball.x, ball.y, ball.z);
       ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(10, .35 * q.s), 0, 7); ctx.stroke();
       ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#ff2d55'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillText('今!', q.x, q.y - Math.max(12, .4 * q.s));
+      ctx.fillText(TL('今!', 'Sekarang!'), q.x, q.y - Math.max(12, .4 * q.s));
     }
     if (ball.chance && ball.live && ball.last === 'C') { // highlight the sitter (and its shadow) so you go for it
       const q = P(ball.x, ball.y, ball.z), g = P(ball.x, ball.y), pulse = 1 + Math.sin(performance.now() / 70) * .25;
@@ -2623,14 +2642,14 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     if (rally >= 3 && (state === 'rally' || state === 'pause')) {
       ctx.font = 'bold 16px system-ui, sans-serif'; ctx.fillStyle = '#e8ff3a';
-      ctx.fillText(`ラリー ${rally}`, W / 2, 24);
+      ctx.fillText(`${TL('ラリー', 'Reli')} ${rally}`, W / 2, 24);
     }
     if (state === 'serve') {
       const mine = server() === 'P';
       const text = mine
-        ? (ball.held ? (coarse ? 'ショットボタンでトス' : 'ショットキー / クリックでトス') : '球種を長押し → 一番高いところで離せ!')
-        : 'CPU のサーブ…';
-      const t2 = [bigPoint(), faults ? 'セカンドサーブ（スピンサーブ）' : ''].filter(Boolean).join(' ・ ');
+        ? (ball.held ? (coarse ? TL('ショットボタンでトス', 'Tekan tombol pukulan untuk lambungkan bola') : TL('ショットキー / クリックでトス', 'Tombol pukulan / klik untuk lambungkan bola')) : TL('球種を長押し → 一番高いところで離せ!', 'Tahan jenis pukulan → lepas di titik tertinggi!'))
+        : TL('CPU のサーブ…', 'Servis CPU…');
+      const t2 = [bigPoint(), faults ? TL('セカンドサーブ（スピンサーブ）', 'Servis kedua (servis spin)') : ''].filter(Boolean).join(' ・ ');
       ctx.font = 'bold 18px system-ui, sans-serif';
       const w = ctx.measureText(text).width + 32, y = coarse ? H * .42 : H - 40;
       ctx.fillStyle = 'rgba(15,20,40,.75)';
@@ -3117,7 +3136,7 @@
         if (lite || fpsSamples > 240 || !(state === 'rally' || state === 'serve')) return;
         fpsSamples++; fpsTime += dt;
         if (fpsSamples === 240 && fpsTime / 240 > 1 / 38) {
-          lite = true; applyLite(); popupAt(player.x, player.y, 3, '軽量モードに切り替えました', '#fff');
+          lite = true; applyLite(); popupAt(player.x, player.y, 3, TL('軽量モードに切り替えました', 'Beralih ke mode ringan'), '#fff');
           const box = $('lite3d'); if (box) box.checked = true;
         }
       }
@@ -3201,7 +3220,7 @@
   }
 
   // the strongest menu opponent: as strong as the tournament's No. 2 seed (no quirks, no big serve)
-  LEVELS.max = { ...levelFor({ n: '最強', r: seedRating(2), st: 'all' }), name: '最強' };
+  LEVELS.max = { ...levelFor({ n: 'max', r: seedRating(2), st: 'all' }), name: TL('最強', 'Terkuat') };
   const BOARD_HTML = $('board').innerHTML;
   const pickOne = (sel, attr, val) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('on', b.dataset[attr] === val));
   document.querySelectorAll('[data-venue]').forEach(b => (b.onclick = () => { venue = VENUES[b.dataset.venue]; pickOne('[data-venue]', 'venue', b.dataset.venue); }));
@@ -3219,7 +3238,7 @@
   $('toTour').onclick = () => showTour();
   $('tourNew').onclick = () => {
     const t = loadTour();
-    if (t && !t.out && t.res.length < 7 && t.res.length > 0 && !confirm('今のトーナメントを捨てて、新しく始めますか？')) return;
+    if (t && !t.out && t.res.length < 7 && t.res.length > 0 && !confirm(TL('今のトーナメントを捨てて、新しく始めますか？', 'Buang turnamen sekarang dan mulai yang baru?'))) return;
     tour = newTour(); saveTour(); showTour();
   };
   $('tourCont').onclick = () => { tour = loadTour(); if (tour) { tour.venue in VENUES || (tour.venue = 'mel'); showTour(); } else refreshTourButtons(); };
