@@ -366,7 +366,7 @@
     } catch (e) {}
   }
   // ---- hit and bounce sounds, synthesised sample by sample ----
-  // No pitched tones at all (those sound like an instrument): a real hit is a burst of noise -- a sharp crack,
+  // No pitched tones at all (those sound like an instrument): a real hit is a burst of noise -- a soft click,
   // a short hollow "pock" band around 1 kHz, a dull low body, a quick airy tail, and on spin shots the strings
   // brushing the ball. Each band is a resonant filter on white noise, so there is no note to hear.
   function biquad(x, type, f0, Q, sr) {
@@ -394,20 +394,20 @@
   function hitBuffer(power, kind) {
     const sr = audio.sampleRate, n = Math.floor(sr * .12), j = 1 + (Math.random() - .5) * .12;
     const crisp = kind === 'flat' || kind === 'smash', soft = kind === 'slice' || kind === 'drop';
-    // the impact: a fast rise and a ~4 ms fall, with a faint 25 ms tail
-    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0003)) * (Math.exp(-t / (soft ? .0045 : .0035)) + .1 * Math.exp(-t / .025)); });
+    // the impact: a soft ~1 ms rise (an instant rise clicks like a pop) and a ~4 ms fall, with a faint 25 ms tail
+    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0011)) * (Math.exp(-t / (soft ? .0045 : .0035)) + .1 * Math.exp(-t / .025)); });
     const pock = biquad(imp, 'bp', (soft ? 820 : crisp ? 1150 : 1000) * (1 - power * .1) * j, 1.1, sr);
     const ring = biquad(imp, 'bp', 2700 * j, 1.4, sr);
     const body = biquad(imp, 'lp', 420, .7, sr);
-    const crack = biquad(noiseArr(n, i => Math.exp(-i / sr / .0007)), 'hp', 3500, .7, sr);
+    const crack = biquad(noiseArr(n, i => (1 - Math.exp(-i / sr / .0005)) * Math.exp(-i / sr / .0012)), 'bp', 3000, .8, sr);
     const brushAmt = soft ? .5 : kind === 'top' || kind === 'lob' ? .25 + power * .1 : .05;
     const brush = biquad(noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .003)) * Math.exp(-t / .03); }), 'hp', 2800, .7, sr);
-    return mixToBuffer(n, [[pock, 1], [ring, .35], [body, .55 + power * .4 - (soft ? .25 : 0)], [crack, crisp ? .9 : .55], [brush, brushAmt]]);
+    return mixToBuffer(n, [[pock, 1], [ring, .12], [body, .7 + power * .4 - (soft ? .25 : 0)], [crack, crisp ? .22 : .12], [brush, brushAmt]]);
   }
   function bounceBuffer(impact) {
     const sr = audio.sampleRate, n = Math.floor(sr * .09);
-    const c = venue.clay ? { f: 520, dec: .006, crack: .1, grit: .55 } : venue.grass ? { f: 380, dec: .005, crack: .05, grit: .2 } : { f: 700, dec: .0045, crack: .45, grit: .12 };
-    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0004)) * Math.exp(-t / c.dec); });
+    const c = venue.clay ? { f: 520, dec: .006, crack: .1, grit: .55 } : venue.grass ? { f: 380, dec: .005, crack: .05, grit: .2 } : { f: 700, dec: .0045, crack: .2, grit: .12 };
+    const imp = noiseArr(n, i => { const t = i / sr; return (1 - Math.exp(-t / .0009)) * Math.exp(-t / c.dec); });
     const thud = biquad(imp, 'bp', c.f * (1 + (Math.random() - .5) * .1), .9, sr);
     const low = biquad(imp, 'lp', 300, .7, sr);
     const crack = biquad(noiseArr(n, i => Math.exp(-i / sr / .0006)), 'hp', 3000, .7, sr);
@@ -426,7 +426,7 @@
     if (muted) return;
     try {
       ac();
-      playBuf(hitBuffer(power, kind), (.42 + power * .38) * (far ? .6 : 1), far ? .07 : 0, far ? 3200 : 0);
+      playBuf(hitBuffer(power, kind), (.32 + power * .26) * (far ? .6 : 1), far ? .07 : 0, far ? 2600 : 3800);
     } catch (e) {}
   };
   // the swing itself: a whoosh rising into contact on hard shots
@@ -653,7 +653,7 @@
       Object.assign(cpu, { x: CX + (dc ? -2.6 : 2.6), y: -.8 });
     } else {
       Object.assign(cpu, { x: CX + (dc ? -.9 : .9), y: -.4 });
-      Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
+      Object.assign(player, { x: CX + (dc ? 3.1 : -2.2), y: L + .8 }); // shaded right: a right-hander's slice runs away wide to the right
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
     player.slide = cpu.slide = player.anim = cpu.anim = 0; cpu.rush = false; if (!keepVoice) quietForPoint();
