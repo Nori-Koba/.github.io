@@ -145,6 +145,7 @@
       </div>
       <label><input type="checkbox" id="auto"> オートスイング（ボタンを押していなくても自動で打つ）</label>
       <label id="liteRow" class="hidden"><input type="checkbox" id="lite3d"> 軽量モード（3D が重いとき。遅い端末では自動で ON）</label>
+      <label><input type="checkbox" id="replays"> 名場面リプレイ（長いラリー・大事なポイント・豪快なエースのときだけ）</label>
       <label><input type="checkbox" id="use2d"> 2D 表示にする（いちばん軽い。古い端末向け）</label>
       <p style="margin-top:10px"><b>相手の強さを選んでスタート</b></p>
       <div class="btns">
@@ -502,7 +503,7 @@
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; charge = null; ptr = null; });
   let ptr = null, mouseShot = null;
   addEventListener('keydown', e => {
-    if (GL && GL.replaying()) { pauseT = Math.max(.6, pauseT - GL.stopReplay()); return; } // any key skips a replay
+    if (GL && GL.replaying()) { GL.stopReplay(); pauseT = Math.min(pauseT, .15); return; } // any key skips a replay
     const k = e.key.toLowerCase();
     if (!keys[k] && KEYMAP[k]) press(KEYMAP[k]);
     if (MOVE_KEYS.includes(k)) ptr = null; // keyboard takes over from the mouse until it moves again
@@ -526,7 +527,7 @@
   }
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
-    if (GL && GL.replaying()) { pauseT = Math.max(.6, pauseT - GL.stopReplay()); return; }
+    if (GL && GL.replaying()) { GL.stopReplay(); pauseT = Math.min(pauseT, .15); return; }
     setPtr(e);
     if (e.pointerType === 'mouse') {
       mouseShot = e.button === 1 ? 'flat' : e.button === 2 ? (e.shiftKey ? 'drop' : 'slice') : (e.shiftKey ? 'lob' : 'top');
@@ -542,7 +543,7 @@
   canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') ptr = null; });
   document.querySelectorAll('#shots button').forEach(b => {
     const s = b.dataset.shot;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (GL && GL.replaying()) { pauseT = Math.max(.6, pauseT - GL.stopReplay()); return; } b.setPointerCapture(e.pointerId); b.classList.add('on'); press(s); });
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (GL && GL.replaying()) { GL.stopReplay(); pauseT = Math.min(pauseT, .15); return; } b.setPointerCapture(e.pointerId); b.classList.add('on'); press(s); });
     const up = () => { if (b.classList.contains('on')) { b.classList.remove('on'); release(s); } };
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
   });
@@ -1116,7 +1117,9 @@
       }
     } else {
       const ace = ball.serve ? 'サービスエース!' : null;
-      replayAsk = true;
+      // replays are for highlights only: a long rally, a big ace, or a winner on a break / set / match point
+      const highlight = rally >= 7 || (ace && (ball.serveKmh || 0) >= 195) || bigPoint() !== '';
+      replayAsk = replaysOn && highlight && pointsSinceReplay >= 4;
       pointTo(ball.last, ace || (ball.last === 'P' ? 'ナイスショット!' : '取れなかった…'));
     }
   }
@@ -1165,10 +1168,12 @@
     if (a >= 3 && b >= 3) return a === b ? 'Deuce' : `Advantage, ${NAME[a > b ? server() : other(server())]}`;
     return a === b ? `${N[a]} all` : `${N[a]}, ${N[b]}`;
   }
-  let replayAsk = false;
+  let replayAsk = false, pointsSinceReplay = 99, replaysOn = true;
+  try { replaysOn = localStorage.getItem('bumpyReplays') !== 'off'; } catch (e) {}
   function pause(title, sub, sec, cb) {
     state = 'pause'; msg = { title, sub }; pauseT = sec; pauseCb = cb;
-    if (replayAsk) { replayAsk = false; if (GL && !practice) pauseT += GL.replay(); }
+    pointsSinceReplay++;
+    if (replayAsk) { replayAsk = false; if (GL && !practice) { const d = GL.replay(); if (d) { pauseT += d; pointsSinceReplay = 0; } } }
   }
 
   function pointTo(w, label) {
@@ -2502,6 +2507,7 @@
           ctx.fillStyle = '#fff'; ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
           ctx.fillText('▶ REPLAY', 26, H - 47);
           ctx.font = '12px system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(coarse ? 'タップでスキップ' : 'キーでスキップ', 16, H - 20);
+          ctx.textAlign = 'center'; drawMsg();
           return;
         }
       }
@@ -2632,6 +2638,9 @@
       ctx.fillStyle = '#fff'; ctx.fillText(text, W / 2, y);
       if (t2) { ctx.font = 'bold 14px system-ui, sans-serif'; ctx.fillStyle = '#ffd166'; ctx.fillText(t2, W / 2, y - 34); }
     }
+    drawMsg();
+  }
+  function drawMsg() {
     if (msg) {
       const y = coarse ? H * .5 : H - 150;
       ctx.font = 'bold 28px system-ui, sans-serif';
@@ -3082,7 +3091,7 @@
       }
       function replayFrame(now) {
         const r = replay, e = now - r.start;
-        if (e >= r.dur) { replay = null; return false; }
+        if (e >= r.dur) { replay = null; if (state === 'pause') pauseT = Math.min(pauseT, .15); return false; }
         const tr = r.t0 + e * SLOW;
         while (r.i < r.frames.length - 1 && rec[r.frames[r.i + 1] * STRIDE] <= tr) r.i++;
         const [bx, by, bz] = applyRec(r.frames[r.i]);
@@ -3170,6 +3179,8 @@
   try { want2d = localStorage.getItem('bumpyRender') === '2d'; } catch (e) {}
   GL = want2d ? null : initGL();
   $('use2d').checked = !GL;
+  $('replays').checked = replaysOn;
+  $('replays').onchange = e => { replaysOn = e.target.checked; try { localStorage.setItem('bumpyReplays', replaysOn ? 'on' : 'off'); } catch (err) {} };
   $('use2d').onchange = e => { try { localStorage.setItem('bumpyRender', e.target.checked ? '2d' : '3d'); } catch (err) {} location.reload(); };
   if (GL) {
     document.body.classList.add('gl3d'); GL.resize();
