@@ -229,9 +229,12 @@
   const CW = 8.23, L = 23.77, CX = CW / 2, NET_Y = L / 2, SVC = 6.40, NET_H = 0.914, ALLEY = 1.37;
   const G = 9.8, TS = 0.85, CAM_BACK = 16;
   const PSPEED = 8.5, SWING = 0.28, FULL_CHARGE = .9, HOP = .22;
-  // how far from your body each stroke can reach (m): topspin needs the ball close, slice can stretch
-  const REACHES = { top: 1.05, flat: 1.2, smash: 1.3, lob: 1.4, drop: 1.5, slice: 1.8 };
+  // how far from your body each stroke can reach (m): a smash and the touch shots need the ball right
+  // there, a full topspin swing covers more, and a slice can stretch furthest
+  const REACHES = { smash: .9, drop: 1, lob: 1.1, flat: 1.2, top: 1.35, slice: 1.8 };
   const reachOf = type => REACHES[type] || 1.2;
+  // a high ball out of the air becomes a smash (unless you lob or drop it), so the smash reach applies
+  const hitReach = type => (ball.bounces === 0 && ball.z > 2.1 && type !== 'lob' && type !== 'drop' ? REACHES.smash : reachOf(type));
   const BALL_TS = 1;   // rallies run at real ball speed too
   const SERVE_TS = 1;  // serves fly at full speed: returners only get a step or two
   // returning a serve: the faster it comes, the later you react and the fewer steps you get
@@ -1892,17 +1895,17 @@
 
     if (state === 'rally') {
       const dp = d2(ball, player), reachable = canHit('P') && ball.z < 3.2;
-      if (charge && reachable && dp < reachOf(charge.type) * .95 && player.cool <= 0) fireSwing(); // charged shot fires on contact
+      if (charge && reachable && dp < hitReach(charge.type) * .95 && player.cool <= 0) fireSwing(); // charged shot fires on contact
       else if (!charge && $('auto').checked && reachable && ball.z < 2.6 && player.cool <= 0) {
         // auto swing: topspin when the ball is close, a defensive slice when you have to stretch
-        const t = dp < reachOf('top') * .9 ? 'top' : dp < reachOf('slice') * .9 ? 'slice' : null;
+        const t = dp < hitReach('top') * .9 ? 'top' : dp < hitReach('slice') * .9 ? 'slice' : null;
         if (t) {
           player.shot = t; player.power = .45; player.swing = SWING; player.cool = .42; player.aimX = openCourt(); player.aimD = 0; player.closest = null;
           startAnim(player, strokeKind(player), t);
         }
       }
       // contact happens where the ball passes closest to you during the swing, not where it enters the ring
-      const inRing = reachable && dp < reachOf(player.shot);
+      const inRing = reachable && dp < hitReach(player.shot);
       if (player.swing > 0 && inRing && (player.closest == null || dp < player.closest)) player.closest = dp;
       else if (player.closest != null && (!inRing || dp > player.closest || player.swing <= 0)) {
         if (reachable) playerHit(player.closest);
@@ -2607,7 +2610,7 @@
       };
       const inRange = r => canHit('P') && ball.z < 3.2 && d2(ball, player) < r;
       if (charge && !charge.serve) {
-        const r = reachOf(charge.type), on = inRange(r);
+        const r = hitReach(charge.type), on = inRange(r);
         ring(r, SHOTS[charge.type].color, .95, [], on ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)');
       } else {
         ring(reachOf('slice'), SHOTS.slice.color, .55, [6, 5], null);
