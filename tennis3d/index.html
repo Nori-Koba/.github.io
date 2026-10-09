@@ -111,7 +111,7 @@
 
   <div class="overlay" id="menu">
     <div class="card">
-      <h2>🎾 Bumpy Tennis 3D <small style="font-size:13px;color:var(--sub)">開発中・段階 1</small></h2>
+      <h2>🎾 Bumpy Tennis 3D <small style="font-size:13px;color:var(--sub)">開発中・段階 2</small></h2>
       <p>CPU と 1 対 1 のテニス勝負！</p>
       <p style="margin:8px 0 4px"><b>会場</b></p>
       <div class="btns venues" style="margin-top:0">
@@ -343,19 +343,84 @@
       });
     } catch (e) {}
   }
-  // racket hit: a contact click, the ball's hollow ring and a short bright string ping; harder = lower and fuller
-  const sHit = power => {
-    const v = .55 + power * .45, k = 1 - power * .12;
-    noise(.012, 'highpass', 2800, .7, .5 * v);
-    modes([[640 * k, .075, 1], [1320 * k, .045, .5], [2480 * k, .03, .25], [3600, .018, .16]], .32 * v);
-    noise(.05, 'bandpass', 900 * k, 1.5, .14 * v, .002);
+  // ---- hit and bounce sounds, synthesised sample by sample ----
+  // A real hit is not a ringing tone: a sharp contact click, the ball's short "pock" that dies within a few cycles,
+  // a low "thock" from the frame, an airy tail, and on spin shots the strings brushing up the ball.
+  function hitBuffer(power, kind) {
+    const sr = audio.sampleRate, n = Math.floor(sr * .16), b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
+    const j = 1 + (Math.random() - .5) * .1; // no two hits sound exactly alike
+    const f1 = (kind === 'flat' || kind === 'smash' ? 1180 : kind === 'slice' || kind === 'drop' ? 880 : 1020) * (1 - power * .12) * j;
+    const thump = kind === 'slice' || kind === 'drop' ? .3 : .75 + power * .55;
+    const brush = kind === 'slice' || kind === 'drop' ? .55 : kind === 'top' || kind === 'lob' ? .25 + power * .1 : .06;
+    const click = kind === 'flat' || kind === 'smash' ? 1.1 : .8;
+    let lp = 0, lp2 = 0, peak = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, w = Math.random() * 2 - 1;
+      lp += (w - lp) * .22; lp2 += (w - lp2) * .6;
+      let v = w * Math.exp(-t / .0011) * click;                                    // contact click
+      v += Math.sin(6.2832 * f1 * t) * Math.exp(-t / .0055) * (.85 + .35 * lp);    // the pock: 5-6 cycles, not a ring
+      v += Math.sin(6.2832 * f1 * 2.27 * t) * Math.exp(-t / .0022) * .28;
+      v += Math.sin(6.2832 * 150 * j * t) * Math.exp(-t / .017) * thump * .65;     // frame thock
+      v += lp * Math.exp(-t / .028) * .3;                                          // air
+      v += (w - lp2) * brush * Math.exp(-t / .03) * (1 - Math.exp(-t / .003));     // strings brushing the ball
+      d[i] = v; peak = Math.max(peak, Math.abs(v));
+    }
+    for (let i = 0; i < n; i++) d[i] /= peak;
+    return b;
+  }
+  function bounceBuffer(impact) {
+    const sr = audio.sampleRate, n = Math.floor(sr * .1), b = audio.createBuffer(1, n, sr), d = b.getChannelData(0);
+    const c = venue.clay ? { f: 210, tau: .006, click: .25, dust: .6, cut: .08 } : venue.grass ? { f: 170, tau: .005, click: .1, dust: .25, cut: .05 }
+      : { f: 260, tau: .01, click: .7, dust: .2, cut: .3 };
+    const j = 1 + (Math.random() - .5) * .1;
+    let lp = 0, peak = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, w = Math.random() * 2 - 1;
+      lp += (w - lp) * c.cut;
+      let v = w * Math.exp(-t / .0009) * c.click;                                  // ball meets the court
+      v += Math.sin(6.2832 * c.f * j * t) * Math.exp(-t / c.tau);                  // dull "thup"
+      v += Math.sin(6.2832 * c.f * 3.1 * j * t) * Math.exp(-t / (c.tau * .4)) * .3;
+      v += lp * Math.exp(-t / .02) * c.dust * 3;                                   // clay spray / grass
+      d[i] = v; peak = Math.max(peak, Math.abs(v));
+    }
+    for (let i = 0; i < n; i++) d[i] /= peak;
+    return b;
+  }
+  function playBuf(buf, vol, delay = 0, cutoff = 0) {
+    const src = audio.createBufferSource(), g = audio.createGain(), t = audio.currentTime + delay;
+    src.buffer = buf; g.gain.value = vol;
+    if (cutoff) { const f = audio.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; src.connect(f).connect(g); }
+    else src.connect(g);
+    g.connect(bus); src.start(t);
+  }
+  // racket hit; the far player's shots arrive ~70 ms later (sound travels 24 m) and a little duller
+  const sHit = (power, kind = 'top', far = false) => {
+    if (muted) return;
+    try {
+      ac();
+      playBuf(hitBuffer(power, kind), (.42 + power * .38) * (far ? .6 : 1), far ? .07 : 0, far ? 3200 : 0);
+    } catch (e) {}
   };
-  // bounce: dry on hard courts, dull on clay, a soft thud on grass
+  // the swing itself: a whoosh rising into contact on hard shots
+  const sWhoosh = (power, lead = .12) => {
+    if (muted || power < .35) return;
+    try {
+      ac();
+      const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain(), t = audio.currentTime;
+      src.buffer = longBuf; f.type = 'bandpass'; f.Q.value = 1.4;
+      f.frequency.setValueAtTime(350, t); f.frequency.exponentialRampToValueAtTime(1400, t + lead);
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.05 * power, t + lead * .9); g.gain.exponentialRampToValueAtTime(.0001, t + lead + .06);
+      src.connect(f).connect(g).connect(bus); src.start(t, Math.random() * 2); src.stop(t + lead + .1);
+    } catch (e) {}
+  };
+  // bounce: a dry "thup" on hard courts, a soft spray on clay, a muffled thud on grass
   const sBounce = impact => {
-    const c = venue.clay ? { f: 230, cut: 900, v: .5 } : venue.grass ? { f: 200, cut: 600, v: .3 } : { f: 320, cut: 2200, v: .8 };
-    const v = Math.min(1, impact / 12) * c.v;
-    noise(.03, 'lowpass', c.cut, .7, .45 * v);
-    modes([[c.f, .05, 1], [c.f * 2.9, .025, .35]], .25 * v);
+    if (muted) return;
+    try {
+      ac();
+      const v = Math.min(1, impact / 12) * (venue.clay ? .5 : venue.grass ? .3 : .75);
+      playBuf(bounceBuffer(impact), .55 * v);
+    } catch (e) {}
   };
   const sSqueak = vol => { if (venue.clay || venue.grass) return; tone(2700, .09, 'sine', .05 * vol, 0, 1900); tone(3400, .06, 'sine', .025 * vol, .01, 2500); };
   const sWin = () => [523, 659, 784].forEach((f, i) => tone(f, .14, 'triangle', .1, i * .09));
@@ -702,7 +767,7 @@
     const s = who === 'P' ? player : cpu;
     startAnim(s, 'serve', type, .32);
     (who === 'P' ? cpu : player).hop = HOP;
-    sHit(power);
+    sHit(power, type === 'top' ? 'top' : 'flat', who === 'C');
     popupAt(s.x, s.y, 2.6, `${sh.name}サーブ ${kmh}km/h`, sh.color);
     if (who === 'P') {
       maxSpeed = Math.max(maxSpeed, kmh);
@@ -745,6 +810,7 @@
     if (player.cool > 0) { charge = null; return; }
     player.shot = charge.type; player.power = Math.min(1, charge.t / FULL_CHARGE);
     startAnim(player, strokeKind(player), charge.type);
+    sWhoosh(player.power);
     player.swing = SWING; player.cool = .42; player.aimX = aimX; player.aimD = aimD; player.closest = null;
     charge = null;
   }
@@ -814,7 +880,7 @@
     if (player.anim > player.animDur - ct) player.anim = player.animDur - ct;
     ball.shotKmh = kmh;
     rally++; maxRally = Math.max(maxRally, rally); maxSpeed = Math.max(maxSpeed, kmh);
-    sHit(smash ? 1 : power);
+    sHit(smash ? 1 : power, smash ? 'smash' : type);
     const label = smash ? 'スマッシュ!' : sh.name;
     popupAt(player.x, player.y, 2.5, `${label} ${kmh}km/h`, smash ? '#ff5d73' : sh.color);
     ball.chance = scramble && !mishit; // your floater is now a sitter for the CPU
@@ -864,7 +930,7 @@
     Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
     rally++; maxRally = Math.max(maxRally, rally);
     startAnim(cpu, smash ? 'smash' : air ? 'volley' : sideKind(cpu), 'flat', .3);
-    cpu.swing = SWING * .6; cpu.defend = false; player.hop = HOP; sHit(1);
+    cpu.swing = SWING * .6; cpu.defend = false; player.hop = HOP; sHit(1, smash ? 'smash' : 'flat', true);
     popupAt(cpu.x, cpu.y, 2.8, `${smash ? 'スマッシュ' : air ? 'ボレー' : '強打'}! ${kmh}km/h`, '#ff5d73');
   }
 
@@ -913,7 +979,7 @@
     Object.assign(ball, { last: 'C', bounces: 0, serve: false, chance: false });
     rally++; maxRally = Math.max(maxRally, rally);
     startAnim(cpu, ball.z > 2.3 ? 'smash' : sideKind(cpu), type, .3); // the CPU's swing is shown from just before contact
-    cpu.swing = SWING * .6; player.hop = HOP; sHit(power);
+    cpu.swing = SWING * .6; player.hop = HOP; sHit(power, type, true);
     cpu.defend = stretched;
     // a net rusher follows an attacking ball in
     cpu.rush = Q('net') && !stretched && type !== 'lob' && type !== 'drop' && (power > .5 || player.x < 1 || player.x > CW - 1) && Math.random() < .6;
@@ -2116,7 +2182,7 @@
     ctx.fill();
     ctx.strokeStyle = OUTLINE; ctx.lineWidth = Math.max(.7, w * .12); ctx.stroke();
   }
-  function figure(o, kit, ch) {
+  function figure(o, kit, ch, skel = false) {
     const FIG = BASE_FIG * (o.size || 1), BUILD = o.build || 1;
     const { R, Fw } = facing(o);
     const pose = poseOf(o, ch);
@@ -2166,6 +2232,7 @@
     const kneePole = [Fw[0] + md[0] * .5, Fw[1] + md[1] * .5, .1];
     const legL = ik(hipL, ankles[0], .46 * FIG, .42 * FIG, kneePole), legR = ik(hipR, ankles[1], .46 * FIG, .42 * FIG, kneePole);
 
+    if (skel) return { FIG, BUILD, R, Fw, md, yaw, hipL, hipR, shL, shR, neck, head, hand, dir, armR, armL, legL, legR, ankles, feet };
     const base = P(o.x, o.y), s = base.s * FIG;
     const Q = p => P(p[0], p[1], p[2]);
     const parts = [];
@@ -2316,7 +2383,10 @@
     });
     parts.sort((a, b) => a.y - b.y).forEach(p => p.f());
 
-    // charge meter
+    chargeMeter(o, ch);
+  }
+  function chargeMeter(o, ch) {
+    const FIG = BASE_FIG * (o.size || 1), base = P(o.x, o.y), s = base.s * FIG;
     if (ch) {
       const p = Math.min(1, ch.t / ch.full), w = Math.max(44, 1.1 * s), y = P(o.x, o.y, 2.35 * FIG).y, col = SHOTS[ch.type].color;
       ctx.fillStyle = 'rgba(15,20,40,.75)'; ctx.fillRect(base.x - w / 2 - 2, y - 5, w + 4, 10);
@@ -2503,7 +2573,7 @@
       { y: player.y, f: () => figure(player, KIT_P, charge) },
     ];
     if (state !== 'menu') items.push({ y: ball.y + .01, f: drawBall });
-    if (GL) { GL.frame(); if (state !== 'menu') drawTrail(); }
+    if (GL) { GL.frame(); if (state !== 'menu') drawTrail(); chargeMeter(player, charge); }
     else items.sort((a, b) => a.y - b.y).forEach(i => i.f());
 
     popups.forEach(p => {
@@ -2638,6 +2708,134 @@
         s.mesh.position.set(CX + ((a.x + b.x) / 2 - W / 2) * d / F, camH - ((a.y + b.y) / 2 - hy) * d / F, wy);
         s.mesh.visible = true;
       }
+      // ---- stage 2: the players as 3D bodies, posed every frame from the same skeleton the 2D drawing uses ----
+      const V = p => new T.Vector3(p[0], p[2], p[1]);
+      const UP = new T.Vector3(0, 1, 0), tmpQ = new T.Quaternion(), tmpM = new T.Matrix4();
+      const gridTex = (() => {
+        const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+        g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2;
+        for (let i = 4; i < 64; i += 8) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 64); g.moveTo(0, i); g.lineTo(64, i); g.stroke(); }
+        return new T.CanvasTexture(c);
+      })();
+      function makeBody() {
+        const mats = {
+          skin: new T.MeshStandardMaterial({ roughness: .62 }), shirt: new T.MeshStandardMaterial({ roughness: .85 }),
+          trim: new T.MeshStandardMaterial({ roughness: .8 }), shorts: new T.MeshStandardMaterial({ roughness: .85 }),
+          hair: new T.MeshStandardMaterial({ roughness: .95 }), cap: new T.MeshStandardMaterial({ roughness: .8 }),
+          shoe: new T.MeshStandardMaterial({ roughness: .55 }), sock: new T.MeshStandardMaterial({ color: 0xf2f2f2, roughness: .9 }),
+          sole: new T.MeshStandardMaterial({ color: 0xdedede, roughness: .7 }), dark: new T.MeshStandardMaterial({ color: 0x1b1b1b, roughness: .5 }),
+          racket: new T.MeshStandardMaterial({ roughness: .35, metalness: .25 }),
+          strings: new T.MeshBasicMaterial({ map: gridTex, transparent: true, opacity: .8, side: T.DoubleSide, depthWrite: false }),
+        };
+        const g = new T.Group(); scene.add(g);
+        const add = (geo, mat) => { const m = new T.Mesh(geo, mat); m.castShadow = true; g.add(m); return m; };
+        // a limb segment: unit cylinder from bottom (start) to top (end) with end/start radius ratio `taper`
+        const segGeo = taper => new T.CylinderGeometry(taper, 1, 1, 14, 1);
+        const sph = new T.SphereGeometry(1, 16, 12);
+        const P2 = {};
+        ['thighL', 'thighR'].forEach(k => (P2[k] = add(segGeo(.66), mats.skin)));
+        ['calfAL', 'calfAR'].forEach(k => (P2[k] = add(segGeo(1.12), mats.skin)));
+        ['calfBL', 'calfBR'].forEach(k => (P2[k] = add(segGeo(.5), mats.skin)));
+        ['kneeL', 'kneeR', 'elbowL', 'elbowR', 'handL', 'handR'].forEach(k => (P2[k] = add(sph, mats.skin)));
+        ['shortL', 'shortR'].forEach(k => (P2[k] = add(segGeo(.92), mats.shorts)));
+        P2.pelvis = add(sph, mats.shorts);
+        ['sockL', 'sockR'].forEach(k => (P2[k] = add(segGeo(1), mats.sock)));
+        ['shoeL', 'shoeR'].forEach(k => (P2[k] = add(new T.BoxGeometry(1, 1, 1), mats.shoe)));
+        ['soleL', 'soleR'].forEach(k => (P2[k] = add(new T.BoxGeometry(1, 1, 1), mats.sole)));
+        P2.torso = add(new T.CylinderGeometry(1, .8, 1, 20, 1), mats.shirt);
+        P2.chest = add(sph, mats.shirt);
+        ['shoulderL', 'shoulderR'].forEach(k => (P2[k] = add(sph, mats.shirt)));
+        ['upperL', 'upperR'].forEach(k => (P2[k] = add(segGeo(.8), mats.skin)));
+        ['foreL', 'foreR'].forEach(k => (P2[k] = add(segGeo(.75), mats.skin)));
+        ['sleeveL', 'sleeveR'].forEach(k => (P2[k] = add(segGeo(.9), mats.shirt)));
+        P2.neck = add(segGeo(.9), mats.skin);
+        P2.head = add(sph, mats.skin);
+        P2.hair = add(new T.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * .55), mats.hair);
+        P2.cap = add(new T.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI * .45), mats.cap);
+        P2.visor = add(new T.CylinderGeometry(1, 1, 1, 16, 1, false, 0, Math.PI), mats.cap);
+        P2.band = add(new T.CylinderGeometry(1, 1, 1, 20, 1, true), mats.trim);
+        ['eyeL', 'eyeR'].forEach(k => (P2[k] = add(sph, mats.dark)));
+        P2.grip = add(segGeo(1), mats.dark);
+        ['throatL', 'throatR'].forEach(k => (P2[k] = add(segGeo(1), mats.racket)));
+        P2.frame = add(new T.TorusGeometry(1, .07, 6, 30), mats.racket);
+        P2.strings = new T.Mesh(new T.CircleGeometry(1, 28), mats.strings); g.add(P2.strings);
+        let kitNow = null;
+        const seg = (m, a, b, r) => { // place a unit cylinder from a to b with base radius r
+          const d = new T.Vector3().subVectors(b, a), len = d.length() || 1e-4;
+          m.position.copy(a).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(UP, d.divideScalar(len)); m.scale.set(r, len, r);
+        };
+        const ball3 = (m, p, r, sy = 1) => { m.position.copy(p); m.scale.set(r, r * sy, r); };
+        const basis = (m, X, Y, Z) => { tmpM.makeBasis(X, Y, Z); m.quaternion.setFromRotationMatrix(tmpM); };
+        return {
+          group: g,
+          update(o, kit, ch) {
+            if (kitNow !== kit) {
+              kitNow = kit;
+              ['skin', 'shirt', 'trim', 'shorts', 'hair', 'cap', 'shoe', 'racket'].forEach(k => mats[k].color.set(kit[k] || (k === 'cap' ? kit.shirt : '#888')));
+            }
+            const k = figure(o, kit, ch, true), F = k.FIG, B = k.BUILD;
+            const hipL = V(k.hipL), hipR = V(k.hipR), shL = V(k.shL), shR = V(k.shR);
+            const hipC = hipL.clone().add(hipR).multiplyScalar(.5), shC = shL.clone().add(shR).multiplyScalar(.5);
+            // the body's frame: X to its right, Y up the spine, Z out of its back
+            const X = new T.Vector3().subVectors(shR, shL).normalize(), Y0 = new T.Vector3().subVectors(shC, hipC).normalize();
+            const Y = Y0.clone().addScaledVector(X, -X.dot(Y0)).normalize(), Z = new T.Vector3().crossVectors(X, Y);
+            // legs
+            [['L', k.legL, k.ankles[0], k.feet[0], hipL], ['R', k.legR, k.ankles[1], k.feet[1], hipR]].forEach(([s, leg, an, ft, hip]) => {
+              const kn = V(leg.joint), ank = V(an), foot = V(ft), calfMid = kn.clone().lerp(ank, .35);
+              seg(P2['thigh' + s], hip, kn, .1 * F * B); ball3(P2['knee' + s], kn, .066 * F * B);
+              seg(P2['calfA' + s], kn, calfMid, .066 * F * B); seg(P2['calfB' + s], calfMid, ank, .074 * F * B);
+              seg(P2['short' + s], hip, hip.clone().lerp(kn, .5), .118 * F * B);
+              seg(P2['sock' + s], ank.clone().lerp(kn, .16), ank, .042 * F * B);
+              // shoe, pointing where the player is facing and moving
+              const fw = new T.Vector3(k.Fw[0] + k.md[0] * .35, 0, k.Fw[1] + k.md[1] * .35).normalize(), back = fw.clone().negate();
+              const right = new T.Vector3().crossVectors(UP, back);
+              const c = foot.clone().addScaledVector(fw, .055 * F); c.y = foot.y + .04 * F;
+              basis(P2['shoe' + s], right, UP, back); P2['shoe' + s].position.copy(c); P2['shoe' + s].scale.set(.1 * F, .07 * F, .27 * F);
+              basis(P2['sole' + s], right, UP, back); P2['sole' + s].position.copy(c).setY(foot.y + .008 * F); P2['sole' + s].scale.set(.105 * F, .022 * F, .28 * F);
+            });
+            basis(P2.pelvis, X, Y, Z); P2.pelvis.position.copy(hipC).addScaledVector(Y, .02 * F); P2.pelvis.scale.set(.19 * F * B, .11 * F, .13 * F);
+            // torso: tapers from the shoulders to the waist; the chest fills out the top
+            basis(P2.torso, X, Y, Z); P2.torso.position.copy(hipC).lerp(shC, .5).addScaledVector(Y, -.02 * F);
+            P2.torso.scale.set(.2 * F * B, hipC.distanceTo(shC) * 1.08, .115 * F * B);
+            basis(P2.chest, X, Y, Z); P2.chest.position.copy(shC).addScaledVector(Y, -.12 * F); P2.chest.scale.set(.2 * F * B, .15 * F, .12 * F * B);
+            ball3(P2.shoulderL, shL, .068 * F * B); ball3(P2.shoulderR, shR, .068 * F * B);
+            // arms
+            [['R', k.armR, shR], ['L', k.armL, shL]].forEach(([s, arm, sh]) => {
+              const el = V(arm.joint), wr = V(arm.end);
+              seg(P2['upper' + s], sh, el, .055 * F * B); ball3(P2['elbow' + s], el, .043 * F * B);
+              seg(P2['fore' + s], el, wr, .045 * F * B); ball3(P2['hand' + s], wr, .045 * F);
+              seg(P2['sleeve' + s], sh, sh.clone().lerp(el, .45), .075 * F * B);
+            });
+            // neck and head
+            const nk = V(k.neck), hd = V(k.head);
+            seg(P2.neck, nk.clone().addScaledVector(Y, -.04 * F), hd, .045 * F);
+            const r = .118 * F;
+            [P2.head, P2.hair, P2.cap, P2.visor, P2.band].forEach(m => basis(m, X, Y, Z));
+            P2.head.position.copy(hd); P2.head.scale.set(r * .92, r * 1.08, r);
+            P2.hair.position.copy(hd).addScaledVector(Y, r * .05).addScaledVector(Z, r * .05); P2.hair.scale.set(r * .97, r * 1.12, r * 1.04);
+            const capOn = o === player || kit.head === 'cap', bandOn = !capOn && kit.head !== 'none';
+            P2.cap.visible = P2.visor.visible = capOn; P2.band.visible = bandOn;
+            if (capOn) {
+              P2.cap.position.copy(hd).addScaledVector(Y, r * .12); P2.cap.scale.set(r * 1.01, r * 1.05, r * 1.06);
+              P2.visor.position.copy(hd).addScaledVector(Y, r * .32).addScaledVector(Z, -r * .55); P2.visor.scale.set(r * .95, r * .06, r * .9);
+              P2.visor.quaternion.multiply(tmpQ.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI));
+            }
+            if (bandOn) { P2.band.position.copy(hd).addScaledVector(Y, r * .38); P2.band.scale.set(r * 1.0, r * .22, r * 1.03); }
+            [['eyeL', -1], ['eyeR', 1]].forEach(([e, sx]) => ball3(P2[e], hd.clone().addScaledVector(X, sx * r * .35).addScaledVector(Y, r * .08).addScaledVector(Z, -r * .9), r * .1));
+            // racket: grip and throat along the racket direction, the head's face square to the body's forward
+            const dir = new T.Vector3(k.dir[0], k.dir[2], k.dir[1]).normalize(), hand = V(k.hand);
+            const at = q => hand.clone().addScaledVector(dir, q * F);
+            seg(P2.grip, at(-.08), at(.3), .016 * F);
+            const fwd = Z.clone().negate(), n = fwd.addScaledVector(dir, -fwd.dot(dir));
+            if (n.lengthSq() < 1e-4) n.copy(X); n.normalize();
+            const side = new T.Vector3().crossVectors(n, dir).normalize(), ctr = at(.53), len = .175 * F, wid = .135 * F;
+            seg(P2.throatL, at(.3), ctr.clone().addScaledVector(dir, -len * .82).addScaledVector(side, wid * .55), .009 * F);
+            seg(P2.throatR, at(.3), ctr.clone().addScaledVector(dir, -len * .82).addScaledVector(side, -wid * .55), .009 * F);
+            [P2.frame, P2.strings].forEach(m => { basis(m, side, dir, n); m.position.copy(ctr); m.scale.set(wid, len, wid * .9); });
+          },
+        };
+      }
+      const bodies = { player: makeBody(), cpu: makeBody() };
       let venueSet = null;
       function setVenue(V) {
         venueSet = V;
@@ -2673,8 +2871,8 @@
           sprites.forEach(s => (s.mesh.visible = false));
           sprite('ump', UMP.x, UMP.y + .02, 2.6, 3.4, drawUmpire);
           judges.forEach((j, i) => sprite('j' + i, j.x, j.y, 1.6, 2.2, () => drawJudge(j)));
-          sprite('cpu', cpu.x, cpu.y, 3.6 * (cpu.size || 1), 3.0 * (cpu.size || 1), () => figure(cpu, cpuKit));
-          sprite('player', player.x, player.y, 3.6, 3.0, () => figure(player, KIT_P, charge));
+          bodies.cpu.update(cpu, cpuKit, null);
+          bodies.player.update(player, KIT_P, charge);
           renderer.render(scene, camera);
         },
       };
