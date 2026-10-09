@@ -126,7 +126,7 @@
         <b>パワーと狙い</b>：ショットのボタンを<b>長押し</b>でためて、離して打つ（ボールが届けば自動で打つ）。<b>ためている間に狙いを決める</b>：キーは押した方向のマスへ（←→で左右、↑で深く、↓で短いアングル）、マウスは相手コートの狙いたい所を指す、指は弾いた方向へ。その間プレイヤーは自動でボールに寄る。強く打つほどアウトしやすい。<br><b>打てる範囲</b>：足元の丸の中のボールだけ打てる。トップスピン（オレンジ）は狭く、スライス（青い点線）は広い。打点は 3 段階：丸の内側＝<b>ナイスショット</b>、真ん中＝普通、ふちギリギリ＝<b>ミスヒットか、ふわっと浮いたチャンスボール</b>（しかもスライディングして戻りが遅れる）。CPU がギリギリで返した浮き球（光る輪）は決めどころ！ 高ければ<b>スマッシュ</b>、腰〜肩の高さならコート後方から<b>ドライブボレー</b>（トップスピン / フラット）でノーバウンドで叩ける。<br>
         <b>サーブ</b>：1 回押してトス → 球種のボタンを<b>長押し</b>でパワーをためて、ボールが<b>一番高いところで離す</b>。ためすぎるとボールが落ちてタイミングがずれる。<b>ファースト</b>はフラット（最速 約210km/h）かスライス（約170km/h、左へ曲がって滑る）。<b>セカンド</b>は必ずスピン（キック）サーブ：ネットを安全に越えて沈み、跳ね上がってぐっと前に伸びる。ほぼ必ず入る。速いサーブほど相手は反応が遅れ、コーナーに決まればエース！
         <div class="shotlist">
-          <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、弾んでぐっと前に伸びる</small></span>
+          <span class="t" style="background:var(--top)">トップスピン</span><span><span class="pc">Z・J・スペース・左クリック</span> <small>ネットを安全に越えて急に落ち、肩の高さまで跳ね上がる</small></span>
           <span class="t" style="background:var(--slice)">スライス</span><span><span class="pc">X・K・右クリック</span> <small>まっすぐ低く滑る。サーブなら左に曲がる</small></span>
           <span class="t" style="background:var(--flat)">フラット</span><span><span class="pc">C・L・ホイールクリック</span> <small>一番速い。でもミスしやすい</small></span>
           <span class="t" style="background:var(--lob)">ロブ</span><span><span class="pc">S・I・Shift+左クリック</span> <small>高く上げて前に出た相手の頭を越す</small></span>
@@ -217,7 +217,7 @@
   };
   // play styles: you hit heavy, dipping topspin; the CPU is a topspin baseliner who mixes in a lot of skidding slice
   const STYLE = {
-    P: { name: 'パワースピン型', top: { mg: .015, bz: .64, bh: 1.03, margin: .35, speed: [32, 45] } },
+    P: { name: 'パワースピン型', top: { mg: .018, bz: .70, bh: .86, margin: .35, speed: [32, 45] } },
     C: { name: 'スライス型',
          slice: { mg: -.005, bz: .5, bh: .86, margin: .22, speed: [25, 33] },
          flat:  { speed: [31, 52] },
