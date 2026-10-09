@@ -775,6 +775,9 @@
       else if (ball.z > 2 && type !== 'top' && type !== 'lob') { err += .5; note = '高い球はトップスピンで!'; }
       else if (ball.z > 1.1 && ball.z < 1.9 && type === 'flat') { speedMul = 1.12; note = '打ちごろ! 強打!'; }
     }
+    // returning a big serve you can only block it back: shorter, slower, through the middle
+    const block = ball.serve && !smash ? clamp(.2 + serveHurry() + (ball.type === 'top' ? .15 : 0), 0, 1) : 0; // fast, or kicking up high
+    if (block) { err += .3 * block; speedMul *= 1 - .3 * block; }
     let tx = goal.x + rand(-err, err) + rand(-.3, .3);
     let ty, opts;
     if (type === 'lob') {
@@ -786,6 +789,7 @@
       opts = { angle: .32 + rand(0, .06), noClear: q < .35 };
     } else {
       ty = (smash ? goal.y + rand(-1, 2.5) : goal.y + rand(-.8, .8)) + rand(-err, err * .4);
+      if (block) { tx = lerp(tx, CX, .45 * block); ty += block * rand(1.5, 4.5); if (block > .5) note = note || 'ブロックリターン'; }
       if (drive) speedMul *= 1.12;
       const speed = smash ? 37 + power * 9 : lerp(sh.speed[0], sh.speed[1], power * .75 + q * .25) * speedMul;
       opts = { speed, noClear: q < .2 };
@@ -867,7 +871,8 @@
     else if (Q('drop') && player.y > NET_Y + 4 && Math.random() < .16) type = 'drop';  // loves the drop shot
     if (ball.z > 2.4) type = 'flat';
     if (stretched) type = 'slice';
-    const sh = styled(type, 'C'), power = stretched ? rand(.1, .35) : rand(...lv.power);
+    const block = ball.serve ? clamp(.2 + serveHurry() + (ball.type === 'top' ? .15 : 0), 0, 1) * (Q('ret') ? .5 : 1) : 0; // a big or high-kicking serve can only be blocked back
+    const sh = styled(type, 'C'), power = (stretched ? rand(.1, .35) : rand(...lv.power)) * (1 - .55 * block);
     let errP = lv.err + (d / lv.reach) * .04 + Math.min(rally, 20) * .002
       + power * power * sh.err * .08
       + (ball.z < .45 ? .07 : 0)                       // low skidding slice is hard to lift
@@ -884,11 +889,12 @@
     const edge = .55 + (1 - lv.aim) * rand(0, 1.8);
     let tx = openLeft ? edge : CW - edge;
     if (stretched) tx = CX + rand(-1.8, 1.8); // a lunging get floats back to the middle
+    else if (block) tx = lerp(tx, CX, .55 * block);
     let ty, opts;
     if (type === 'lob') { ty = L - rand(.6, 3); opts = { angle: rand(.5, .6) }; }
     else if (type === 'drop') { ty = NET_Y + rand(1.5, 3); opts = { angle: rand(.32, .38) }; }
     else if (stretched) { ty = NET_Y + rand(5.5, 8); opts = { angle: rand(.5, .6) }; } // a high floater dropping around the service line
-    else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
+    else { ty = L - (1.3 + (1 - lv.aim) * rand(0, 3.2) + block * rand(1.5, 4.5)); opts = { speed: lerp(sh.speed[0], sh.speed[1], power) }; }
     if (Math.random() < errP) {
       const r = Math.random();
       if (r < .4) tx = Math.random() < .5 ? rand(-1.5, -.15) : CW + rand(.15, 1.5);
