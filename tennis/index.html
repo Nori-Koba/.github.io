@@ -623,7 +623,7 @@
 
   function startMatch(key, opp = null) {
     practice = null; $('quit').classList.remove('hidden');
-    tb = false; tbScore = null;
+    tb = false; tbScore = null; intro = false;
     $('board').innerHTML = BOARD_HTML;
     lvKey = key; lv = LEVELS[key];
     tourOpp = opp; NAME.C = opp ? opp.sur : 'C P U';
@@ -643,7 +643,7 @@
     setupServe();
   }
 
-  function setupServe() {
+  function setupServe(keepVoice) {
     const dc = deuce();
     Object.assign(ball, { live: false, held: true, serve: false, last: null, bounces: 0, rolling: false, trail: [],
                           mg: 0, bz: .7, bh: .85, ax: 0, kick: 0, spin: 0, type: 'flat' });
@@ -656,7 +656,7 @@
       Object.assign(player, { x: CX + (dc ? 2.6 : -2.6), y: L + .8 });
     }
     player.vx = player.vy = cpu.vx = cpu.vy = 0; cpu.plan = null; charge = null; player.feet = cpu.feet = null;
-    player.slide = cpu.slide = player.anim = cpu.anim = 0; cpu.rush = false; quietForPoint();
+    player.slide = cpu.slide = player.anim = cpu.anim = 0; cpu.rush = false; if (!keepVoice) quietForPoint();
     cpuServeT = 1.0;
     state = 'serve';
     updateBoard();
@@ -1477,6 +1477,7 @@
     $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('board').classList.add('hidden'); $('quit').classList.add('hidden');
     $('tour').classList.remove('hidden'); card.scrollTop = 0; state = 'menu';
   }
+  let intro = false; // tournament walk-on: both players stand still on their marks
   function playTourMatch() {
     const r = tour.res.length, e = entrants(r), m = userMatch(r);
     const id = e[2 * m] === 0 ? e[2 * m + 1] : e[2 * m];
@@ -1489,7 +1490,8 @@
     startMatch('normal', { id, ...tour.players[id] });
     // walk-on: the round and court, the umpire introduces the players, the crowd greets them
     const opp = tour.players[id];
-    pause(`${ROUNDS[r]} ・ ${st.court}`, `${TL('あなた', 'Kamu')} vs ${opp.seed ? `[${opp.seed}] ` : ''}${opp.n}`, r >= 4 ? 3.2 : 2.2, () => { state = 'serve'; msg = null; });
+    intro = true;
+    pause(`${ROUNDS[r]} ・ ${st.court}`, `${TL('あなた', 'Kamu')} vs ${opp.seed ? `[${opp.seed}] ` : ''}${opp.n}`, r >= 4 ? 3.2 : 2.2, () => { intro = false; setupServe(true); });
     umpire(`${r === 6 ? 'Ladies and gentlemen, the final. ' : ROUNDS_EN[r] + '. '}${NAME.P}, versus, ${NAME.C}.`, 300);
     crowdClap(r >= 4 ? 1 : .5, r >= 4 ? 3.5 : 2); if (r >= 5) crowdVoice('cheer', .8);
   }
@@ -1822,7 +1824,7 @@
     if (state === 'rally' && ball.live && ball.last === 'P') {
       if (cpu.react > 0) cpu.react -= dt;
       else target = cpu.plan = cpu.plan || planIntercept();
-    } else if (state === 'rally' || state === 'pause') {
+    } else if ((state === 'rally' || state === 'pause') && !intro) {
       // recover to the middle right after hitting; after floating up a sitter, back off deep to defend the smash
       target = { x: CX + (player.x - CX) * .25, y: cpu.defend ? -3.2 : cpu.rush ? NET_Y - 2.4 : -1 };
     }
